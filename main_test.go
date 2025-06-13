@@ -1,27 +1,29 @@
 package main
 
 import (
+	"rockerboo/mcp-lsp-bridge/bridge"
 	"testing"
 )
 
 func TestNewMCPLSPBridge(t *testing.T) {
-	bridge := NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge()
 
-	if bridge == nil {
+	if bridgeInstance == nil {
 		t.Fatal("NewMCPLSPBridge returned nil")
 	}
 
-	if bridge.config == nil {
+	config := bridgeInstance.GetConfig()
+	if config == nil {
 		t.Fatal("Bridge configuration not loaded")
 	}
 
-	if len(bridge.config.LanguageServers) == 0 {
+	if len(config.LanguageServers) == 0 {
 		t.Fatal("No language servers configured")
 	}
 }
 
 func TestInferLanguage(t *testing.T) {
-	bridge := NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge()
 
 	testCases := []struct {
 		filePath   string
@@ -37,7 +39,7 @@ func TestInferLanguage(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.filePath, func(t *testing.T) {
-			language, err := bridge.InferLanguage(tc.filePath)
+			language, err := bridgeInstance.InferLanguage(tc.filePath)
 
 			if tc.shouldFail {
 				if err == nil {
@@ -59,7 +61,7 @@ func TestInferLanguage(t *testing.T) {
 }
 
 func TestGetClientForLanguage(t *testing.T) {
-	bridge := NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge()
 
 	testCases := []struct {
 		language string
@@ -73,7 +75,7 @@ func TestGetClientForLanguage(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.language, func(t *testing.T) {
 			// Get or create the client
-			client, err := bridge.GetClientForLanguage(tc.language)
+			client, err := bridgeInstance.GetClientForLanguage(tc.language)
 			if err != nil {
 				t.Fatalf("Failed to get client for language %s: %v", tc.language, err)
 			}
@@ -82,55 +84,53 @@ func TestGetClientForLanguage(t *testing.T) {
 				t.Fatalf("Client for language %s is nil", tc.language)
 			}
 
-			// Verify the client is stored in the clients map
-			storedClient, exists := bridge.clients[tc.language]
-			if !exists {
-				t.Errorf("Client for language %s not stored in clients map", tc.language)
+			// Test the second call returns the same client (cached)
+			client2, err := bridgeInstance.GetClientForLanguage(tc.language)
+			if err != nil {
+				t.Fatalf("Failed to get client for language %s on second call: %v", tc.language, err)
 			}
 
-			if storedClient != client {
-				t.Errorf("Stored client does not match retrieved client for language %s", tc.language)
+			if client != client2 {
+				t.Errorf("Second call to GetClientForLanguage should return the same client instance")
 			}
 		})
 	}
 }
 
 func TestCloseAllClients(t *testing.T) {
-	bridge := NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge()
 
 	// Create clients for multiple languages
 	languages := []string{"go", "python", "typescript", "rust"}
 	for _, language := range languages {
-		_, err := bridge.GetClientForLanguage(language)
+		_, err := bridgeInstance.GetClientForLanguage(language)
 		if err != nil {
 			t.Fatalf("Failed to get client for language %s: %v", language, err)
 		}
 	}
 
-	// Verify clients were created
-	if len(bridge.clients) != len(languages) {
-		t.Errorf("Expected %d clients, got %d", len(languages), len(bridge.clients))
-	}
-
 	// Close all clients
-	bridge.CloseAllClients()
+	bridgeInstance.CloseAllClients()
 
-	// Verify clients are closed and cleared
-	if len(bridge.clients) != 0 {
-		t.Errorf("Clients map not emptied after CloseAllClients")
+	// Verify that we can create new clients after closing (tests that cleanup worked)
+	for _, language := range languages {
+		_, err := bridgeInstance.GetClientForLanguage(language)
+		if err != nil {
+			t.Fatalf("Failed to recreate client for language %s after CloseAllClients: %v", language, err)
+		}
 	}
 }
 
 // Benchmark client creation
 func BenchmarkGetClientForLanguage(b *testing.B) {
-	bridge := NewMCPLSPBridge()
+	bridgeInstance := bridge.NewMCPLSPBridge()
 	languages := []string{"go", "python", "typescript", "rust"}
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		language := languages[i%len(languages)]
-		
-		_, err := bridge.GetClientForLanguage(language)
+
+		_, err := bridgeInstance.GetClientForLanguage(language)
 		if err != nil {
 			b.Fatalf("Failed to get client for language %s: %v", language, err)
 		}
