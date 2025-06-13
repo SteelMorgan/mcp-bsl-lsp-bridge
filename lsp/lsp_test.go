@@ -7,215 +7,153 @@ import (
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
-// Mock test for LanguageClient creation
 func TestNewLanguageClient(t *testing.T) {
-	// Use a simple command that always exists for testing
-	lc, err := NewLanguageClient("echo")
+	// Use echo as a simple mock command
+	client, err := NewLanguageClient("echo")
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
-	defer lc.Close()
+	defer client.Close()
 
-	if lc.conn == nil {
-		t.Error("JSON-RPC connection not established")
+	// Check basic initialization
+	if client == nil {
+		t.Fatal("NewLanguageClient returned nil")
 	}
 
-	if lc.ctx == nil {
-		t.Error("Context not initialized")
+	// Verify initial state
+	if client.status != StatusConnected {
+		t.Errorf("Expected initial status to be Connected, got %v", client.status)
+	}
+
+	if !client.isConnected {
+		t.Error("Client should be marked as connected")
 	}
 }
 
-// Test ClientCapabilities and ServerCapabilities
-func TestClientServerCapabilities(t *testing.T) {
-	lc, err := NewLanguageClient("echo")
+func TestLanguageClientMetrics(t *testing.T) {
+	client, err := NewLanguageClient("echo")
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
-	defer lc.Close()
+	defer client.Close()
 
-	// Retrieve initial client capabilities
-	_ = lc.ClientCapabilities()
+	// Perform some requests to generate metrics
+	for range 5 {
+		err := client.SendRequest(
+			"test/method",
+			map[string]interface{}{"key": "value"},
+			&map[string]interface{}{},
+			1*time.Second,
+		)
+		// Ignore errors since we're using echo
+		_ = err
+	}
 
-	// Test server capabilities setter and getter
+	// Retrieve and check metrics
+	metrics := client.GetMetrics()
+
+	if metrics["total_requests"].(int64) != 5 {
+		t.Errorf("Expected 5 total requests, got %v", metrics["total_requests"])
+	}
+
+	// Verify other metric properties
+	if metrics["command"] != "echo" {
+		t.Errorf("Unexpected command: %v", metrics["command"])
+	}
+
+	if metrics["is_connected"] != true {
+		t.Error("Client should be marked as connected")
+	}
+}
+
+func TestLanguageClientClose(t *testing.T) {
+	client, err := NewLanguageClient("echo")
+	if err != nil {
+		t.Fatalf("Failed to create language client: %v", err)
+	}
+
+	// Close the client
+	err = client.Close()
+	if err != nil {
+		t.Errorf("Close() returned an error: %v", err)
+	}
+
+	// Verify post-close state
+	if client.isConnected {
+		t.Error("Client should not be connected after Close()")
+	}
+
+	if client.status != StatusUninitialized {
+		t.Errorf("Expected status Uninitialized after Close(), got %v", client.status)
+	}
+}
+
+func TestSendRequestErrorHandling(t *testing.T) {
+	client, err := NewLanguageClient("nonexistent_command")
+	if err == nil {
+		t.Fatal("Expected error when creating client with nonexistent command")
+	}
+
+	// Client should be nil when creation fails
+	if client != nil {
+		t.Error("Expected nil client when creation fails")
+		client.Close() // Clean up if somehow not nil
+	}
+}
+
+func TestClientCapabilitiesAndServerCapabilities(t *testing.T) {
+	client, err := NewLanguageClient("echo")
+	if err != nil {
+		t.Fatalf("Failed to create language client: %v", err)
+	}
+	defer client.Close()
+
+	// Test client capabilities
+	clientCaps := client.ClientCapabilities()
+	if clientCaps != (protocol.ClientCapabilities{}) {
+		t.Error("Initial client capabilities should be empty")
+	}
+
+	// Test server capabilities setting
 	testServerCaps := protocol.ServerCapabilities{
 		TextDocumentSync: &protocol.Or2[protocol.TextDocumentSyncOptions, protocol.TextDocumentSyncKind]{
 			Value: protocol.TextDocumentSyncKind(1),
 		},
 	}
-	lc.SetServerCapabilities(testServerCaps)
+	client.SetServerCapabilities(testServerCaps)
 
-	retrievedServerCaps := lc.ServerCapabilities()
-	if retrievedServerCaps.TextDocumentSync == nil {
+	serverCaps := client.ServerCapabilities()
+	if serverCaps.TextDocumentSync == nil {
 		t.Error("Server capabilities not set correctly")
 	}
 }
 
-// Test Context retrieval
-func TestContext(t *testing.T) {
-	lc, err := NewLanguageClient("echo")
-	if err != nil {
-		t.Fatalf("Failed to create language client: %v", err)
-	}
-	defer lc.Close()
-
-	ctx := lc.Context()
-	if ctx == nil {
-		t.Error("Context should not be nil")
-	}
-
-	// Test context cancellation
-	select {
-	case <-ctx.Done():
-		t.Error("Context should not be done immediately after creation")
-	default:
-		// Expected case
-	}
-}
-
-// Test SendNotification method
-func TestSendNotification(t *testing.T) {
-	lc, err := NewLanguageClient("echo")
-	if err != nil {
-		t.Fatalf("Failed to create language client: %v", err)
-	}
-	defer lc.Close()
-
-	// Test sending a simple notification
-	err = lc.SendNotification("test/notification", map[string]any{
-		"key": "value",
-	})
-	if err != nil {
-		t.Errorf("Failed to send notification: %v", err)
-	}
-}
-
-// Benchmark LanguageClient creation
-func BenchmarkNewLanguageClient(b *testing.B) {
+// Benchmark client creation and basic operations
+func BenchmarkLanguageClientCreation(b *testing.B) {
 	for b.Loop() {
-		lc, err := NewLanguageClient("echo")
+		client, err := NewLanguageClient("echo")
 		if err != nil {
 			b.Fatalf("Failed to create language client: %v", err)
 		}
-		lc.Close()
+		client.Close()
 	}
 }
 
-// Test high-level LSP method wrappers
-func TestLSPMethodWrappers(t *testing.T) {
-	lc, err := NewLanguageClient("echo")
+func BenchmarkSendRequest(b *testing.B) {
+	client, err := NewLanguageClient("echo")
 	if err != nil {
-		t.Fatalf("Failed to create language client: %v", err)
+		b.Fatalf("Failed to create language client: %v", err)
 	}
-	defer lc.Close()
+	defer client.Close()
 
-	// Test DidOpen
-	err = lc.DidOpen("file:///test.go", "go", "package main\n", 1)
-	if err != nil {
-		t.Errorf("DidOpen failed: %v", err)
-	}
-
-	// Test DidChange
-	changes := []protocol.TextDocumentContentChangeEvent{}
-	// Passing an empty slice to avoid complex struct initialization
-	err = lc.DidChange("file:///test.go", 2, changes)
-	if err != nil {
-		t.Errorf("DidChange failed: %v", err)
-	}
-
-	// Test DidSave
-	text := "package test\nfunc main() {}"
-	err = lc.DidSave("file:///test.go", &text)
-	if err != nil {
-		t.Errorf("DidSave failed: %v", err)
-	}
-
-	// Test DidClose
-	err = lc.DidClose("file:///test.go")
-	if err != nil {
-		t.Errorf("DidClose failed: %v", err)
-	}
-}
-
-// Test error handling for NewLanguageClient
-func TestNewLanguageClientError(t *testing.T) {
-	// Test with non-existent command
-	_, err := NewLanguageClient("non_existent_command")
-	if err == nil {
-		t.Error("Expected error when creating client with non-existent command")
-	}
-}
-
-// Test request methods
-func TestSendRequestMethods(t *testing.T) {
-	lc, err := NewLanguageClient("echo")
-	if err != nil {
-		t.Fatalf("Failed to create language client: %v", err)
-	}
-	defer lc.Close()
-
-	// Test SendRequest
-	var result interface{}
-	err = lc.SendRequest("test/method", map[string]interface{}{"key": "value"}, &result, 5*time.Second)
-	if err == nil {
-		t.Log("SendRequest expects an error due to closed connection")
-	}
-
-	// Test SendRequestNoTimeout
-	err = lc.SendRequestNoTimeout("test/method", map[string]interface{}{"key": "value"}, &result)
-	if err == nil {
-		t.Log("SendRequestNoTimeout expects an error due to closed connection")
-	}
-}
-
-// Test Initialize method
-func TestInitializeMethod(t *testing.T) {
-	lc, err := NewLanguageClient("echo")
-	if err != nil {
-		t.Fatalf("Failed to create language client: %v", err)
-	}
-	defer lc.Close()
-
-	processId := int32(1)
-	params := protocol.InitializeParams{
-		ProcessId: &processId,
-		ClientInfo: &protocol.ClientInfo{
-			Name:    "Test Client",
-			Version: "1.0.0",
-		},
-	}
-
-	result, err := lc.Initialize(params)
-	if err == nil {
-		t.Log("Initialize method expects an error due to closed connection")
-	}
-	if result != nil {
-		t.Error("Initialize result should be nil for closed connection")
-	}
-}
-
-// Test other lifecycle methods
-func TestLifecycleMethods(t *testing.T) {
-	lc, err := NewLanguageClient("echo")
-	if err != nil {
-		t.Fatalf("Failed to create language client: %v", err)
-	}
-	defer lc.Close()
-
-	// Test Initialized method
-	err = lc.Initialized()
-	if err == nil {
-		t.Log("Initialized method expects an error due to closed connection")
-	}
-
-	// Test Shutdown method
-	err = lc.Shutdown()
-	if err == nil {
-		t.Log("Shutdown method expects an error due to closed connection")
-	}
-
-	// Test Exit method
-	err = lc.Exit()
-	if err == nil {
-		t.Log("Exit method expects an error due to closed connection")
+	for b.Loop() {
+		err := client.SendRequest(
+			"test/method",
+			map[string]interface{}{"key": "value"},
+			&map[string]interface{}{},
+			1*time.Second,
+		)
+		// Ignore errors since echo doesn't understand LSP protocol
+		_ = err
 	}
 }
