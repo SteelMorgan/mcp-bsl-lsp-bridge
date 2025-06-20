@@ -291,3 +291,343 @@ func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[string]a
 
 	return clients, nil
 }
+
+// GetHoverInformation gets hover information for a symbol at a specific position
+func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character int32) (any, error) {
+	// Extensive debug logging
+	logger.Info(fmt.Sprintf("GetHoverInformation: Starting hover request for URI: %s, Line: %d, Character: %d", uri, line, character))
+
+	// Infer language from URI
+	language, err := b.InferLanguage(uri)
+	if err != nil {
+		logger.Error("GetHoverInformation: Failed to infer language", fmt.Sprintf("URI: %s, Error: %v", uri, err))
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+	logger.Info(fmt.Sprintf("GetHoverInformation: Inferred language: %s", language))
+
+	// Get language client
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		logger.Error("GetHoverInformation: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", language, err))
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	// Execute hover request directly to get HoverResponse
+	hoverParams := protocol.HoverParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+	}
+
+	logger.Info("GetHoverInformation: Sending hover request to language server")
+
+	var result protocol.HoverResponse
+	err = client.SendRequest("textDocument/hover", hoverParams, &result, 5*time.Second)
+	if err != nil {
+		logger.Error("GetHoverInformation: Hover request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
+		return nil, fmt.Errorf("hover request failed: %w", err)
+	}
+
+	// Log hover response details
+	logger.Info(fmt.Sprintf("GetHoverInformation: Received hover response. Type: %T, Contents: %+v", result, result))
+
+	return result, nil
+}
+
+// GetDiagnostics gets diagnostics for a document
+func (b *MCPLSPBridge) GetDiagnostics(uri string) ([]any, error) {
+	// For now, return empty diagnostics since LSP diagnostics are typically pushed
+	// and we haven't implemented a storage mechanism yet
+	// TODO: Implement diagnostic storage in the client handler
+	return []any{}, nil
+}
+
+// GetSignatureHelp gets signature help for a function at a specific position
+func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (any, error) {
+	// Infer language from URI
+	language, err := b.InferLanguage(uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	// Get language client
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	// Execute signature help request
+	signatureParams := protocol.SignatureHelpParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+	}
+
+	var result protocol.SignatureHelpResponse
+	err = client.SendRequest("textDocument/signatureHelp", signatureParams, &result, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("signature help request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+// GetCodeActions gets code actions for a specific range
+func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
+	// Infer language from URI
+	language, err := b.InferLanguage(uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	// Get language client
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	// Execute code action request
+	params := protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: uint32(line), Character: uint32(character)},
+			End:   protocol.Position{Line: uint32(endLine), Character: uint32(endCharacter)},
+		},
+		Context: protocol.CodeActionContext{
+			// Context can be empty for general code actions
+		},
+	}
+
+	var result []protocol.CodeAction
+	err = client.SendRequest("textDocument/codeAction", params, &result, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("code action request failed: %w", err)
+	}
+
+	// Convert to []any for interface compatibility
+	actions := make([]any, len(result))
+	for i, action := range result {
+		actions[i] = action
+	}
+
+	return actions, nil
+}
+
+// FormatDocument formats a document
+func (b *MCPLSPBridge) FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]any, error) {
+	// Infer language from URI
+	language, err := b.InferLanguage(uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	// Get language client
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	// Execute document formatting request
+	params := protocol.DocumentFormattingParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Options: protocol.FormattingOptions{
+			TabSize:      uint32(tabSize),
+			InsertSpaces: insertSpaces,
+		},
+	}
+
+	var result []protocol.TextEdit
+	err = client.SendRequest("textDocument/formatting", params, &result, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("document formatting request failed: %w", err)
+	}
+
+	// Convert to []any for interface compatibility
+	edits := make([]any, len(result))
+	for i, edit := range result {
+		edits[i] = edit
+	}
+
+	return edits, nil
+}
+
+// RenameSymbol renames a symbol with optional preview
+func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (any, error) {
+	// Infer language from URI
+	language, err := b.InferLanguage(uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	// Get language client
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	// Execute rename request
+	params := protocol.RenameParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+		NewName: newName,
+	}
+
+	var result protocol.WorkspaceEdit
+	err = client.SendRequest("textDocument/rename", params, &result, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("rename request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+// FindImplementations finds implementations of a symbol
+func (b *MCPLSPBridge) FindImplementations(uri string, line, character int32) ([]any, error) {
+	// Infer language from URI
+	language, err := b.InferLanguage(uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	// Get language client
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	// Execute implementation request
+	params := protocol.ImplementationParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+	}
+
+	var result []protocol.Location
+	err = client.SendRequest("textDocument/implementation", params, &result, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("implementation request failed: %w", err)
+	}
+
+	// Convert to []any for interface compatibility
+	implementations := make([]any, len(result))
+	for i, impl := range result {
+		implementations[i] = impl
+	}
+
+	return implementations, nil
+}
+
+// PrepareCallHierarchy prepares call hierarchy items
+func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character int32) ([]any, error) {
+	// Infer language from URI
+	language, err := b.InferLanguage(uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	// Get language client
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	// Execute prepare call hierarchy request
+	params := protocol.CallHierarchyPrepareParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position: protocol.Position{
+			Line:      uint32(line),
+			Character: uint32(character),
+		},
+	}
+
+	var result []protocol.CallHierarchyItem
+	err = client.SendRequest("textDocument/prepareCallHierarchy", params, &result, 5*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("prepare call hierarchy request failed: %w", err)
+	}
+
+	// Convert to []any for interface compatibility
+	items := make([]any, len(result))
+	for i, item := range result {
+		items[i] = item
+	}
+
+	return items, nil
+}
+
+// GetIncomingCalls gets incoming calls for a call hierarchy item
+func (b *MCPLSPBridge) GetIncomingCalls(item any) ([]any, error) {
+	// For now, return empty since we need to handle the protocol.CallHierarchyItem properly
+	// TODO: Implement proper call hierarchy item handling
+	return []any{}, nil
+}
+
+// GetOutgoingCalls gets outgoing calls for a call hierarchy item
+func (b *MCPLSPBridge) GetOutgoingCalls(item any) ([]any, error) {
+	// For now, return empty since we need to handle the protocol.CallHierarchyItem properly
+	// TODO: Implement proper call hierarchy item handling
+	return []any{}, nil
+}
+
+// GetWorkspaceDiagnostics gets diagnostics for entire workspace
+func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) (any, error) {
+	// 1. Detect project languages or use multi-language approach
+	languages, err := b.DetectProjectLanguages(workspaceUri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect project languages: %w", err)
+	}
+
+	if len(languages) == 0 {
+		return []any{}, nil // No languages detected, return empty result
+	}
+
+	// 2. Get language clients for detected languages
+	clients, err := b.GetMultiLanguageClients(languages)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get language clients: %w", err)
+	}
+
+	// 3. Execute workspace diagnostic requests
+	var allReports []any
+	for language, clientInterface := range clients {
+		client, ok := clientInterface.(*lsp.LanguageClient)
+		if !ok {
+			logger.Warn(fmt.Sprintf("Invalid client type for language %s", language))
+			continue
+		}
+
+		report, err := b.executeWorkspaceDiagnosticRequest(client, workspaceUri, identifier)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("Workspace diagnostics failed for %s: %v", language, err))
+			continue
+		}
+		allReports = append(allReports, report)
+	}
+
+	return allReports, nil
+}
+
+// executeWorkspaceDiagnosticRequest executes LSP workspace/diagnostic request
+func (b *MCPLSPBridge) executeWorkspaceDiagnosticRequest(client *lsp.LanguageClient, workspaceUri, identifier string) (protocol.WorkspaceDiagnosticReport, error) {
+	params := protocol.WorkspaceDiagnosticParams{
+		Identifier:        identifier,
+		PreviousResultIds: []protocol.PreviousResultId{}, // Empty for first request
+	}
+
+	var result protocol.WorkspaceDiagnosticReport
+	err := client.SendRequest("workspace/diagnostic", params, &result, 30*time.Second) // Longer timeout for workspace operations
+	if err != nil {
+		return protocol.WorkspaceDiagnosticReport{}, fmt.Errorf("workspace diagnostic request failed: %w", err)
+	}
+
+	return result, nil
+}

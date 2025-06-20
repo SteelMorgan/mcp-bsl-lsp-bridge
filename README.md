@@ -4,11 +4,19 @@ A Go-based bridge that combines MCP (Model Context Protocol) server capabilities
 
 ## Features
 
+### Core Capabilities
 - **Cross-platform directory management** following system conventions
 - **Smart configuration loading** with multiple fallback locations
 - **XDG Base Directory Specification** compliance on Unix systems
 - **Root user support** with appropriate system directories
 - **Comprehensive LSP server support** for 20+ programming languages
+
+### Advanced LSP Tools (New!)
+- **Code Intelligence**: Hover documentation, signature help, diagnostics
+- **Code Actions**: Quick fixes, refactoring suggestions, and code improvements
+- **Code Formatting**: Document formatting with customizable options
+- **Advanced Navigation**: Symbol renaming, implementation finding, call hierarchy
+- **Multi-Language Support**: Works across Go, Python, TypeScript, Rust, and more
 
 ## Usage
 
@@ -84,6 +92,40 @@ The bridge attempts to load configuration from multiple locations in order:
 3. Current directory (`lsp_config.json`)
 4. Alternative config name (`config.json`)
 5. Example config (`example.lsp_config.json`)
+
+## Available MCP Tools
+
+The bridge exposes the following MCP tools for Claude Code integration:
+
+### Core Analysis Tools
+- **`mcp__lsp__analyze_code`**: Analyze code for completion suggestions and insights
+- **`mcp__lsp__infer_language`**: Detect programming language from file path
+- **`mcp__lsp__detect_project_languages`**: Detect all languages in a project
+
+### LSP Connection Management
+- **`mcp__lsp__lsp_connect`**: Connect to appropriate language server for a file
+- **`mcp__lsp__lsp_disconnect`**: Disconnect all active language servers
+
+### Code Intelligence Tools ✨ New!
+- **`mcp__lsp__hover`**: Get symbol documentation and type information
+- **`mcp__lsp__signature_help`**: Get function parameter assistance
+- **`mcp__lsp__diagnostics`**: Get error and warning diagnostics
+
+### Code Improvement Tools ✨ New!
+- **`mcp__lsp__code_actions`**: Get quick fixes and refactoring suggestions
+- **`mcp__lsp__format_document`**: Format code with customizable options
+
+### Advanced Navigation Tools ✨ New!
+- **`mcp__lsp__rename`**: Rename symbols with optional preview
+- **`mcp__lsp__implementation`**: Find symbol implementations
+- **`mcp__lsp__call_hierarchy`**: Prepare call hierarchy analysis
+
+### Project Analysis Tools
+- **`mcp__lsp__project_analysis`**: Enhanced project-wide analysis with:
+  - Workspace symbol search
+  - Reference finding
+  - Definition location
+  - Text-based search
 
 ## Configuration
 

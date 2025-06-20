@@ -58,6 +58,50 @@ func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]any
 	return result, nil
 }
 
+func (m *MockBridge) GetHoverInformation(uri string, line, character int32) (any, error) {
+	return map[string]any{"contents": "mock hover"}, nil
+}
+
+func (m *MockBridge) GetDiagnostics(uri string) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) GetWorkspaceDiagnostics(workspaceUri, identifier string) (any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) GetSignatureHelp(uri string, line, character int32) (any, error) {
+	return map[string]any{"signatures": []any{}}, nil
+}
+
+func (m *MockBridge) GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (any, error) {
+	return map[string]any{"changes": map[string]any{}}, nil
+}
+
+func (m *MockBridge) FindImplementations(uri string, line, character int32) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) PrepareCallHierarchy(uri string, line, character int32) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) GetIncomingCalls(item any) ([]any, error) {
+	return []any{}, nil
+}
+
+func (m *MockBridge) GetOutgoingCalls(item any) ([]any, error) {
+	return []any{}, nil
+}
+
 func TestMCPServerSetup(t *testing.T) {
 	// Create a mock bridge
 	mockBridge := &MockBridge{}
@@ -78,8 +122,8 @@ func TestMCPServerSetup(t *testing.T) {
 		if !nameField.IsValid() {
 			t.Fatal("Could not access server name")
 		}
-		if nameField.String() != "lsp-bridge-mcp" {
-			t.Errorf("Expected server name 'lsp-bridge-mcp', got %s", nameField.String())
+		if nameField.String() != "mcp-lsp-bridge" {
+			t.Errorf("Expected server name 'mcp-lsp-bridge', got %s", nameField.String())
 		}
 
 		// Check version
