@@ -12,13 +12,19 @@ A Go-based bridge that combines MCP (Model Context Protocol) server capabilities
 - **Root user support** with appropriate system directories
 - **Comprehensive LSP server support** for 20+ programming languages
 
-### Advanced LSP Tools (New!)
+### Advanced LSP Tools ✨ **ACTIONABLE FUNCTIONALITY** (Latest!)
 
 - **Code Intelligence**: Hover documentation, signature help, diagnostics
 - **Code Actions**: Quick fixes, refactoring suggestions, and code improvements
-- **Code Formatting**: Document formatting with customizable options
-- **Advanced Navigation**: Symbol renaming, implementation finding, call hierarchy
+- **🎯 ACTIONABLE Code Formatting**: Document formatting with preview/apply modes - actually modifies files!
+- **🎯 ACTIONABLE Symbol Renaming**: Cross-file symbol renaming with preview/apply modes - safely renames across entire codebase!
+- **Advanced Navigation**: Implementation finding, call hierarchy analysis
 - **Multi-Language Support**: Works across Go, Python, TypeScript, Rust, and more
+
+**New Dual-Mode Operations:**
+- **Preview Mode** (`apply='false'`): Shows what changes would be made without modifying files
+- **Apply Mode** (`apply='true'`): Actually applies changes to your codebase
+- **Safety First**: Always preview before applying for safe code modifications
 
 ## Usage
 

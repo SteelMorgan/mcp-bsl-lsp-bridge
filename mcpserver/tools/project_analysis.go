@@ -18,10 +18,10 @@ import (
 // RegisterProjectAnalysisTool registers the project_analysis tool
 func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("project_analysis",
-		mcp.WithDescription("Analyze project structure, find references, and search across files"),
+		mcp.WithDescription("Multi-purpose code analysis tool. Use 'definitions' for precise symbol targeting, 'references' for usage locations, 'workspace_symbols' for symbol discovery, 'document_symbols' for file exploration, 'text_search' for content search."),
 		mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
-		mcp.WithString("query", mcp.Description("Symbol or text to search for")),
-		mcp.WithString("analysis_type", mcp.Description("Type of analysis: 'references', 'definitions', 'workspace_symbols', 'document_symbols', or 'text_search'")),
+		mcp.WithString("query", mcp.Description("Symbol name (for definitions/references/workspace_symbols) or file path (for document_symbols) or text pattern (for text_search)")),
+		mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search)")),
 		mcp.WithNumber("offset", mcp.Description("Result offset for pagination (default: 0)")),
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 20, max: 100)")),
 	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -149,16 +149,38 @@ func RegisterProjectAnalysisTool(mcpServer *server.MCPServer, bridge interfaces.
 				endLine := symbol.Location.Range.End.Line
 				endChar := symbol.Location.Range.End.Character
 
-				// Format with coordinates for precise targeting
-				response.WriteString(fmt.Sprintf("%d. %s (%s) in %s:%d:%d-%d:%d\n", 
+				// Format with coordinates optimized for LLM agent consumption
+				response.WriteString(fmt.Sprintf("%d. %s (%s) in %s\n", 
 					offset+i+1, 
 					symbol.Name, 
 					kindStr,
-					filename,
+					filename))
+				response.WriteString(fmt.Sprintf("   URI: %s\n", uri))
+				response.WriteString(fmt.Sprintf("   Range: line=%d, character=%d to line=%d, character=%d\n", 
 					startLine, startChar, endLine, endChar))
-				response.WriteString(fmt.Sprintf("   %s\n", uri))
-				response.WriteString(fmt.Sprintf("   💡 To target this symbol: uri=\"%s\", line=%d, character=%d\n", uri, startLine, startChar))
-				response.WriteString("   ℹ️  Use these coordinates for hover, references, definitions, rename, etc.\n")
+				
+				// Provide agent-optimized targeting coordinates
+				nameLen := len(symbol.Name)
+				response.WriteString(fmt.Sprintf("   Target coordinates for hover/references/definitions:\n"))
+				response.WriteString(fmt.Sprintf("     - Primary: line=%d, character=%d\n", startLine, startChar))
+				
+				// Calculate precise positions within the identifier
+				if nameLen > 3 {
+					midChar := startChar + uint32(nameLen/2)
+					response.WriteString(fmt.Sprintf("     - Alternative: line=%d, character=%d\n", startLine, midChar))
+				}
+				
+				// Provide the most reliable coordinate for hover operations
+				bestHoverChar := startChar
+				if nameLen > 1 {
+					offset := nameLen / 2
+					if offset > 5 {
+						offset = 5
+					}
+					bestHoverChar = startChar + uint32(offset)
+				}
+				response.WriteString(fmt.Sprintf("   Recommended hover coordinate: uri=\"%s\", line=%d, character=%d\n", 
+					uri, startLine, bestHoverChar))
 			}
 
 			// Show pagination info
@@ -404,23 +426,52 @@ func formatDocumentSymbolWithTargeting(response *strings.Builder, symbol protoco
 	selectionRangeUseful := !(targetLine == startLine && targetChar == startChar)
 	
 	if depth == 0 {
-		response.WriteString(fmt.Sprintf("%s%d. %s (%s) at %d:%d-%d:%d\n", 
-			indent, number, symbol.Name, kindStr, startLine, startChar, endLine, endChar))
+		response.WriteString(fmt.Sprintf("%s%d. %s (%s)\n", 
+			indent, number, symbol.Name, kindStr))
 		if docUri != "" {
-			response.WriteString(fmt.Sprintf("%s   %s\n", indent, docUri))
+			response.WriteString(fmt.Sprintf("%s   URI: %s\n", indent, docUri))
 		}
+		response.WriteString(fmt.Sprintf("%s   Range: line=%d, character=%d to line=%d, character=%d\n", 
+			indent, startLine, startChar, endLine, endChar))
 		
 		if selectionRangeUseful {
-			response.WriteString(fmt.Sprintf("%s   💡 Target coordinates: line=%d, character=%d (precise symbol location)\n", indent, targetLine, targetChar))
+			response.WriteString(fmt.Sprintf("%s   Target coordinates: line=%d, character=%d (precise symbol location)\n", indent, targetLine, targetChar))
+			response.WriteString(fmt.Sprintf("%s   Recommended hover coordinate: uri=\"%s\", line=%d, character=%d\n", indent, docUri, targetLine, targetChar))
 		} else {
-			response.WriteString(fmt.Sprintf("%s   💡 Target coordinates: line=%d, character=%d (LSP server provided same range)\n", indent, targetLine, targetChar))
-			response.WriteString(fmt.Sprintf("%s   💡 For better targeting, try: project_analysis with analysis_type='references', query='%s'\n", indent, symbol.Name))
+			response.WriteString(fmt.Sprintf("%s   Target coordinates: line=%d, character=%d\n", indent, targetLine, targetChar))
+			
+			// Suggest appropriate tools based on symbol type and agent needs
+			response.WriteString(fmt.Sprintf("%s   Recommended tools for this symbol:\n", indent))
+			
+			switch symbol.Kind {
+			case protocol.SymbolKindFunction, protocol.SymbolKindMethod:
+				response.WriteString(fmt.Sprintf("%s     - definitions: Get exact function declaration location\n", indent))
+				response.WriteString(fmt.Sprintf("%s     - references: Find all usage locations of this function\n", indent))
+				response.WriteString(fmt.Sprintf("%s     - hover: Get function signature and documentation (position-sensitive)\n", indent))
+				
+			case protocol.SymbolKindClass, protocol.SymbolKindInterface:
+				response.WriteString(fmt.Sprintf("%s     - definitions: Get exact class/interface declaration\n", indent))
+				response.WriteString(fmt.Sprintf("%s     - implementation: Find concrete implementations\n", indent))
+				response.WriteString(fmt.Sprintf("%s     - references: Find all usage locations\n", indent))
+				
+			case protocol.SymbolKindVariable, protocol.SymbolKindConstant:
+				response.WriteString(fmt.Sprintf("%s     - definitions: Get exact declaration location\n", indent))
+				response.WriteString(fmt.Sprintf("%s     - references: Find all usage locations\n", indent))
+				response.WriteString(fmt.Sprintf("%s     - hover: Get type information and value\n", indent))
+				
+			default:
+				response.WriteString(fmt.Sprintf("%s     - definitions: Get exact declaration location\n", indent))
+				response.WriteString(fmt.Sprintf("%s     - references: Find all usage locations\n", indent))
+			}
+			
+			response.WriteString(fmt.Sprintf("%s   Example: project_analysis with analysis_type='definitions', query='%s'\n", indent, symbol.Name))
 		}
-		response.WriteString(fmt.Sprintf("%s   ℹ️  Use these coordinates for hover, references, definitions, rename, etc.\n", indent))
 	} else {
-		response.WriteString(fmt.Sprintf("%s├─ %s (%s) at %d:%d-%d:%d\n", 
-			indent, symbol.Name, kindStr, startLine, startChar, endLine, endChar))
-		response.WriteString(fmt.Sprintf("%s   💡 Target: line=%d, character=%d\n", indent, targetLine, targetChar))
+		response.WriteString(fmt.Sprintf("%s%s (%s)\n", 
+			indent, symbol.Name, kindStr))
+		response.WriteString(fmt.Sprintf("%s   Range: line=%d, character=%d to line=%d, character=%d\n", 
+			indent, startLine, startChar, endLine, endChar))
+		response.WriteString(fmt.Sprintf("%s   Target: line=%d, character=%d\n", indent, targetLine, targetChar))
 	}
 	
 	// Recursively format children

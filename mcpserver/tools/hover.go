@@ -15,10 +15,10 @@ import (
 // RegisterHoverTool registers the hover tool
 func RegisterHoverTool(mcpServer *server.MCPServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("hover",
-		mcp.WithDescription("Get hover information for symbol at position"),
+		mcp.WithDescription("Get detailed symbol information (signatures, documentation, types) at precise coordinates. Position-sensitive - use 'project_analysis' with 'definitions' first to find exact coordinates."),
 		mcp.WithString("uri", mcp.Description("URI to the file")),
-		mcp.WithNumber("line", mcp.Description("Line number (0-based)")),
-		mcp.WithNumber("character", mcp.Description("Character position (0-based)")),
+		mcp.WithNumber("line", mcp.Description("Line number (0-based) - use coordinates from 'definitions' for best results")),
+		mcp.WithNumber("character", mcp.Description("Character position (0-based) - target middle of symbol identifier")),
 	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Extensive debug logging
 		logger.Info("Hover Tool: Starting hover information request")

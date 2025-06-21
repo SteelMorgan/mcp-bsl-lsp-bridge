@@ -56,7 +56,6 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 		var lc *lsp.LanguageClient
 		var err error
 		lc, err = lsp.NewLanguageClient(serverConfig.Command, serverConfig.Args...)
-
 		if err != nil {
 			lastErr = fmt.Errorf("failed to create language client on attempt %d: %w", attempt+1, err)
 			time.Sleep(config.RetryDelay)
@@ -305,22 +304,22 @@ func normalizeURI(uri string) string {
 	if strings.HasPrefix(uri, "file://") {
 		return uri
 	}
-	
+
 	// If it has any other scheme (http://, https://, etc.), return as-is
 	if strings.Contains(uri, "://") {
 		return uri
 	}
-	
+
 	// If it's an absolute path, convert to file URI
 	if strings.HasPrefix(uri, "/") {
 		return "file://" + uri
 	}
-	
+
 	// If it's a relative path, convert to absolute path first, then to file URI
 	if absPath, err := filepath.Abs(uri); err == nil {
 		return "file://" + absPath
 	}
-	
+
 	// Fallback: assume it's a file path and add file:// prefix
 	return "file://" + uri
 }
@@ -387,7 +386,7 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client *lsp.LanguageClient, uri, langu
 	// Read the file content
 	// Remove file:// prefix to get the actual file path
 	filePath := strings.TrimPrefix(uri, "file://")
-	
+
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
@@ -440,7 +439,7 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]any, error) {
 		logger.Error("GetDocumentSymbols: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", language, err))
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
 	}
-	
+
 	// Additional debugging: check client status
 	metrics := client.GetMetrics()
 	logger.Info(fmt.Sprintf("GetDocumentSymbols: Client metrics: %+v", metrics))
@@ -481,7 +480,7 @@ func (b *MCPLSPBridge) GetDiagnostics(uri string) ([]any, error) {
 func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character int32) (any, error) {
 	// Normalize URI
 	normalizedURI := normalizeURI(uri)
-	
+
 	// Infer language from URI
 	language, err := b.InferLanguage(normalizedURI)
 	if err != nil {
@@ -593,23 +592,141 @@ func (b *MCPLSPBridge) FormatDocument(uri string, tabSize int32, insertSpaces bo
 	return edits, nil
 }
 
+// ApplyTextEdits applies text edits to a file
+func (b *MCPLSPBridge) ApplyTextEdits(uri string, edits []any) error {
+	// Convert URI to file path
+	filePath := strings.TrimPrefix(uri, "file://")
+
+	// Read current file content
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	// Convert edits to protocol.TextEdit
+	textEdits := make([]protocol.TextEdit, 0, len(edits))
+	for _, edit := range edits {
+		if textEdit, ok := edit.(protocol.TextEdit); ok {
+			textEdits = append(textEdits, textEdit)
+		}
+	}
+
+	// Apply edits to content
+	modifiedContent, err := applyTextEditsToContent(string(content), textEdits)
+	if err != nil {
+		return fmt.Errorf("failed to apply text edits: %w", err)
+	}
+
+	// Write modified content back to file
+	err = os.WriteFile(filePath, []byte(modifiedContent), 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to write file %s: %w", filePath, err)
+	}
+
+	return nil
+}
+
+// applyTextEditsToContent applies text edits to string content
+func applyTextEditsToContent(content string, edits []protocol.TextEdit) (string, error) {
+	if len(edits) == 0 {
+		return content, nil
+	}
+
+	// Split content into lines for easier manipulation
+	lines := strings.Split(content, "\n")
+
+	// Sort edits by position (reverse order to apply from end to beginning)
+	// This prevents position shifts from affecting subsequent edits
+	for i := 0; i < len(edits)-1; i++ {
+		for j := i + 1; j < len(edits); j++ {
+			edit1 := edits[i]
+			edit2 := edits[j]
+
+			// Compare positions (later positions first)
+			if edit1.Range.Start.Line < edit2.Range.Start.Line ||
+				(edit1.Range.Start.Line == edit2.Range.Start.Line &&
+					edit1.Range.Start.Character < edit2.Range.Start.Character) {
+				edits[i], edits[j] = edits[j], edits[i]
+			}
+		}
+	}
+
+	// Apply edits in reverse order
+	for _, edit := range edits {
+		startLine := int(edit.Range.Start.Line)
+		startChar := int(edit.Range.Start.Character)
+		endLine := int(edit.Range.End.Line)
+		endChar := int(edit.Range.End.Character)
+
+		// Validate line indices
+		if startLine >= len(lines) || endLine >= len(lines) {
+			continue // Skip invalid edits
+		}
+
+		if startLine == endLine {
+			// Single line edit
+			line := lines[startLine]
+			if startChar > len(line) || endChar > len(line) {
+				continue // Skip invalid character positions
+			}
+
+			// Replace text within the line
+			newLine := line[:startChar] + edit.NewText + line[endChar:]
+			lines[startLine] = newLine
+		} else {
+			// Multi-line edit
+			if startChar > len(lines[startLine]) || endChar > len(lines[endLine]) {
+				continue // Skip invalid character positions
+			}
+
+			// Create new line combining start of first line + new text + end of last line
+			newLine := lines[startLine][:startChar] + edit.NewText + lines[endLine][endChar:]
+
+			// Remove the lines that were replaced
+			newLines := make([]string, 0, len(lines)-(endLine-startLine))
+			newLines = append(newLines, lines[:startLine]...)
+			newLines = append(newLines, newLine)
+			if endLine+1 < len(lines) {
+				newLines = append(newLines, lines[endLine+1:]...)
+			}
+			lines = newLines
+		}
+	}
+
+	return strings.Join(lines, "\n"), nil
+}
+
 // RenameSymbol renames a symbol with optional preview
 func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName string, preview bool) (any, error) {
+	// Normalize URI to ensure proper file:// scheme
+	normalizedURI := normalizeURI(uri)
+	logger.Info(fmt.Sprintf("RenameSymbol: Starting rename request for URI: %s -> %s, Line: %d, Character: %d, NewName: %s", uri, normalizedURI, line, character, newName))
+
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
 	if err != nil {
+		logger.Error("RenameSymbol: Failed to infer language", fmt.Sprintf("URI: %s, Error: %v", uri, err))
 		return nil, fmt.Errorf("failed to infer language: %w", err)
 	}
+	logger.Info(fmt.Sprintf("RenameSymbol: Inferred language: %s", language))
 
 	// Get language client
 	client, err := b.GetClientForLanguage(language)
 	if err != nil {
+		logger.Error("RenameSymbol: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", language, err))
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
 	}
 
-	// Execute rename request
+	// Ensure the document is opened in the language server
+	err = b.ensureDocumentOpen(client, normalizedURI, language)
+	if err != nil {
+		logger.Error("RenameSymbol: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+		// Continue anyway, as some servers might still work without explicit didOpen
+	}
+
+	// Execute rename request using normalized URI
 	params := protocol.RenameParams{
-		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(normalizedURI)},
 		Position: protocol.Position{
 			Line:      uint32(line),
 			Character: uint32(character),
@@ -617,20 +734,94 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character int32, newName s
 		NewName: newName,
 	}
 
+	logger.Info("RenameSymbol: Sending rename request to language server")
+
 	var result protocol.WorkspaceEdit
 	err = client.SendRequest("textDocument/rename", params, &result, 10*time.Second)
 	if err != nil {
+		logger.Error("RenameSymbol: Rename request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
 		return nil, fmt.Errorf("rename request failed: %w", err)
 	}
 
+	// Log the response details
+	logger.Info(fmt.Sprintf("RenameSymbol: Received rename response. Changes: %+v, DocumentChanges: %+v", result.Changes, result.DocumentChanges))
+
 	return result, nil
+}
+
+// ApplyWorkspaceEdit applies a workspace edit to multiple files
+func (b *MCPLSPBridge) ApplyWorkspaceEdit(edit any) error {
+	workspaceEdit, ok := edit.(protocol.WorkspaceEdit)
+	if !ok {
+		return fmt.Errorf("invalid workspace edit type: %T", edit)
+	}
+
+	logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Processing workspace edit. Changes: %+v, DocumentChanges: %+v", workspaceEdit.Changes, workspaceEdit.DocumentChanges))
+
+	// Handle DocumentChanges format (preferred by most language servers)
+	if workspaceEdit.DocumentChanges != nil {
+		for _, docChange := range workspaceEdit.DocumentChanges {
+			logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Processing document change of type: %T", docChange.Value))
+			
+			// DocumentChanges is []Or4[TextDocumentEdit, CreateFile, RenameFile, DeleteFile]
+			// We only handle TextDocumentEdit for now
+			if textDocEdit, ok := docChange.Value.(protocol.TextDocumentEdit); ok {
+				logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Found TextDocumentEdit for URI: %s", textDocEdit.TextDocument.Uri))
+				
+				// Convert protocol.TextEdit to []any for ApplyTextEdits
+				textEdits := make([]any, len(textDocEdit.Edits))
+				for i, edit := range textDocEdit.Edits {
+					// Edits might also be a union type, extract the actual TextEdit
+					if actualEdit, ok := edit.Value.(protocol.TextEdit); ok {
+						textEdits[i] = actualEdit
+						logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Edit %d - Line %d:%d-%d:%d, NewText: '%s'", 
+							i+1, actualEdit.Range.Start.Line, actualEdit.Range.Start.Character,
+							actualEdit.Range.End.Line, actualEdit.Range.End.Character, actualEdit.NewText))
+					} else {
+						logger.Error("ApplyWorkspaceEdit: Edit is not a TextEdit", fmt.Sprintf("Type: %T", edit.Value))
+						continue
+					}
+				}
+				
+				// Apply the edits
+				if len(textEdits) > 0 {
+					logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Applying %d text edits to %s", len(textEdits), textDocEdit.TextDocument.Uri))
+					err := b.ApplyTextEdits(string(textDocEdit.TextDocument.Uri), textEdits)
+					if err != nil {
+						return fmt.Errorf("failed to apply document changes to %s: %w", textDocEdit.TextDocument.Uri, err)
+					}
+				}
+			} else {
+				// Handle other types (CreateFile, RenameFile, DeleteFile) if needed
+				logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Skipping non-TextDocumentEdit change: %T", docChange.Value))
+			}
+		}
+	}
+
+	// Apply changes map (alternative format)
+	if workspaceEdit.Changes != nil {
+		for uri, edits := range workspaceEdit.Changes {
+			// Convert []protocol.TextEdit to []any
+			anyEdits := make([]any, len(edits))
+			for i, edit := range edits {
+				anyEdits[i] = edit
+			}
+			
+			err := b.ApplyTextEdits(string(uri), anyEdits)
+			if err != nil {
+				return fmt.Errorf("failed to apply edits to %s: %w", uri, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // FindImplementations finds implementations of a symbol
 func (b *MCPLSPBridge) FindImplementations(uri string, line, character int32) ([]any, error) {
 	// Normalize URI
 	normalizedURI := normalizeURI(uri)
-	
+
 	// Infer language from URI
 	language, err := b.InferLanguage(normalizedURI)
 	if err != nil {

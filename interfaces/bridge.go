@@ -23,8 +23,10 @@ type BridgeInterface interface {
 	// Code actions and formatting tools
 	GetCodeActions(uri string, line, character, endLine, endCharacter int32) ([]any, error)
 	FormatDocument(uri string, tabSize int32, insertSpaces bool) ([]any, error)
+	ApplyTextEdits(uri string, edits []any) error
 	// Advanced navigation tools
 	RenameSymbol(uri string, line, character int32, newName string, preview bool) (any, error)
+	ApplyWorkspaceEdit(edit any) error
 	FindImplementations(uri string, line, character int32) ([]any, error)
 	PrepareCallHierarchy(uri string, line, character int32) ([]any, error)
 	GetIncomingCalls(item any) ([]any, error)

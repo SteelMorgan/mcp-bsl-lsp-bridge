@@ -13,12 +13,12 @@ import (
 // RegisterCodeActionsTool registers the code actions tool
 func RegisterCodeActionsTool(mcpServer *server.MCPServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("code_actions",
-		mcp.WithDescription("Get code actions (quick fixes, refactoring) for a range"),
-		mcp.WithString("uri", mcp.Description("URI to the file")),
-		mcp.WithNumber("line", mcp.Description("Start line number (0-based)")),
-		mcp.WithNumber("character", mcp.Description("Start character position (0-based)")),
-		mcp.WithNumber("end_line", mcp.Description("End line number (0-based, optional)")),
-		mcp.WithNumber("end_character", mcp.Description("End character position (0-based, optional)")),
+		mcp.WithDescription("Get intelligent code actions including quick fixes, refactoring suggestions, and automated improvements for a code range. Returns language server suggested actions like import fixes, error corrections, extract method, add missing imports, implement interfaces, and other context-aware improvements. Use at error locations for fixes or at any code location for refactoring suggestions."),
+		mcp.WithString("uri", mcp.Description("URI to the file (file:// scheme required, e.g., 'file:///path/to/file.go')")),
+		mcp.WithNumber("line", mcp.Description("Start line number (0-based) - target specific code location or error")),
+		mcp.WithNumber("character", mcp.Description("Start character position (0-based) - target specific code location or error")),
+		mcp.WithNumber("end_line", mcp.Description("End line number (0-based, optional) - for range-based actions, defaults to start line")),
+		mcp.WithNumber("end_character", mcp.Description("End character position (0-based, optional) - for range-based actions, defaults to start character")),
 	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Parse and validate parameters
 		uri, err := request.RequireString("uri")

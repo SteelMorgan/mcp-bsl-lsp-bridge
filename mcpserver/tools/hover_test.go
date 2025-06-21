@@ -67,6 +67,8 @@ func (m *MockBridge) PrepareCallHierarchy(uri string, line, character int32) ([]
 func (m *MockBridge) GetIncomingCalls(item any) ([]any, error) { return []any{}, nil }
 func (m *MockBridge) GetOutgoingCalls(item any) ([]any, error) { return []any{}, nil }
 func (m *MockBridge) GetDocumentSymbols(uri string) ([]any, error) { return []any{}, nil }
+func (m *MockBridge) ApplyTextEdits(uri string, edits []any) error { return nil }
+func (m *MockBridge) ApplyWorkspaceEdit(edit any) error { return nil }
 
 // Test hover tool registration and functionality
 func TestHoverTool(t *testing.T) {

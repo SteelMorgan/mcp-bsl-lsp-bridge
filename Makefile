@@ -75,9 +75,15 @@ test-mcp-hover-optimization:
 	@echo "Testing hover optimization workflow (document symbols → hover coordination)..."
 	@cd scripts && python3 test_hover_optimization.py
 
+# Programmatic MCP tool testing
+.PHONY: test-mcp-external-tool
+test-mcp-external-tool:
+	@echo "Running programmatic MCP external testing tool..."
+	@cd scripts && python3 mcp_external_test.py
+
 # Run all MCP testing (comprehensive suite)
 .PHONY: test-mcp-all
-test-mcp-all: test-mcp-simple test-mcp-tools test-mcp-external test-mcp-new-tools test-mcp-hover-optimization
+test-mcp-all: test-mcp-simple test-mcp-tools test-mcp-external test-mcp-new-tools test-mcp-hover-optimization test-mcp-external-tool
 	@echo "All MCP tests completed!"
 
 # Lint the code
@@ -214,6 +220,7 @@ help:
 	@echo "  test-mcp-tools   - Run individual MCP tools test"
 	@echo "  test-mcp-new-tools - Test newly fixed implementation and signature help tools"
 	@echo "  test-mcp-hover-optimization - Test hover optimization workflow"
+	@echo "  test-mcp-external-tool - Run programmatic external MCP tool testing"
 	@echo "  test-mcp-all     - Run complete MCP testing suite"
 	@echo "  lint         - Lint the code"
 	@echo "  fmt          - Format the code"

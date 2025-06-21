@@ -15,10 +15,10 @@ import (
 // RegisterSignatureHelpTool registers the signature help tool
 func RegisterSignatureHelpTool(mcpServer *server.MCPServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("signature_help",
-		mcp.WithDescription("Get signature help for function at position"),
+		mcp.WithDescription("Get function parameter information at call sites. Use when positioned inside function calls (between parentheses) to see parameter details and overloads."),
 		mcp.WithString("uri", mcp.Description("URI to the file")),
-		mcp.WithNumber("line", mcp.Description("Line number (0-based)")),
-		mcp.WithNumber("character", mcp.Description("Character position (0-based)")),
+		mcp.WithNumber("line", mcp.Description("Line number (0-based) - position at function call site")),
+		mcp.WithNumber("character", mcp.Description("Character position (0-based) - position within function call parentheses")),
 	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Parse and validate parameters
 		uri, err := request.RequireString("uri")

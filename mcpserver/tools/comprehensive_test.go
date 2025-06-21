@@ -208,6 +208,14 @@ func (m *ComprehensiveMockBridge) GetDocumentSymbols(uri string) ([]any, error) 
 	return []any{}, nil
 }
 
+func (m *ComprehensiveMockBridge) ApplyTextEdits(uri string, edits []any) error {
+	return nil
+}
+
+func (m *ComprehensiveMockBridge) ApplyWorkspaceEdit(edit any) error {
+	return nil
+}
+
 // Helper function for testing - removed unused createMockRequest
 
 // Test actual tool handler execution
