@@ -79,7 +79,7 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 	// ADD THIS LINE: Expect InferLanguage to be called and return "go"
 	mockBridge.On("InferLanguage", "file:///test.go").Return("go", nil).Once()
 
-	mockBridge.On("GetHoverInformation", "file:///test.go", int32(10), int32(5)).Return(&hoverResult, nil).Once()
+	mockBridge.On("GetHoverInformation", "file:///test.go", uint32(10), uint32(5)).Return(&hoverResult, nil).Once()
 
 	tool, handler := HoverTool(mockBridge)
 	mcpServer, err := mcptest.NewServer(t, server.ServerTool{
@@ -296,7 +296,7 @@ func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
 	mockBridge.On("InferLanguage", "file:///invalid.xyz").Return("", fmt.Errorf("unsupported file type")).Once()
 
-	mockBridge.On("GetHoverInformation", "file:///invalid.xyz", int32(10), int32(5)).Return((*protocol.Hover)(nil), fmt.Errorf("unsupported file type")).Once()
+	mockBridge.On("GetHoverInformation", "file:///invalid.xyz", uint32(10), uint32(5)).Return((*protocol.Hover)(nil), fmt.Errorf("unsupported file type")).Once()
 
 	// Initialize tool and handler directly
 	tool, handler := HoverTool(mockBridge)

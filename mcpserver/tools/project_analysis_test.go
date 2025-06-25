@@ -160,7 +160,7 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 					mockClients[lang] = &lsp.LanguageClient{}
 				}
 				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
-				bridge.On("FindSymbolReferences", "go", "file:///main.go", int32(5), int32(0), true).Return(tc.mockReferences, nil)
+				bridge.On("FindSymbolReferences", "go", "file:///main.go", uint32(5), uint32(0), true).Return(tc.mockReferences, nil)
 			}
 
 			// Create MCP server and register tool
@@ -247,7 +247,7 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 					mockClients[lang] = &lsp.LanguageClient{}
 				}
 				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
-				bridge.On("FindSymbolDefinitions", "go", "file:///main.go", int32(5), int32(0)).Return(tc.mockDefinitions, nil)
+				bridge.On("FindSymbolDefinitions", "go", "file:///main.go", uint32(5), uint32(0)).Return(tc.mockDefinitions, nil)
 			}
 
 			// Create MCP server and register tool
@@ -472,8 +472,8 @@ func TestProjectAnalysisUtilityFunctions(t *testing.T) {
 		testCases := []struct {
 			input         string
 			expectedUri   string
-			expectedLine  int32
-			expectedChar  int32
+			expectedLine  uint32
+			expectedChar  uint32
 			expectedError bool
 		}{
 			{"main:5:0", "main", 5, 0, false},

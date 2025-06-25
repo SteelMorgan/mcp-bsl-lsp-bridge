@@ -413,10 +413,10 @@ func TestSignatureHelpToolExecution(t *testing.T) {
 	}
 
 	// Expectation for successful case
-	bridge.On("GetSignatureHelp", "file:///test.go", int32(10), int32(15)).Return(&successResult, nil)
+	bridge.On("GetSignatureHelp", "file:///test.go", uint32(10), uint32(15)).Return(&successResult, nil)
 
 	// Expectation for error case
-	bridge.On("GetSignatureHelp", "file:///error.go", int32(10), int32(15)).Return((*protocol.SignatureHelp)(nil), fmt.Errorf("signature help failed"))
+	bridge.On("GetSignatureHelp", "file:///error.go", uint32(10), uint32(15)).Return((*protocol.SignatureHelp)(nil), fmt.Errorf("signature help failed"))
 
 	// Test successful signature help
 	result, err := bridge.GetSignatureHelp("file:///test.go", 10, 15)
@@ -458,10 +458,10 @@ func TestCodeActionsToolExecution(t *testing.T) {
 	}
 
 	// Expectation for successful case
-	bridge.On("GetCodeActions", "file:///test.go", int32(10), int32(5), int32(10), int32(15)).Return(successResult, nil)
+	bridge.On("GetCodeActions", "file:///test.go", uint32(10), uint32(5), uint32(10), uint32(15)).Return(successResult, nil)
 
 	// Expectation for error case
-	bridge.On("GetCodeActions", "file:///error.go", int32(10), int32(5), int32(10), int32(15)).Return([]protocol.CodeAction(nil), fmt.Errorf("code actions failed"))
+	bridge.On("GetCodeActions", "file:///error.go", uint32(10), uint32(5), uint32(10), uint32(15)).Return([]protocol.CodeAction(nil), fmt.Errorf("code actions failed"))
 
 	// Test successful code actions
 	result, err := bridge.GetCodeActions("file:///test.go", 10, 5, 10, 15)
@@ -506,10 +506,10 @@ func TestFormatDocumentToolExecution(t *testing.T) {
 	}
 
 	// Expectation for successful case
-	bridge.On("FormatDocument", "file:///test.go", int32(4), true).Return(successResult, nil)
+	bridge.On("FormatDocument", "file:///test.go", uint32(4), true).Return(successResult, nil)
 
 	// Expectation for error case
-	bridge.On("FormatDocument", "file:///error.go", int32(4), true).Return([]protocol.TextEdit(nil), fmt.Errorf("formatting failed"))
+	bridge.On("FormatDocument", "file:///error.go", uint32(4), true).Return([]protocol.TextEdit(nil), fmt.Errorf("formatting failed"))
 
 	// Test successful formatting
 	result, err := bridge.FormatDocument("file:///test.go", 4, true)
@@ -559,11 +559,11 @@ func TestRenameToolExecution(t *testing.T) {
 
 	// Expectation for successful case
 	// Match the arguments used in the actual call: uri, line, character, newName, dryRun
-	bridge.On("RenameSymbol", "file:///test.go", int32(10), int32(5), "newName", true).Return(&successResult, nil)
+	bridge.On("RenameSymbol", "file:///test.go", uint32(10), uint32(5), "newName", true).Return(&successResult, nil)
 
 	// Expectation for error case
 	// Assuming "InvalidName" is the new name that would cause an error
-	bridge.On("RenameSymbol", "file:///test.go", int32(10), int32(5), "InvalidName", true).Return((*protocol.WorkspaceEdit)(nil), fmt.Errorf("formatting failed"))
+	bridge.On("RenameSymbol", "file:///test.go", uint32(10), uint32(5), "InvalidName", true).Return((*protocol.WorkspaceEdit)(nil), fmt.Errorf("formatting failed"))
 
 	// Test successful rename
 	result, err := bridge.RenameSymbol("file:///test.go", 10, 5, "newName", true)
@@ -600,11 +600,11 @@ func TestImplementationToolExecution(t *testing.T) {
 
 	// Expectation for successful implementation search
 	// When FindImplementations is called with "file:///test.go", 10, 5, it should return successResult and nil error.
-	bridge.On("FindImplementations", "file:///test.go", int32(10), int32(5)).Return(successResult, nil)
+	bridge.On("FindImplementations", "file:///test.go", uint32(10), uint32(5)).Return(successResult, nil)
 
 	// Expectation for error case
 	// When FindImplementations is called with "file:///error.go", 10, 5, it should return nil and an error.
-	bridge.On("FindImplementations", "file:///error.go", int32(10), int32(5)).Return([]protocol.Location(nil), fmt.Errorf("implementation search failed"))
+	bridge.On("FindImplementations", "file:///error.go", uint32(10), uint32(5)).Return([]protocol.Location(nil), fmt.Errorf("implementation search failed"))
 
 
 	// Test successful implementation search
@@ -643,8 +643,8 @@ func TestCallHierarchyToolExecution(t *testing.T) {
 		},
 	}
 
-	bridge.On("PrepareCallHierarchy", "file:///test.go", int32(10), int32(5)).Return(successResult, nil)
-	bridge.On("PrepareCallHierarchy", "file:///error.go", int32(10), int32(5)).Return([]protocol.CallHierarchyItem(nil), fmt.Errorf("call hierarchy failed"))
+	bridge.On("PrepareCallHierarchy", "file:///test.go", uint32(10), uint32(5)).Return(successResult, nil)
+	bridge.On("PrepareCallHierarchy", "file:///error.go", uint32(10), uint32(5)).Return([]protocol.CallHierarchyItem(nil), fmt.Errorf("call hierarchy failed"))
 
 	// Test successful call hierarchy preparation
 	result, err := bridge.PrepareCallHierarchy("file:///test.go", 10, 5)
