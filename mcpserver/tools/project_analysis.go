@@ -21,7 +21,8 @@ func RegisterProjectAnalysisTool(mcpServer ToolServer, bridge interfaces.BridgeI
 }
 
 func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
-	return mcp.NewTool("project_analysis",
+	return mcp.NewTool(
+		"project_analysis",
 		mcp.WithDescription("Multi-purpose code analysis tool. Use 'definitions' for precise symbol targeting, 'references' for usage locations, 'workspace_symbols' for symbol discovery, 'document_symbols' for file exploration, 'text_search' for content search."),
 		mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
 		mcp.WithString("query", mcp.Description("Symbol name (for definitions/references/workspace_symbols) or file path (for document_symbols) or text pattern (for text_search)")),
@@ -98,294 +99,26 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 		}
 
 		var response strings.Builder
-		response.WriteString(fmt.Sprintf("Project Analysis: %s\n", analysisType))
-		response.WriteString(fmt.Sprintf("Query: %s\n", query))
-		response.WriteString(fmt.Sprintf("Workspace: %s\n", workspaceUri))
-		response.WriteString(fmt.Sprintf("Detected Languages: %v\n", languages))
-		response.WriteString(fmt.Sprintf("Active Language: %s\n\n", activeLanguage))
+		fmt.Fprintf(&response, "Project Analysis: %s\n", analysisType)
+		fmt.Fprintf(&response, "Query: %s\n", query)
+		fmt.Fprintf(&response, "Workspace: %s\n", workspaceUri)
+		fmt.Fprintf(&response, "Detected Languages: %v\n", languages)
+		fmt.Fprintf(&response, "Active Language: %s\n\n", activeLanguage)
 
 		switch analysisType {
 		case "workspace_symbols":
-			symbols, err := lspClient.WorkspaceSymbols(query)
-			if err != nil {
-				logger.Error("Workspace symbols query failed", fmt.Sprintf("Language: %s, Query: %s, Error: %v", activeLanguage, query, err))
-				response.WriteString("=== WORKSPACE SYMBOLS ===\n")
-				response.WriteString(fmt.Sprintf("Error: Failed to get workspace symbols for language\n'%s': %v\n", activeLanguage, err))
-				break
-			}
-
-			// Apply pagination
-			totalCount := len(symbols)
-
-			// Handle offset
-			if offset >= totalCount {
-				response.WriteString(fmt.Sprintf("Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount))
-				break
-			}
-
-			// Apply offset and limit
-			end := min(offset+limit, totalCount)
-
-			paginatedSymbols := symbols[offset:end]
-			resultCount := len(paginatedSymbols)
-
-			// Format pagination info
-			if offset > 0 || end < totalCount {
-				response.WriteString(fmt.Sprintf("Showing results %d-%d of %d total:\n\n", offset+1, offset+resultCount, totalCount))
-			} else {
-				response.WriteString(fmt.Sprintf("Found %d results:\n\n", totalCount))
-			}
-
-			for i, symbol := range paginatedSymbols {
-				switch v := symbol.Location.Value.(type) {
-
-				case protocol.Location:
-					// Extract filename from URI
-					uri := string(v.Uri)
-					filename := filepath.Base(strings.TrimPrefix(uri, "file://"))
-
-					// Format symbol kind in a readable way
-					kindStr := symbolKindToString(symbol.Kind)
-
-					// Extract location coordinates
-					startLine := v.Range.Start.Line
-					startChar := v.Range.Start.Character
-					endLine := v.Range.End.Line
-					endChar := v.Range.End.Character
-
-					// Format with coordinates optimized for LLM agent consumption
-					response.WriteString(fmt.Sprintf("%d. %s (%s) in %s\n",
-						offset+i+1,
-						symbol.Name,
-						kindStr,
-						filename))
-					response.WriteString(fmt.Sprintf("	URI: %s\n", uri))
-					response.WriteString(fmt.Sprintf("	Range: line=%d, character=%d to line=%d, character=%d\n",
-						startLine, startChar, endLine, endChar))
-
-					// Provide agent-optimized targeting coordinates
-					nameLen := len(symbol.Name)
-					response.WriteString("	Target coordinates for hover/references/definitions:\n")
-					response.WriteString(fmt.Sprintf("	  - Primary: line=%d, character=%d\n", startLine, startChar))
-
-					// Calculate precise positions within the identifier
-					if nameLen > 3 {
-						midChar := startChar + uint32(nameLen/2)
-						response.WriteString(fmt.Sprintf("	  - Alternative: line=%d, character=%d\n", startLine, midChar))
-					}
-
-					// Provide the most reliable coordinate for hover operations
-					bestHoverChar := startChar
-					if nameLen > 1 {
-						offset := min(nameLen/2, 5)
-						bestHoverChar = startChar + uint32(offset)
-					}
-					response.WriteString(fmt.Sprintf("	Recommended hover coordinate: uri=\"%s\", line=%d, character=%d\n",
-						uri, startLine, bestHoverChar))
-				default:
-					response.WriteString("Unhandled hover method protocol.Location")
-
-				}
-			}
-
-			// Show pagination info
-			if end < totalCount {
-				remaining := totalCount - end
-				response.WriteString(fmt.Sprintf("\n... and %d more results available (use offset=%d to see next page)\n", remaining, end))
-			}
-
+			return handleWorkspaceSymbols(lspClient, query, offset, limit, workspaceUri, languages, activeLanguage, &response)
 		case "document_symbols":
-			// For document symbols, the query should be a file URI
-			docUri := query
-			if !strings.HasPrefix(query, "file://") {
-				// If query is not a URI, treat it as a file path and normalize it
-				docUri = normalizeURI(query)
-			}
-
-			response.WriteString("=== DOCUMENT SYMBOLS ===\n")
-			response.WriteString(fmt.Sprintf("Document: %s\n\n", docUri))
-
-			symbols, err := bridge.GetDocumentSymbols(docUri)
-			if err != nil {
-				logger.Error("Document symbols query failed", fmt.Sprintf("URI: %s, Error: %v", docUri, err))
-				response.WriteString(fmt.Sprintf("Error: Failed to get document symbols: %v\n", err))
-				break
-			}
-
-			if len(symbols) == 0 {
-				response.WriteString("No symbols found in document.\n")
-				break
-			}
-
-			// Apply pagination to document symbols
-			totalCount := len(symbols)
-
-			// Handle offset
-			if offset >= totalCount {
-				response.WriteString(fmt.Sprintf("Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount))
-				break
-			}
-
-			// Apply offset and limit
-			end := min(offset+limit, totalCount)
-
-			paginatedSymbols := symbols[offset:end]
-			resultCount := len(paginatedSymbols)
-
-			// Format pagination info
-			if offset > 0 || end < totalCount {
-				response.WriteString(fmt.Sprintf("Showing symbols %d-%d of %d total:\n\n", offset+1, offset+resultCount, totalCount))
-			} else {
-				response.WriteString(fmt.Sprintf("Found %d symbols:\n\n", totalCount))
-			}
-
-			// Format symbols with hierarchy
-			for i, sym := range paginatedSymbols {
-				formatDocumentSymbolWithTargeting(&response, sym, 0, offset+i+1, docUri)
-			}
-
-			// Show pagination info
-			if end < totalCount {
-				remaining := totalCount - end
-				response.WriteString(fmt.Sprintf("\n... and %d more symbols available (use offset=%d to see next page)\n", remaining, end))
-			}
-
+			return handleDocumentSymbols(bridge, query, offset, limit, &response)
 		case "references":
-			// For references, search for the symbol first
-			symbols, err := lspClient.WorkspaceSymbols(query)
-			if err != nil {
-				response.WriteString("=== REFERENCES ===\n")
-				response.WriteString(fmt.Sprintf("Error: Cannot find references - workspace symbols search failed: %v\n", err))
-				break
-			}
-
-			response.WriteString("=== REFERENCES ===\n")
-			if len(symbols) == 0 {
-				response.WriteString(fmt.Sprintf("No symbols found matching the query '%s'.\n", query))
-				break
-			}
-
-			// Use the first symbol found
-			symbol := symbols[0]
-			switch v := symbol.Location.Value.(type) {
-			case protocol.Location:
-				uri := string(v.Uri)
-				line := v.Range.Start.Line
-				character := v.Range.Start.Character
-
-				references, err := bridge.FindSymbolReferences(activeLanguage, uri, uint32(line), uint32(character), true)
-				if err != nil {
-					response.WriteString(fmt.Sprintf("Failed to find references: %v\n", err))
-					break
-				}
-
-				if len(references) == 0 {
-					response.WriteString(fmt.Sprintf("No references found for symbol '%s'.\n", symbol.Name))
-					break
-				}
-
-				response.WriteString(fmt.Sprintf("Found %d references for symbol '%s':\n", len(references), symbol.Name))
-				for i, ref := range references {
-					response.WriteString(fmt.Sprintf("%d. %v\n", i+1, ref))
-				}
-			default:
-				return mcp.NewToolResultError(fmt.Sprintf("Unsupported reference format: %s", v)), nil
-			}
-
+			return handleReferences(bridge, lspClient, query, offset, limit, activeLanguage, &response)
 		case "definitions":
-			// For definitions, search for the symbol first
-			symbols, err := lspClient.WorkspaceSymbols(query)
-			if err != nil {
-				response.WriteString("=== DEFINITIONS ===\n")
-				response.WriteString(fmt.Sprintf("Error: Cannot find definitions - workspace symbols search failed: %v\n", err))
-				break
-			}
-
-			response.WriteString("=== DEFINITIONS ===\n")
-			if len(symbols) == 0 {
-				response.WriteString(fmt.Sprintf("No symbols found matching the query '%s'.\n", query))
-				break
-			}
-
-			// Use the first symbol found
-			symbol := symbols[0]
-
-			switch v := symbol.Location.Value.(type) {
-
-			case protocol.Location:
-				uri := string(v.Uri)
-				line := v.Range.Start.Line
-				character := v.Range.Start.Character
-
-				definitions, err := bridge.FindSymbolDefinitions(activeLanguage, uri, uint32(line), uint32(character))
-				if err != nil {
-					response.WriteString(fmt.Sprintf("Failed to find definitions: %v\n", err))
-					break
-				}
-
-				if len(definitions) == 0 {
-					response.WriteString(fmt.Sprintf("No definitions found for symbol '%s'.\n", symbol.Name))
-					break
-				}
-
-				response.WriteString(fmt.Sprintf("Found %d definitions for symbol '%s':\n", len(definitions), symbol.Name))
-				for i, def := range definitions {
-					response.WriteString(fmt.Sprintf("%d. %v\n", i+1, def))
-				}
-			default:
-				return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", analysisType)), nil
-			}
-
+			return handleDefinitions(bridge, lspClient, query, offset, limit, activeLanguage, &response)
 		case "text_search":
-			response.WriteString("=== TEXT SEARCH ===\n")
-			searchResults, err := bridge.SearchTextInWorkspace(activeLanguage, query)
-			if err != nil {
-				response.WriteString(fmt.Sprintf("Text search failed: %v\n", err))
-				break
-			}
-
-			if len(searchResults) == 0 {
-				response.WriteString(fmt.Sprintf("No results found for query '%s'.\n", query))
-				break
-			}
-
-			// Apply pagination to text search results
-			totalCount := len(searchResults)
-
-			// Handle offset
-			if offset >= totalCount {
-				response.WriteString(fmt.Sprintf("Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount))
-				break
-			}
-
-			// Apply offset and limit
-			end := min(offset+limit, totalCount)
-
-			paginatedResults := searchResults[offset:end]
-			resultCount := len(paginatedResults)
-
-			// Format pagination info
-			if offset > 0 || end < totalCount {
-				response.WriteString(fmt.Sprintf("Showing results %d-%d of %d total:\n\n", offset+1, offset+resultCount, totalCount))
-			} else {
-				response.WriteString(fmt.Sprintf("Found %d results:\n\n", totalCount))
-			}
-
-			for i, result := range paginatedResults {
-				response.WriteString(fmt.Sprintf("%d. %v\n", offset+i+1, result))
-			}
-
-			// Show pagination info
-			if end < totalCount {
-				remaining := totalCount - end
-				response.WriteString(fmt.Sprintf("\n... and %d more results available (use offset=%d to see next page)\n", remaining, end))
-			}
-
+			return handleTextSearch(bridge, query, offset, limit, activeLanguage, &response)
 		default:
 			return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", analysisType)), nil
 		}
-
-		return mcp.NewToolResultText(response.String()), nil
 	}
 }
 
@@ -486,4 +219,294 @@ func formatDocumentSymbolWithTargeting(response *strings.Builder, symbol protoco
 	for _, child := range symbol.Children {
 		formatDocumentSymbolWithTargeting(response, child, depth+1, 0, "")
 	}
+}
+
+// handleWorkspaceSymbols handles the 'workspace_symbols' analysis type
+func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset, limit int, workspaceUri string, languages []string, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
+	symbols, err := lspClient.WorkspaceSymbols(query)
+	if err != nil {
+		logger.Error("Workspace symbols query failed", fmt.Sprintf("Language: %s, Query: %s, Error: %v", activeLanguage, query, err))
+		response.WriteString("=== WORKSPACE SYMBOLS ===\n")
+		fmt.Fprintf(response, "Error: Failed to get workspace symbols for language '%s': %v\n", activeLanguage, err)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	// Apply pagination
+	totalCount := len(symbols)
+
+	// Handle offset
+	if offset >= totalCount {
+		fmt.Fprintf(response, "Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	// Apply offset and limit
+	end := min(offset+limit, totalCount)
+
+	paginatedSymbols := symbols[offset:end]
+	resultCount := len(paginatedSymbols)
+
+	// Format pagination info
+	if offset > 0 || end < totalCount {
+		fmt.Fprintf(response, "Showing results %d-%d of %d total:\n", offset+1, offset+resultCount, totalCount)
+	} else {
+		fmt.Fprintf(response, "Found %d results:\n", totalCount)
+	}
+
+	for i, symbol := range paginatedSymbols {
+		switch v := symbol.Location.Value.(type) {
+
+		case protocol.Location:
+			// Extract filename from URI
+			uri := string(v.Uri)
+			filename := filepath.Base(strings.TrimPrefix(uri, "file://"))
+
+			// Format symbol kind in a readable way
+			kindStr := symbolKindToString(symbol.Kind)
+
+			// Extract location coordinates
+			startLine := v.Range.Start.Line
+			startChar := v.Range.Start.Character
+			endLine := v.Range.End.Line
+			endChar := v.Range.End.Character
+
+			// Format with coordinates optimized for LLM agent consumption
+			fmt.Fprintf(response, "%d. %s (%s) in %s\n",
+				offset+i+1,
+				symbol.Name,
+				kindStr,
+				filename)
+			fmt.Fprintf(response, "\tURI: %s\n", uri)
+			fmt.Fprintf(response, "\tRange: line=%d, character=%d to line=%d, character=%d\n",
+				startLine, startChar, endLine, endChar)
+
+			// Provide agent-optimized targeting coordinates
+			nameLen := len(symbol.Name)
+			response.WriteString("\tTarget coordinates for hover/references/definitions:\n")
+			fmt.Fprintf(response, "\t - Primary: line=%d, character=%d\n", startLine, startChar)
+
+			// Calculate precise positions within the identifier
+			if nameLen > 3 {
+				midChar := startChar + uint32(nameLen/2)
+				fmt.Fprintf(response, "\t - Alternative: line=%d, character=%d\n", startLine, midChar)
+			}
+
+			// Provide the most reliable coordinate for hover operations
+			bestHoverChar := startChar
+			if nameLen > 1 {
+				offset := min(nameLen/2, 5)
+				bestHoverChar = startChar + uint32(offset)
+			}
+			fmt.Fprintf(response, "\tRecommended hover coordinate: uri=\"%s\", line=%d, character=%d\n",
+				uri, startLine, bestHoverChar)
+		default:
+			response.WriteString("Unhandled hover method protocol.Location")
+		}
+	}
+
+	// Show pagination info
+	if end < totalCount {
+		remaining := totalCount - end
+		fmt.Fprintf(response, "\n... and %d more results available (use offset=%d to see next page)\n", remaining, end)
+	}
+	return mcp.NewToolResultText(response.String()), nil
+}
+
+// handleDocumentSymbols handles the 'document_symbols' analysis type
+func handleDocumentSymbols(bridge interfaces.BridgeInterface, query string, offset, limit int, response *strings.Builder) (*mcp.CallToolResult, error) {
+	// For document symbols, the query should be a file URI
+	docUri := query
+	if !strings.HasPrefix(query, "file://") {
+		// If query is not a URI, treat it as a file path and normalize it
+		docUri = normalizeURI(query)
+	}
+
+	response.WriteString("=== DOCUMENT SYMBOLS ===\n")
+	fmt.Fprintf(response, "Document: %s\n", docUri)
+
+	symbols, err := bridge.GetDocumentSymbols(docUri)
+	if err != nil {
+		logger.Error("Document symbols query failed", fmt.Sprintf("URI: %s, Error: %v", docUri, err))
+		fmt.Fprintf(response, "Error: Failed to get document symbols: %v\n", err)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	if len(symbols) == 0 {
+		response.WriteString("No symbols found in document.\n")
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	// Apply pagination to document symbols
+	totalCount := len(symbols)
+
+	// Handle offset
+	if offset >= totalCount {
+		fmt.Fprintf(response, "Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	// Apply offset and limit
+	end := min(offset+limit, totalCount)
+
+	paginatedSymbols := symbols[offset:end]
+	resultCount := len(paginatedSymbols)
+
+	// Format pagination info
+	if offset > 0 || end < totalCount {
+		fmt.Fprintf(response, "Showing symbols %d-%d of %d total:\n", offset+1, offset+resultCount, totalCount)
+	} else {
+		fmt.Fprintf(response, "Found %d symbols:\n", totalCount)
+	}
+
+	// Format symbols with hierarchy
+	for i, sym := range paginatedSymbols {
+		formatDocumentSymbolWithTargeting(response, sym, 0, offset+i+1, docUri)
+	}
+
+	// Show pagination info
+	if end < totalCount {
+		remaining := totalCount - end
+		fmt.Fprintf(response, "\n... and %d more symbols available (use offset=%d to see next page)\n", remaining, end)
+	}
+	return mcp.NewToolResultText(response.String()), nil
+}
+
+// handleReferences handles the 'references' analysis type
+func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
+	// For references, search for the symbol first
+	symbols, err := lspClient.WorkspaceSymbols(query)
+	if err != nil {
+		response.WriteString("=== REFERENCES ===\n")
+		fmt.Fprintf(response, "Error: Cannot find references - workspace symbols search failed: %v\n", err)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	response.WriteString("=== REFERENCES ===\n")
+	if len(symbols) == 0 {
+		fmt.Fprintf(response, "No symbols found matching the query '%s'.\n", query)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	// Use the first symbol found
+	symbol := symbols[0]
+	switch v := symbol.Location.Value.(type) {
+	case protocol.Location:
+		uri := string(v.Uri)
+		line := v.Range.Start.Line
+		character := v.Range.Start.Character
+
+		references, err := bridge.FindSymbolReferences(activeLanguage, uri, uint32(line), uint32(character), true)
+		if err != nil {
+			fmt.Fprintf(response, "Failed to find references: %v\n", err)
+			return mcp.NewToolResultText(response.String()), nil
+		}
+
+		if len(references) == 0 {
+			fmt.Fprintf(response, "No references found for symbol '%s'.\n", symbol.Name)
+			return mcp.NewToolResultText(response.String()), nil
+		}
+
+		fmt.Fprintf(response, "Found %d references for symbol '%s':\n", len(references), symbol.Name)
+		for i, ref := range references {
+			fmt.Fprintf(response, "%d. %v\n", i+1, ref)
+		}
+	default:
+		return mcp.NewToolResultError(fmt.Sprintf("Unsupported reference format: %s", v)), nil
+	}
+	return mcp.NewToolResultText(response.String()), nil
+}
+
+// handleDefinitions handles the 'definitions' analysis type
+func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
+	// For definitions, search for the symbol first
+	symbols, err := lspClient.WorkspaceSymbols(query)
+	if err != nil {
+		response.WriteString("=== DEFINITIONS ===\n")
+		fmt.Fprintf(response, "Error: Cannot find definitions - workspace symbols search failed: %v\n", err)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	response.WriteString("=== DEFINITIONS ===\n")
+	if len(symbols) == 0 {
+		fmt.Fprintf(response, "No symbols found matching the query '%s'.\n", query)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	// Use the first symbol found
+	symbol := symbols[0]
+
+	switch v := symbol.Location.Value.(type) {
+
+	case protocol.Location:
+		uri := string(v.Uri)
+		line := v.Range.Start.Line
+		character := v.Range.Start.Character
+
+		definitions, err := bridge.FindSymbolDefinitions(activeLanguage, uri, uint32(line), uint32(character))
+		if err != nil {
+			fmt.Fprintf(response, "Failed to find definitions: %v\n", err)
+			return mcp.NewToolResultText(response.String()), nil
+		}
+
+		if len(definitions) == 0 {
+			fmt.Fprintf(response, "No definitions found for symbol '%s'.\n", symbol.Name)
+			return mcp.NewToolResultText(response.String()), nil
+		}
+
+		fmt.Fprintf(response, "Found %d definitions for symbol '%s':\n", len(definitions), symbol.Name)
+		for i, def := range definitions {
+			fmt.Fprintf(response, "%d. %v\n", i+1, def)
+		}
+	default:
+		return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", "definitions")), nil
+	}
+	return mcp.NewToolResultText(response.String()), nil
+}
+
+// handleTextSearch handles the 'text_search' analysis type
+func handleTextSearch(bridge interfaces.BridgeInterface, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
+	response.WriteString("=== TEXT SEARCH ===\n")
+	searchResults, err := bridge.SearchTextInWorkspace(activeLanguage, query)
+	if err != nil {
+		fmt.Fprintf(response, "Text search failed: %v\n", err)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	if len(searchResults) == 0 {
+		fmt.Fprintf(response, "No results found for query '%s'.\n", query)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	// Apply pagination to text search results
+	totalCount := len(searchResults)
+
+	// Handle offset
+	if offset >= totalCount {
+		fmt.Fprintf(response, "Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount)
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	// Apply offset and limit
+	end := min(offset+limit, totalCount)
+
+	paginatedResults := searchResults[offset:end]
+	resultCount := len(paginatedResults)
+
+	// Format pagination info
+	if offset > 0 || end < totalCount {
+		fmt.Fprintf(response, "Showing results %d-%d of %d total:\n", offset+1, offset+resultCount, totalCount)
+	} else {
+		fmt.Fprintf(response, "Found %d results:\n", totalCount)
+	}
+
+	for i, result := range paginatedResults {
+		fmt.Fprintf(response, "%d. %v\n", offset+i+1, result)
+	}
+
+	// Show pagination info
+	if end < totalCount {
+		remaining := totalCount - end
+		fmt.Fprintf(response, "\n... and %d more results available (use offset=%d to see next page)\n", remaining, end)
+	}
+	return mcp.NewToolResultText(response.String()), nil
 }
