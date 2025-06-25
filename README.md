@@ -2,6 +2,10 @@
 
 A Go-based bridge that combines MCP (Model Context Protocol) server capabilities with LSP (Language Server Protocol) client functionality for advanced code analysis and interaction.
 
+## Under development
+
+**NOTE**: Currently working to build up functionality and laying down the groundwork for the interface. Consider that many things may change as we work into making it more streamlined.
+
 ## Features
 
 ### Core Capabilities
