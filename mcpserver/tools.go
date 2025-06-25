@@ -26,6 +26,7 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 	// Code improvement tools
 	tools.RegisterCodeActionsTool(mcpServer, bridge)
 	tools.RegisterFormatDocumentTool(mcpServer, bridge)
+	tools.RegisterRangeTools(mcpServer, bridge)
 
 	// Advanced navigation tools
 	tools.RegisterRenameTool(mcpServer, bridge)
