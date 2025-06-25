@@ -17,7 +17,6 @@ jobs:
         curl -L https://github.com/rockerBOO/mock-lsp-server/releases/download/v0.1.0/mock-lsp-server-linux-amd64-v0.1.0.tar.gz -o mock-lsp-server.tar.gz
         tar -xzf mock-lsp-server.tar.gz
         mv mock-lsp-server-linux-amd64 mock-lsp-server
-        echo "::add-path::$PWD/mock-lsp-server"
     - name: Set up Go
       uses: actions/setup-go@v3
       with:
