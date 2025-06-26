@@ -86,8 +86,6 @@ func TestInferLanguage(t *testing.T) {
 	}
 }
 
-
-
 // Benchmark client creation
 func BenchmarkGetClientForLanguage(b *testing.B) {
 	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
