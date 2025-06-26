@@ -11,14 +11,37 @@ type MockBridge struct {
 	mock.Mock
 }
 
-func (m *MockBridge) GetClientForLanguageInterface(language string) (any, error) {
-	args := m.Called(language)
-	return args.Get(0), args.Error(1)
+// func (m *MockBridge) GetClientForLanguageInterface(language string) (*lsp.LanguageClientInterface, error) {
+// 	args := m.Called(language)
+// 	return args.Get(0).(*lsp.LanguageClientInterface), args.Error(1)
+// }
+func (m *MockBridge) GetClientForLanguageInterface(language string) (lsp.LanguageClientInterface, error) {
+    args := m.Called(language)
+    
+    // Safe type assertion with error checking
+    if args.Get(0) == nil {
+        return nil, args.Error(1)
+    }
+    
+    // Try to assert to the interface type
+    if client, ok := args.Get(0).(lsp.LanguageClientInterface); ok {
+        return client, args.Error(1)
+    }
+    
+    // If that fails, it might be the concrete mock type, so convert it
+    if mockClient, ok := args.Get(0).(*MockLanguageClient); ok {
+        return mockClient, args.Error(1)
+    }
+    
+    return nil, args.Error(1)
 }
 
-func (m *MockBridge) InferLanguage(filePath string) (string, error) {
+func (m *MockBridge) InferLanguage(filePath string) (lsp.Language, error) {
 	args := m.Called(filePath)
-	return args.String(0), args.Error(1)
+	if args.Get(0) == nil {
+		return lsp.Language(""), args.Error(1)
+	}
+	return args.Get(0).(lsp.Language), args.Error(1)
 }
 
 func (m *MockBridge) CloseAllClients() {
@@ -110,17 +133,22 @@ func (m *MockBridge) FindImplementations(uri string, line, character uint32) ([]
 	return args.Get(0).([]protocol.Location), args.Error(1)
 }
 
+func (m *MockBridge) SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]lsp.TokenPosition, error) {
+	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter)
+	return args.Get(0).([]lsp.TokenPosition), args.Error(1)
+}
+
 func (m *MockBridge) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).([]protocol.CallHierarchyItem), args.Error(1)
 }
 
-func (m *MockBridge) GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall , error) {
+func (m *MockBridge) GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
 	args := m.Called(item)
 	return args.Get(0).([]protocol.CallHierarchyIncomingCall), args.Error(1)
 }
 
-func (m *MockBridge) GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall , error) {
+func (m *MockBridge) GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
 	args := m.Called(item)
 	return args.Get(0).([]protocol.CallHierarchyOutgoingCall), args.Error(1)
 }

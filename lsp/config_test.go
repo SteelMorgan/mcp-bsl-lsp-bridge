@@ -33,7 +33,7 @@ func createTempProjectWithFiles(t *testing.T, files map[string]string) string {
 func TestDetectProjectLanguages(t *testing.T) {
 	// Create a test configuration
 	config := &LSPServerConfig{
-		LanguageServers: map[string]LanguageServerConfig{
+		LanguageServers: map[Language]LanguageServerConfig{
 			"go": {
 				Filetypes: []string{".go"},
 			},
@@ -44,7 +44,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				Filetypes: []string{".ts", ".js"},
 			},
 		},
-		ExtensionLanguageMap: map[string]string{
+		ExtensionLanguageMap: map[string]Language{
 			".go": "go",
 			".py": "python",
 			".ts": "typescript",
@@ -133,7 +133,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 func TestDetectPrimaryProjectLanguage(t *testing.T) {
 	// Create a test configuration
 	config := &LSPServerConfig{
-		LanguageServers: map[string]LanguageServerConfig{
+		LanguageServers: map[Language]LanguageServerConfig{
 			"go": {
 				Filetypes: []string{".go"},
 			},
@@ -144,7 +144,7 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 				Filetypes: []string{".ts", ".js"},
 			},
 		},
-		ExtensionLanguageMap: map[string]string{
+		ExtensionLanguageMap: map[string]Language{
 			".go": "go",
 			".py": "python",
 			".ts": "typescript",

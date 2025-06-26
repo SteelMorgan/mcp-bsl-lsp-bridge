@@ -20,7 +20,7 @@ func TestInferLanguageToolHandler(t *testing.T) {
 
 	// Setup mock expectations
 	mockConfig := &lsp.LSPServerConfig{
-		ExtensionLanguageMap: map[string]string{
+		ExtensionLanguageMap: map[string]lsp.Language{
 			".go":   "go",
 			".js":   "javascript",
 			".py":   "python",

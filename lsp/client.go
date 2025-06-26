@@ -199,7 +199,7 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	reqCtx, cancel := context.WithTimeout(lc.ctx, timeout)
 	defer cancel()
 
-	logger.Debug(fmt.Sprintf("LSP Request: method=%s params=%+v", method, params))
+	logger.Debug(fmt.Sprintf("LSP Request: method=%s params=%v", method, params))
 
 	err := lc.conn.Call(reqCtx, method, params, result)
 	if err != nil {
@@ -255,4 +255,18 @@ func (lc *LanguageClient) GetMetrics() ClientMetrics {
 		IsConnected:        lc.IsConnected(),
 		ProcessID:          lc.processID,
 	}
+}
+
+func (lc *LanguageClient) SetupSemanticTokens() error {
+	tokenTypes, tokenModifiers, err := GetTokenTypeFromServerCapabilities(&lc.serverCapabilities)
+	if err != nil {
+		return err
+	}
+
+	lc.tokenParser = NewSemanticTokenParser(tokenTypes, tokenModifiers)
+	return nil
+}
+
+func (lc *LanguageClient) TokenParser() *SemanticTokenParser {
+	return lc.tokenParser
 }

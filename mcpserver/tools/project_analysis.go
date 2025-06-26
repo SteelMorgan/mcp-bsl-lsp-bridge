@@ -430,9 +430,36 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 	if len(symbols) == 0 {
 		fmt.Fprintf(response, "No symbols found matching the query '%s'.\n", query)
 		return mcp.NewToolResultText(response.String()), nil
+
+	} else if len(symbols) > 1 {
+		// If multiple symbols found, list them and ask for clarification
+		fmt.Fprintf(response, "Multiple symbols found matching the query '%s'.\n", query)
+		fmt.Fprintf(response, "Please clarify which one you mean:\n")
+		// Iterate through symbols and format them similar to workspace_symbols
+		for i, symbol := range symbols {
+			if v, ok := symbol.Location.Value.(protocol.Location); ok {
+				uri := string(v.Uri)
+				filename := filepath.Base(strings.TrimPrefix(uri, "file://"))
+				kindStr := symbolKindToString(symbol.Kind)
+				startLine := v.Range.Start.Line
+				startChar := v.Range.Start.Character
+				endLine := v.Range.End.Line
+				endChar := v.Range.End.Character
+
+				fmt.Fprintf(response, "%d. %s (%s) in %s\n", i+1, symbol.Name, kindStr, filename)
+				fmt.Fprintf(response, "	URI: %s\n", uri)
+				fmt.Fprintf(response, "	Range: line=%d, character=%d to line=%d, character=%d\n",
+					startLine, startChar, endLine, endChar)
+			} else {
+				fmt.Fprintf(response, "%d. %s (Unsupported Location Type: %T)\n", i+1, symbol.Name, symbol.Location.Value)
+			}
+		}
+		fmt.Fprintf(response, "Please provide a more specific query or the full path to the file containing the desired symbol.\n")
+		return mcp.NewToolResultText(response.String()), nil
 	}
 
-	// Use the first symbol found
+	// If only one symbol found, proceed to find its definitions
+	// Use the first (and only) symbol found
 	symbol := symbols[0]
 
 	switch v := symbol.Location.Value.(type) {
@@ -455,10 +482,35 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 
 		fmt.Fprintf(response, "Found %d definitions for symbol '%s':\n", len(definitions), symbol.Name)
 		for i, def := range definitions {
-			fmt.Fprintf(response, "%d. %v\n", i+1, def)
+			// A definition can be LocationLink or Location (protocol.Or2[protocol.LocationLink, protocol.Location])
+			// Need to switch on the value of the Or2
+			if loc, ok := def.Value.(protocol.Location); ok {
+				defUri := string(loc.Uri)
+				defFilename := filepath.Base(strings.TrimPrefix(defUri, "file://"))
+				defStartLine := loc.Range.Start.Line
+				defStartChar := loc.Range.Start.Character
+				defEndLine := loc.Range.End.Line
+				defEndChar := loc.Range.End.Character
+				fmt.Fprintf(response, "%d. %s:line=%d, character=%d to line=%d, character=%d\n",
+					i+1, defFilename, defStartLine, defStartChar, defEndLine, defEndChar)
+				fmt.Fprintf(response, "	URI: %s\n", defUri)
+			} else if locLink, ok := def.Value.(protocol.LocationLink); ok {
+				// LocationLink has OriginSelectionRange and TargetUri/Range/SelectionRange
+				defUri := string(locLink.TargetUri)
+				defFilename := filepath.Base(strings.TrimPrefix(defUri, "file://"))
+				defStartLine := locLink.TargetRange.Start.Line
+				defStartChar := locLink.TargetRange.Start.Character
+				defEndLine := locLink.TargetRange.End.Line
+				defEndChar := locLink.TargetRange.End.Character
+				fmt.Fprintf(response, "%d. %s:line=%d, character=%d to line=%d, character=%d\n",
+					i+1, defFilename, defStartLine, defStartChar, defEndLine, defEndChar)
+				fmt.Fprintf(response, "	URI: %s\n", defUri)
+			} else {
+				fmt.Fprintf(response, "%d. Definition with unsupported type: %T\n", i+1, def.Value)
+			}
 		}
 	default:
-		return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", "definitions")), nil
+		return mcp.NewToolResultError(fmt.Sprintf("Unexpected symbol location format from workspace search: %T\n", v)), nil
 	}
 	return mcp.NewToolResultText(response.String()), nil
 }

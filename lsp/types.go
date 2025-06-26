@@ -31,6 +31,8 @@ type LanguageClient struct {
 	clientCapabilities protocol.ClientCapabilities
 	serverCapabilities protocol.ServerCapabilities
 
+	tokenParser *SemanticTokenParser
+
 	// Connection management
 	command         string
 	args            []string
@@ -84,6 +86,8 @@ type LanguageClientInterface interface {
 	ClientCapabilities() protocol.ClientCapabilities
 	ServerCapabilities() protocol.ServerCapabilities
 	SetServerCapabilities(capabilities protocol.ServerCapabilities)
+	SetupSemanticTokens() error
+	TokenParser() *SemanticTokenParser
 
 	// Text document synchronization
 	DidOpen(uri string, languageId protocol.LanguageKind, text string, version int32) error
@@ -99,6 +103,8 @@ type LanguageClientInterface interface {
 	DocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)
 	Implementation(uri string, line, character uint32) ([]protocol.Location, error)
 	SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error)
+	SemanticTokens(uri string) (*protocol.SemanticTokens, error)
+	SemanticTokensRange(uri string, startLine, startCharacter, endLine, endCharacter uint32) (*protocol.SemanticTokens, error)
 }
 
 type LSPConnectionInterface interface {
@@ -108,21 +114,14 @@ type LSPConnectionInterface interface {
 	Close() error
 }
 
-// func (c *Conn) Call(ctx context.Context, method string, params, result interface{}, ...) error
-// func (c *Conn) Close() error
-// func (c *Conn) DisconnectNotify() <-chan struct{}
-// func (c *Conn) DispatchCall(ctx context.Context, method string, params interface{}, opts ...CallOption) (Waiter, error)
-// func (c *Conn) Notify(ctx context.Context, method string, params interface{}, opts ...CallOption) error
-// func (c *Conn) Reply(ctx context.Context, id ID, result interface{}) error
-// func (c *Conn) ReplyWithError(ctx context.Context, id ID, respErr *Error) error
-// func (c *Conn) SendResponse(ctx context.Context, resp *Response) error
-
 type LSPProcessInterface interface {
 	Deadline() (time.Time, bool)
 	Done() <-chan struct{}
 	Err() error
 	Value(key any) any
 }
+
+type Language string
 
 type ClientMetrics struct {
 	Command            string       `json:"command"`
@@ -139,7 +138,7 @@ type ClientMetrics struct {
 
 // LSPServerConfig represents the complete configuration for language servers
 type LSPServerConfig struct {
-	LanguageServers map[string]LanguageServerConfig `json:"language_servers"`
+	LanguageServers map[Language]LanguageServerConfig `json:"language_servers"`
 	Global          struct {
 		LogPath            string `json:"log_file_path"`
 		LogLevel           string `json:"log_level"`
@@ -147,6 +146,6 @@ type LSPServerConfig struct {
 		MaxRestartAttempts int    `json:"max_restart_attempts"`
 		RestartDelayMs     int    `json:"restart_delay_ms"`
 	} `json:"global"`
-	LanguageExtensionMap map[string][]string `json:"language_extension_map"`
-	ExtensionLanguageMap map[string]string   `json:"extension_language_map"`
+	LanguageExtensionMap map[Language][]string `json:"language_extension_map"`
+	ExtensionLanguageMap map[string]Language   `json:"extension_language_map"`
 }

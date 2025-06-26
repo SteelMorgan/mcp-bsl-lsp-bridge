@@ -6,6 +6,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
+	"rockerboo/mcp-lsp-bridge/lsp"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -34,7 +35,7 @@ func LSPConnectTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 				return mcp.NewToolResultError("No configuration available"), nil
 			}
 
-			if _, exists := config.LanguageServers[language]; !exists {
+			if _, exists := config.LanguageServers[lsp.Language(language)]; !exists {
 				logger.Error("lsp_connect: No language server configured",
 					fmt.Sprintf("Language: %s", language),
 				)

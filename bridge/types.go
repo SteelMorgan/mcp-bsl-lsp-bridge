@@ -4,18 +4,11 @@ import (
 	"rockerboo/mcp-lsp-bridge/lsp"
 
 	"github.com/mark3labs/mcp-go/server"
-	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
 // MCPLSPBridge combines MCP server capabilities with multiple LSP clients
 type MCPLSPBridge struct {
 	server  *server.MCPServer
-	clients map[string]lsp.LanguageClientInterface
+	clients map[lsp.Language]lsp.LanguageClientInterface
 	config  *lsp.LSPServerConfig
-}
-
-// SemanticAnalysisResult holds the results of semantic analysis
-type SemanticAnalysisResult struct {
-	Symbols    []protocol.DocumentSymbol
-	References []protocol.Location
 }

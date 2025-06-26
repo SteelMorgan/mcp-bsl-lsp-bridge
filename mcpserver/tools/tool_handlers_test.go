@@ -18,7 +18,7 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 		uri            string
 		line           int
 		character      int
-		mockLanguage   string
+		mockLanguage   lsp.Language
 		mockClient     any
 		mockResult     *lsp.AnalyzeCodeResult
 		expectError    bool
@@ -55,14 +55,14 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 			// Set up mock expectations based on test case
 			if tc.expectError {
 				// For error cases, mock should return an error
-				bridge.On("InferLanguage", tc.uri).Return("", fmt.Errorf("unknown language"))
+				bridge.On("InferLanguage", tc.uri).Return(lsp.Language(""), fmt.Errorf("unknown language"))
 			} else {
 				// For success cases, mock should return the expected language
 				bridge.On("InferLanguage", tc.uri).Return(tc.mockLanguage, nil)
 
 				// Also set up the client mock if we have one
 				if tc.mockClient != nil {
-					bridge.On("GetClientForLanguageInterface", tc.mockLanguage).Return(tc.mockClient, nil)
+					bridge.On("GetClientForLanguageInterface", string(tc.mockLanguage)).Return(tc.mockClient, nil)
 				}
 			}
 
@@ -84,7 +84,7 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 				t.Errorf("Expected language %s, got %s", tc.mockLanguage, language)
 			}
 
-			client, err := bridge.GetClientForLanguageInterface(language)
+			client, err := bridge.GetClientForLanguageInterface(string(language))
 			if err != nil {
 				t.Errorf("Unexpected error getting client: %v", err)
 				return
@@ -105,13 +105,13 @@ func TestInferLanguageToolExecution(t *testing.T) {
 		filePath     string
 		mockConfig   *lsp.LSPServerConfig
 		expectError  bool
-		expectedLang string
+		expectedLang lsp.Language
 	}{
 		{
 			name:     "go file",
 			filePath: "/path/to/file.go",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".go": "go",
 					".py": "python",
 				},
@@ -123,7 +123,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 			name:     "python file",
 			filePath: "/path/to/file.py",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".go": "go",
 					".py": "python",
 				},
@@ -135,7 +135,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 			name:     "unknown extension",
 			filePath: "/path/to/file.xyz",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".go": "go",
 					".py": "python",
 				},
@@ -201,7 +201,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 func TestLSPConnectToolExecution(t *testing.T) {
 	testCases := []struct {
 		name        string
-		language    string
+		language    lsp.Language
 		mockConfig  *lsp.LSPServerConfig
 		mockClient  any
 		expectError bool
@@ -210,7 +210,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 			name:     "successful connection",
 			language: "go",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {Command: "gopls"},
 				},
 			},
@@ -221,7 +221,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 			name:     "language not configured",
 			language: "rust",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {Command: "gopls"},
 				},
 			},
@@ -247,10 +247,10 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				if _, exists := tc.mockConfig.LanguageServers[tc.language]; exists {
 					if tc.expectError && tc.mockClient == nil {
 						// This test case expects an error when getting the client
-						bridge.On("GetClientForLanguageInterface", tc.language).Return(nil, fmt.Errorf("failed to create client"))
+						bridge.On("GetClientForLanguageInterface", string(tc.language)).Return(nil, fmt.Errorf("failed to create client"))
 					} else if tc.mockClient != nil {
 						// This test case expects success
-						bridge.On("GetClientForLanguageInterface", tc.language).Return(tc.mockClient, nil)
+						bridge.On("GetClientForLanguageInterface", string(tc.language)).Return(tc.mockClient, nil)
 					}
 				}
 			}
@@ -274,7 +274,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				return
 			}
 
-			client, err := bridge.GetClientForLanguageInterface(tc.language)
+			client, err := bridge.GetClientForLanguageInterface(string(tc.language))
 			if tc.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
@@ -545,7 +545,7 @@ func TestRenameToolExecution(t *testing.T) {
 
 	successResult := protocol.WorkspaceEdit{
 		Changes: map[protocol.DocumentUri][]protocol.TextEdit{
-			protocol.DocumentUri("file:///test.go"): []protocol.TextEdit{
+			protocol.DocumentUri("file:///test.go"): {
 				{
 					Range: protocol.Range{
 						Start: protocol.Position{Line: 0, Character: 0},
@@ -605,7 +605,6 @@ func TestImplementationToolExecution(t *testing.T) {
 	// Expectation for error case
 	// When FindImplementations is called with "file:///error.go", 10, 5, it should return nil and an error.
 	bridge.On("FindImplementations", "file:///error.go", uint32(10), uint32(5)).Return([]protocol.Location(nil), fmt.Errorf("implementation search failed"))
-
 
 	// Test successful implementation search
 	result, err := bridge.FindImplementations("file:///test.go", 10, 5)

@@ -24,7 +24,7 @@ func LoadLSPConfig(path string) (*LSPServerConfig, error) {
 
 	// Compute extension to language mapping if not provided
 	if config.ExtensionLanguageMap == nil {
-		config.ExtensionLanguageMap = make(map[string]string)
+		config.ExtensionLanguageMap = make(map[string]Language)
 		for language, serverConfig := range config.LanguageServers {
 			for _, ext := range serverConfig.Filetypes {
 				config.ExtensionLanguageMap[ext] = language
@@ -34,7 +34,7 @@ func LoadLSPConfig(path string) (*LSPServerConfig, error) {
 
 	// Compute language to extensions mapping if not provided
 	if config.LanguageExtensionMap == nil {
-		config.LanguageExtensionMap = make(map[string][]string)
+		config.LanguageExtensionMap = make(map[Language][]string)
 		for language, serverConfig := range config.LanguageServers {
 			config.LanguageExtensionMap[language] = serverConfig.Filetypes
 		}
@@ -45,7 +45,7 @@ func LoadLSPConfig(path string) (*LSPServerConfig, error) {
 
 func (c LSPServerConfig) FindServerConfig(language string) (*LanguageServerConfig, error) {
 	for lang, serverConfig := range c.LanguageServers {
-		if lang == language {
+		if lang == Language(language) {
 			return &serverConfig, nil
 		}
 	}
@@ -130,7 +130,7 @@ func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]string, e
 		if !info.IsDir() {
 			ext := filepath.Ext(path)
 			if language, found := c.ExtensionLanguageMap[ext]; found {
-				languageScores[language] += 1
+				languageScores[string(language)] += 1
 			}
 		}
 

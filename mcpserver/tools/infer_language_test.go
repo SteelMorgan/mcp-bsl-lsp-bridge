@@ -15,13 +15,13 @@ func TestInferLanguageTool(t *testing.T) {
 		filePath     string
 		mockConfig   *lsp.LSPServerConfig
 		expectError  bool
-		expectedLang string
+		expectedLang lsp.Language
 	}{
 		{
 			name:     "Go file detection",
 			filePath: "/path/to/main.go",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".go":  "go",
 					".py":  "python",
 					".js":  "javascript",
@@ -38,7 +38,7 @@ func TestInferLanguageTool(t *testing.T) {
 			name:     "Python file detection",
 			filePath: "/path/to/script.py",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".go": "go",
 					".py": "python",
 					".js": "javascript",
@@ -51,7 +51,7 @@ func TestInferLanguageTool(t *testing.T) {
 			name:     "JavaScript file detection",
 			filePath: "/path/to/app.js",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".go": "go",
 					".py": "python",
 					".js": "javascript",
@@ -64,7 +64,7 @@ func TestInferLanguageTool(t *testing.T) {
 			name:     "TypeScript file detection",
 			filePath: "/path/to/component.ts",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".ts": "typescript",
 					".js": "javascript",
 				},
@@ -76,7 +76,7 @@ func TestInferLanguageTool(t *testing.T) {
 			name:     "Rust file detection",
 			filePath: "/path/to/main.rs",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".rs": "rust",
 					".go": "go",
 				},
@@ -88,7 +88,7 @@ func TestInferLanguageTool(t *testing.T) {
 			name:     "unknown extension",
 			filePath: "/path/to/file.xyz",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".go": "go",
 					".py": "python",
 				},
@@ -105,7 +105,7 @@ func TestInferLanguageTool(t *testing.T) {
 			name:     "file without extension",
 			filePath: "/path/to/Makefile",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".go": "go",
 					".py": "python",
 				},
@@ -116,7 +116,7 @@ func TestInferLanguageTool(t *testing.T) {
 			name:     "hidden file with extension",
 			filePath: "/path/to/.config.json",
 			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]string{
+				ExtensionLanguageMap: map[string]lsp.Language{
 					".json": "json",
 					".go":   "go",
 				},
@@ -193,7 +193,7 @@ func TestInferLanguageEdgeCases(t *testing.T) {
 		
 		// Set up the mock expectation for GetConfig
 		bridge.On("GetConfig").Return(&lsp.LSPServerConfig{
-			ExtensionLanguageMap: map[string]string{".go": "go"},
+			ExtensionLanguageMap: map[string]lsp.Language{".go": "go"},
 		})
 		
 		// Empty file path should not have an extension
@@ -221,7 +221,7 @@ func TestInferLanguageEdgeCases(t *testing.T) {
 		
 		// Set up the mock expectation for GetConfig
 		bridge.On("GetConfig").Return(&lsp.LSPServerConfig{
-			ExtensionLanguageMap: map[string]string{".go": "go", ".js": "javascript"},
+			ExtensionLanguageMap: map[string]lsp.Language{".go": "go", ".js": "javascript"},
 		})
 		
 		filePath := "/path/to/app.min.js"

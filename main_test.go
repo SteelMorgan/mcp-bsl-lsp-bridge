@@ -12,7 +12,7 @@ func createTestConfig() *lsp.LSPServerConfig {
 	if err != nil {
 		// Fallback to a minimal config if file doesn't exist
 		return &lsp.LSPServerConfig{
-			LanguageServers: map[string]lsp.LanguageServerConfig{
+			LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 				"go": {
 					Command:   "gopls",
 					Args:      []string{},
@@ -20,10 +20,10 @@ func createTestConfig() *lsp.LSPServerConfig {
 					Filetypes: []string{".go"},
 				},
 			},
-			ExtensionLanguageMap: map[string]string{
+			ExtensionLanguageMap: map[string]lsp.Language{
 				".go": "go",
 			},
-			LanguageExtensionMap: map[string][]string{
+			LanguageExtensionMap: map[lsp.Language][]string{
 				"go": {".go"},
 			},
 		}
@@ -53,7 +53,7 @@ func TestInferLanguage(t *testing.T) {
 
 	testCases := []struct {
 		filePath   string
-		expected   string
+		expected   lsp.Language
 		shouldFail bool
 	}{
 		{"/path/to/example.go", "go", false},

@@ -77,7 +77,7 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 	}
 
 	// ADD THIS LINE: Expect InferLanguage to be called and return "go"
-	mockBridge.On("InferLanguage", "file:///test.go").Return("go", nil).Once()
+	mockBridge.On("InferLanguage", "file:///test.go").Return(lsp.Language("go"), nil).Once()
 
 	mockBridge.On("GetHoverInformation", "file:///test.go", uint32(10), uint32(5)).Return(&hoverResult, nil).Once()
 
@@ -173,7 +173,7 @@ func TestMCPToolIntegration_DiagnosticsTool(t *testing.T) {
 }
 func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
-	mockBridge.On("InferLanguage", "file:///path/to/main.go").Return("go", nil).Once() // Changed to file:/// URI
+	mockBridge.On("InferLanguage", "file:///path/to/main.go").Return(lsp.Language("go"), nil).Once() // Changed to file:/// URI
 
 	// Initialize tool and handler directly
 	tool, handler := InferLanguageTool(mockBridge)
@@ -218,7 +218,7 @@ func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 func TestMCPToolIntegration_LSPConnectTool(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
 	mockBridge.On("GetConfig").Return(&lsp.LSPServerConfig{
-		LanguageServers: map[string]lsp.LanguageServerConfig{
+		LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 			"go": {
 				Command:   "gopls",
 				Args:      []string{},
@@ -226,10 +226,10 @@ func TestMCPToolIntegration_LSPConnectTool(t *testing.T) {
 				Filetypes: []string{".go"},
 			},
 		},
-		ExtensionLanguageMap: map[string]string{
+		ExtensionLanguageMap: map[string]lsp.Language{
 			".go": "go",
 		},
-		LanguageExtensionMap: map[string][]string{
+		LanguageExtensionMap: map[lsp.Language][]string{
 			"go": {".go"},
 		},
 	}, nil).Once()
@@ -294,7 +294,7 @@ func TestMCPToolIntegration_LSPDisconnectTool(t *testing.T) {
 }
 func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
-	mockBridge.On("InferLanguage", "file:///invalid.xyz").Return("", fmt.Errorf("unsupported file type")).Once()
+	mockBridge.On("InferLanguage", "file:///invalid.xyz").Return(lsp.Language(""), fmt.Errorf("unsupported file type")).Once()
 
 	mockBridge.On("GetHoverInformation", "file:///invalid.xyz", uint32(10), uint32(5)).Return((*protocol.Hover)(nil), fmt.Errorf("unsupported file type")).Once()
 

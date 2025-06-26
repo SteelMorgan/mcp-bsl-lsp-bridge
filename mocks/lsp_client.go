@@ -91,6 +91,16 @@ func (m *MockLanguageClient) SetServerCapabilities(capabilities protocol.ServerC
 	m.Called(capabilities)
 }
 
+func (m *MockLanguageClient) SetupSemanticTokens() error {
+	args := m.Called()
+	return args.Error(1)
+}
+
+func (m *MockLanguageClient) TokenParser() *lsp.SemanticTokenParser {
+	args := m.Called()
+	return args.Get(0).(*lsp.SemanticTokenParser)
+}
+
 // Text document synchronization
 func (m *MockLanguageClient) DidOpen(uri string, languageId protocol.LanguageKind, text string, version int32) error {
 	args := m.Called(uri, languageId, text, version)
@@ -146,4 +156,14 @@ func (m *MockLanguageClient) Implementation(uri string, line, character uint32) 
 func (m *MockLanguageClient) SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
 	args := m.Called(uri, line, character)
 	return args.Get(0).(*protocol.SignatureHelp), args.Error(1)
+}
+
+func (m *MockLanguageClient) SemanticTokens(uri string) (*protocol.SemanticTokens, error) {
+	args := m.Called(uri)
+	return args.Get(0).(*protocol.SemanticTokens), args.Error(1)
+}
+
+func (m *MockLanguageClient) SemanticTokensRange(uri string, startLine, startCharacter, endLine, endCharacter uint32) (*protocol.SemanticTokens, error) {
+	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter)
+	return args.Get(0).(*protocol.SemanticTokens), args.Error(1)
 }

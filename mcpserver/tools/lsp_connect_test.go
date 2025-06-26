@@ -8,7 +8,6 @@ import (
 	"rockerboo/mcp-lsp-bridge/mocks"
 
 	"github.com/mark3labs/mcp-go/mcptest"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestLSPConnectTool(t *testing.T) {
@@ -24,7 +23,7 @@ func TestLSPConnectTool(t *testing.T) {
 			name:     "successful Go connection",
 			language: "go",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command:   "gopls",
 						Args:      []string{"serve"},
@@ -45,7 +44,7 @@ func TestLSPConnectTool(t *testing.T) {
 			name:     "successful Python connection",
 			language: "python",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command:   "gopls",
 						Filetypes: []string{".go"},
@@ -65,7 +64,7 @@ func TestLSPConnectTool(t *testing.T) {
 			name:     "successful TypeScript connection",
 			language: "typescript",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"typescript": {
 						Command:   "typescript-language-server",
 						Args:      []string{"--stdio"},
@@ -81,7 +80,7 @@ func TestLSPConnectTool(t *testing.T) {
 			name:     "successful Rust connection",
 			language: "rust",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"rust": {
 						Command:   "rust-analyzer",
 						Filetypes: []string{".rs"},
@@ -96,7 +95,7 @@ func TestLSPConnectTool(t *testing.T) {
 			name:     "language not configured",
 			language: "unsupported",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command:   "gopls",
 						Filetypes: []string{".go"},
@@ -117,14 +116,13 @@ func TestLSPConnectTool(t *testing.T) {
 			name:     "client creation failure",
 			language: "go",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command:   "gopls",
 						Filetypes: []string{".go"},
 					},
 				},
 			},
-			mockClient:  nil, // Simulate client creation failure
 			expectError: true,
 			description: "Should handle client creation failures gracefully",
 		},
@@ -132,7 +130,7 @@ func TestLSPConnectTool(t *testing.T) {
 			name:     "empty language string",
 			language: "",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[string]lsp.LanguageServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {Command: "gopls"},
 				},
 			},
@@ -152,11 +150,10 @@ func TestLSPConnectTool(t *testing.T) {
 			if tc.mockClient != nil {
 				bridge.On("GetClientForLanguageInterface", tc.language).Return(tc.mockClient, nil)
 			} else if tc.expectError && tc.name == "client creation failure" {
-				bridge.On("GetClientForLanguageInterface", tc.language).Return(nil, fmt.Errorf("failed to create client for language: %s", tc.language))
+
+				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), fmt.Errorf("failed to create client for language: %s", tc.language))
 			} else if tc.expectError {
-				// For other error cases, we might not even call GetClientForLanguageInterface
-				// or it might return an error - set up based on your actual implementation
-				bridge.On("GetClientForLanguageInterface", mock.Anything).Return(nil, fmt.Errorf("client creation failed")).Maybe()
+				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), fmt.Errorf("client creation failed")).Maybe()
 			}
 
 			// Create MCP server and register tool
@@ -176,7 +173,7 @@ func TestLSPConnectTool(t *testing.T) {
 			}
 
 			// Test language server configuration existence
-			_, exists := config.LanguageServers[tc.language]
+			_, exists := config.LanguageServers[lsp.Language(tc.language)]
 			if !exists {
 				if !tc.expectError {
 					t.Errorf("Expected language server config for %s", tc.language)
@@ -185,7 +182,7 @@ func TestLSPConnectTool(t *testing.T) {
 			}
 
 			// Test client creation
-			client, err := bridge.GetClientForLanguageInterface(tc.language)
+			client, err := bridge.GetClientForLanguageInterface(string(tc.language))
 			if tc.expectError {
 				if err == nil {
 					t.Error("Expected error but got none")
@@ -211,7 +208,7 @@ func TestLSPConnectTool(t *testing.T) {
 func TestLSPConnectValidation(t *testing.T) {
 	t.Run("validate language server configuration", func(t *testing.T) {
 		config := &lsp.LSPServerConfig{
-			LanguageServers: map[string]lsp.LanguageServerConfig{
+			LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 				"go": {
 					Command:   "gopls",
 					Args:      []string{"serve"},
@@ -249,7 +246,7 @@ func TestLSPConnectValidation(t *testing.T) {
 
 	t.Run("multiple language server support", func(t *testing.T) {
 		config := &lsp.LSPServerConfig{
-			LanguageServers: map[string]lsp.LanguageServerConfig{
+			LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 				"go": {
 					Command:   "gopls",
 					Filetypes: []string{".go"},
@@ -271,7 +268,7 @@ func TestLSPConnectValidation(t *testing.T) {
 
 		expectedLanguages := []string{"go", "python", "typescript", "rust"}
 		for _, lang := range expectedLanguages {
-			serverConfig, exists := config.LanguageServers[lang]
+			serverConfig, exists := config.LanguageServers[lsp.Language(lang)]
 			if !exists {
 				t.Errorf("Expected %s language server config", lang)
 				continue

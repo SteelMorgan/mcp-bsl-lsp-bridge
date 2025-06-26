@@ -8,8 +8,8 @@ import (
 
 // BridgeInterface defines the interface that the bridge must implement
 type BridgeInterface interface {
-	GetClientForLanguageInterface(language string) (any, error)
-	InferLanguage(filePath string) (string, error)
+	GetClientForLanguageInterface(language string) (lsp.LanguageClientInterface, error)
+	InferLanguage(filePath string) (lsp.Language, error)
 	CloseAllClients()
 	GetConfig() *lsp.LSPServerConfig
 	DetectProjectLanguages(projectPath string) ([]string, error)
@@ -24,6 +24,7 @@ type BridgeInterface interface {
 	GetDiagnostics(uri string) ([]any, error)
 	GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]protocol.WorkspaceDiagnosticReport, error)
 	GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error)
+	SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]lsp.TokenPosition, error)
 	// Code actions and formatting tools
 	GetCodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error)
 	FormatDocument(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error)

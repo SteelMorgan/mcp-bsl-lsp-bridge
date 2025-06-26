@@ -3,7 +3,6 @@ package lsp
 import (
 	"encoding/json"
 	"fmt"
-	"rockerboo/mcp-lsp-bridge/logger"
 	"time"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -233,21 +232,56 @@ func (lc *LanguageClient) SignatureHelp(uri string, line, character uint32) (*pr
 			Character: character,
 		},
 	}
-	
+
 	var rawResponse json.RawMessage
 	err := lc.SendRequest("textDocument/signatureHelp", params, &rawResponse, 5*time.Second)
-	logger.Info(fmt.Sprintf("Raw response: %+v", rawResponse))
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Handle null response - server has no signature help available
 	if len(rawResponse) == 4 && string(rawResponse) == "null" {
 		return nil, nil
 	}
-	
+
 	var result protocol.SignatureHelp
 	err = json.Unmarshal(rawResponse, &result)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (lc *LanguageClient) SemanticTokens(uri string) (*protocol.SemanticTokens, error) {
+	var result protocol.SemanticTokens
+	err := lc.SendRequest("textDocument/semanticTokens", protocol.SemanticTokensParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+	}, &result, 5*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (lc *LanguageClient) SemanticTokensRange(uri string, startLine, startCharacter, endLine, endCharacter uint32) (*protocol.SemanticTokens, error) {
+	var result protocol.SemanticTokens
+	err := lc.SendRequest("textDocument/semanticTokens/range", protocol.SemanticTokensRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+		Range: protocol.Range{
+			Start: protocol.Position{
+				Line:      startLine,
+				Character: startCharacter,
+			},
+			End: protocol.Position{
+				Line:      endLine,
+				Character: endCharacter,
+			},
+		},
+	}, &result, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}

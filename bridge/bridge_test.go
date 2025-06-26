@@ -22,7 +22,7 @@ import (
 // Test helper functions
 func createTestBridge() *MCPLSPBridge {
 	config := &lsp.LSPServerConfig{
-		LanguageServers: map[string]lsp.LanguageServerConfig{
+		LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 			"go": {
 				Command: "gopls",
 				Args:    []string{},
@@ -32,7 +32,7 @@ func createTestBridge() *MCPLSPBridge {
 				Args:    []string{"--stdio"},
 			},
 		},
-		ExtensionLanguageMap: map[string]string{
+		ExtensionLanguageMap: map[string]lsp.Language{
 			".go": "go",
 			".ts": "typescript",
 			".js": "javascript",
@@ -52,7 +52,7 @@ func createTempFile(t *testing.T, name, content string) string {
 // Test NewMCPLSPBridge
 func TestNewMCPLSPBridge(t *testing.T) {
 	config := &lsp.LSPServerConfig{
-		LanguageServers: map[string]lsp.LanguageServerConfig{
+		LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 			"go": {Command: "gopls"},
 		},
 	}
@@ -81,7 +81,7 @@ func TestInferLanguage(t *testing.T) {
 	tests := []struct {
 		name     string
 		filePath string
-		want     string
+		want     lsp.Language
 		wantErr  bool
 	}{
 		{
