@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"sync/atomic"
@@ -216,7 +217,7 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 
 	// Ensure connection is still valid by checking context and connection
 	if lc.ctx.Err() != nil || lc.conn == nil {
-		return fmt.Errorf("language server connection is closed")
+		return errors.New("language server connection is closed")
 	}
 
 	// Reset status to connected if we have a valid connection
@@ -256,7 +257,7 @@ func (lc *LanguageClient) SendRequestNoTimeout(method string, params any, result
 // SendNotification sends a notification
 func (lc *LanguageClient) SendNotification(method string, params any) error {
 	if len(method) == 0 {
-		return fmt.Errorf("empty notification method")
+		return errors.New("empty notification method")
 	}
 
 	return lc.conn.Notify(lc.ctx, method, params)

@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"testing"
 
@@ -97,7 +97,7 @@ func TestHoverToolHandler(t *testing.T) {
 		{
 			name:         "hover error",
 			mockResponse: (*protocol.Hover)(nil),
-			mockError:    fmt.Errorf("hover failed"),
+			mockError:    errors.New("hover failed"),
 			expectError:  true,
 		},
 		{
@@ -170,7 +170,7 @@ func TestDiagnosticsToolHandler(t *testing.T) {
 	// Test diagnostics error
 	t.Run("diagnostics error", func(t *testing.T) {
 		// Return empty slice instead of nil when there's an error
-		bridge.On("GetDiagnostics", "file:///error.go").Return([]any{}, fmt.Errorf("diagnostics failed"))
+		bridge.On("GetDiagnostics", "file:///error.go").Return([]any{}, errors.New("diagnostics failed"))
 		_, err := bridge.GetDiagnostics("file:///error.go")
 		if err == nil {
 			t.Error("Expected error but got none")

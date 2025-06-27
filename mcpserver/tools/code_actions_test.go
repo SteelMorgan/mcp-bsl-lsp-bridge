@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"testing"
 
@@ -48,7 +48,7 @@ func TestCodeActionsTool(t *testing.T) {
 			character:      5,
 			endLine:        10,
 			endCharacter:   15,
-			mockError:      fmt.Errorf("code actions failed"),
+			mockError:      errors.New("code actions failed"),
 			expectError:    true,
 			expectedOutput: "",
 		},

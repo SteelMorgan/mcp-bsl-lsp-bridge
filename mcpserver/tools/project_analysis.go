@@ -71,7 +71,7 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 
 			// Use the first detected language
 			if len(languages) == 0 {
-				logger.Warn("No programming languages detected in project", fmt.Sprintf("Workspace URI: %s", workspaceUri))
+				logger.Warn("No programming languages detected in project", "Workspace URI: "+workspaceUri)
 				return mcp.NewToolResultError("No languages detected in project"), nil
 			}
 
@@ -117,7 +117,7 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			case "text_search":
 				return handleTextSearch(bridge, query, offset, limit, activeLanguage, &response)
 			default:
-				return mcp.NewToolResultError(fmt.Sprintf("Unknown analysis type: %s", analysisType)), nil
+				return mcp.NewToolResultError("Unknown analysis type: " + analysisType), nil
 			}
 		}
 }

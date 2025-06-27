@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -39,7 +40,7 @@ func tryLoadConfig(primaryPath, configDir string) (*lsp.LSPServerConfig, error) 
 		}
 	}
 
-	return nil, fmt.Errorf("no valid configuration found")
+	return nil, errors.New("no valid configuration found")
 }
 
 func main() {

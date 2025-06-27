@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"fmt"
+	"errors"
 	"rockerboo/mcp-lsp-bridge/mocks"
 	"strings"
 	"testing"
@@ -20,16 +20,16 @@ func TestDiagnosticsTool(t *testing.T) {
 		expectError    bool
 	}{
 		{
-			name: "no diagnostics",
-			uri:  "file:///test.go",
-			mockResponse: []any{},
+			name:           "no diagnostics",
+			uri:            "file:///test.go",
+			mockResponse:   []any{},
 			expectedOutput: "No diagnostics found",
 			expectError:    false,
 		},
 		{
 			name:           "diagnostics error",
 			uri:            "file:///test.go",
-			mockError:      fmt.Errorf("diagnostics failed"),
+			mockError:      errors.New("diagnostics failed"),
 			expectError:    true,
 			expectedOutput: "",
 		},

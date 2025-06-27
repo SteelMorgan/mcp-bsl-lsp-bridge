@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -79,14 +80,14 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 			continue
 		}
 
-		root_path := fmt.Sprintf("file://%s", dir)
+		root_path := "file://" + dir
 		root_uri := protocol.DocumentUri(root_path)
 		process_id := int32(os.Getpid())
 
 		// Prepare initialization parameters
 		workspaceFolders := []protocol.WorkspaceFolder{
 			{
-				Uri:  protocol.URI(fmt.Sprintf("file://%s", dir)),
+				Uri:  protocol.URI("file://" + dir),
 				Name: filepath.Base(dir),
 			},
 		}
@@ -241,7 +242,7 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClient
 			return existingClient, nil
 		}
 		// Client context is cancelled, remove it and create a new one
-		logger.Warn(fmt.Sprintf("Removing client with cancelled context for language %s", language))
+		logger.Warn("Removing client with cancelled context for language " + language)
 		err := existingClient.Close()
 		if err != nil {
 			return nil, err
@@ -311,7 +312,7 @@ func (b *MCPLSPBridge) GetClientForLanguageInterface(language string) (lsp.Langu
 // DetectProjectLanguages detects all languages used in a project directory
 func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]string, error) {
 	if b.config == nil {
-		return nil, fmt.Errorf("no LSP configuration available")
+		return nil, errors.New("no LSP configuration available")
 	}
 	return b.config.DetectProjectLanguages(projectPath)
 }
@@ -319,7 +320,7 @@ func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]string, err
 // DetectPrimaryProjectLanguage detects the primary language of a project
 func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (string, error) {
 	if b.config == nil {
-		return "", fmt.Errorf("no LSP configuration available")
+		return "", errors.New("no LSP configuration available")
 	}
 	return b.config.DetectPrimaryProjectLanguage(projectPath)
 }
@@ -947,7 +948,7 @@ func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLin
 	parser := client.TokenParser()
 
 	if parser == nil {
-		return nil, fmt.Errorf("failed to get token parser")
+		return nil, errors.New("failed to get token parser")
 	}
 
 	tokenRange := protocol.Range{

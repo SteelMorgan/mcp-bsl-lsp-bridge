@@ -2,11 +2,11 @@ package tools
 
 import (
 	"context"
-	"fmt"
+
 	"strings"
 
-	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/interfaces"
+	"rockerboo/mcp-lsp-bridge/logger"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -26,10 +26,10 @@ func RegisterWorkspaceDiagnosticsTool(mcpServer ToolServer, bridge interfaces.Br
 		}
 
 		// Strip file:// prefix if present
-		if after, ok :=strings.CutPrefix(workspaceUri, "file://"); ok  {
+		if after, ok := strings.CutPrefix(workspaceUri, "file://"); ok {
 			workspaceUri = after
-			logger.Info("workspace_diagnostics: stripped file:// prefix", 
-				fmt.Sprintf("Processed URI: %s", workspaceUri))
+			logger.Info("workspace_diagnostics: stripped file:// prefix",
+				"Processed URI: "+workspaceUri)
 		}
 
 		// Optional identifier
@@ -47,7 +47,7 @@ func RegisterWorkspaceDiagnosticsTool(mcpServer ToolServer, bridge interfaces.Br
 
 		// Format results for user-friendly output
 		formattedResult := formatWorkspaceDiagnostics(result)
-		
+
 		return mcp.NewToolResultText(formattedResult), nil
 	})
 }

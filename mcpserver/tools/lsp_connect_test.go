@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -153,7 +154,7 @@ func TestLSPConnectTool(t *testing.T) {
 
 				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), fmt.Errorf("failed to create client for language: %s", tc.language))
 			} else if tc.expectError {
-				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), fmt.Errorf("client creation failed")).Maybe()
+				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), errors.New("client creation failed")).Maybe()
 			}
 
 			// Create MCP server and register tool

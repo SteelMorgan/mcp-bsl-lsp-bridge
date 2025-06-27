@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"testing"
 
@@ -62,24 +62,24 @@ func TestHoverTool(t *testing.T) {
 			description:  "Should handle nil Hover result",
 		},
 		{
-			name:        "hover error - column beyond line",
-			uri:         "file:///test.go",
-			line:        10,
-			character:   100,
+			name:         "hover error - column beyond line",
+			uri:          "file:///test.go",
+			line:         10,
+			character:    100,
 			mockResponse: (*protocol.Hover)(nil),
-			mockError:   fmt.Errorf("hover request failed: jsonrpc2: code 0 message: column is beyond end of line"),
-			expectError: true,
-			description: "Should handle column position errors",
+			mockError:    errors.New("hover request failed: jsonrpc2: code 0 message: column is beyond end of line"),
+			expectError:  true,
+			description:  "Should handle column position errors",
 		},
 		{
-			name:        "hover error - invalid response",
-			uri:         "file:///test.go",
-			line:        10,
-			character:   5,
+			name:         "hover error - invalid response",
+			uri:          "file:///test.go",
+			line:         10,
+			character:    5,
 			mockResponse: (*protocol.Hover)(nil),
-			mockError:   fmt.Errorf("hover request failed: response must have an id and jsonrpc field"),
-			expectError: true,
-			description: "Should handle invalid JSON-RPC responses",
+			mockError:    errors.New("hover request failed: response must have an id and jsonrpc field"),
+			expectError:  true,
+			description:  "Should handle invalid JSON-RPC responses",
 		},
 		{
 			name:      "hover with absolute path (should normalize to file URI)",

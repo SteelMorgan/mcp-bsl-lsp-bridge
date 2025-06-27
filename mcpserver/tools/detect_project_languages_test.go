@@ -1,9 +1,10 @@
 package tools
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"strings"
 	"testing"
 
 	"github.com/mark3labs/mcp-go/server"
@@ -190,11 +191,11 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 	t.Run("project with no recognizable languages", func(t *testing.T) {
 		bridge := &mocks.MockBridge{}
-		
+
 		// Set up mock expectations
 		bridge.On("DetectProjectLanguages", "/path/to/empty-project").Return([]string{}, nil)
-		bridge.On("DetectPrimaryProjectLanguage", "/path/to/empty-project").Return("", fmt.Errorf("no primary language detected"))
-		
+		bridge.On("DetectPrimaryProjectLanguage", "/path/to/empty-project").Return("", errors.New("no primary language detected"))
+
 		// Test empty language detection
 		languages, err := bridge.DetectProjectLanguages("/path/to/empty-project")
 		if err != nil {
@@ -203,24 +204,24 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if len(languages) != 0 {
 			t.Errorf("Expected 0 languages, got %d", len(languages))
 		}
-		
+
 		// Test primary language detection failure
 		_, err = bridge.DetectPrimaryProjectLanguage("/path/to/empty-project")
 		if err == nil {
 			t.Error("Expected error for empty project")
 		}
-		
+
 		// Verify all expectations were met
 		bridge.AssertExpectations(t)
 	})
-	
+
 	t.Run("project with single language", func(t *testing.T) {
 		bridge := &mocks.MockBridge{}
-		
+
 		// Set up mock expectations
 		bridge.On("DetectProjectLanguages", "/path/to/single-lang").Return([]string{"go"}, nil)
 		bridge.On("DetectPrimaryProjectLanguage", "/path/to/single-lang").Return("go", nil)
-		
+
 		// Test single language detection
 		languages, err := bridge.DetectProjectLanguages("/path/to/single-lang")
 		if err != nil {
@@ -232,7 +233,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if languages[0] != "go" {
 			t.Errorf("Expected 'go', got '%s'", languages[0])
 		}
-		
+
 		// Test primary language detection
 		primary, err := bridge.DetectPrimaryProjectLanguage("/path/to/single-lang")
 		if err != nil {
@@ -241,19 +242,19 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if primary != "go" {
 			t.Errorf("Expected 'go', got '%s'", primary)
 		}
-		
+
 		// Verify all expectations were met
 		bridge.AssertExpectations(t)
 	})
-	
+
 	t.Run("project with many languages prioritization", func(t *testing.T) {
 		languages := []string{"go", "python", "typescript", "javascript", "rust", "c", "cpp", "java", "shell", "yaml", "json", "dockerfile"}
 		bridge := &mocks.MockBridge{}
-		
+
 		// Set up mock expectations
 		bridge.On("DetectProjectLanguages", "/path/to/polyglot-project").Return(languages, nil)
 		bridge.On("DetectPrimaryProjectLanguage", "/path/to/polyglot-project").Return("go", nil)
-		
+
 		// Test many languages detection
 		detectedLangs, err := bridge.DetectProjectLanguages("/path/to/polyglot-project")
 		if err != nil {
@@ -262,14 +263,14 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if len(detectedLangs) != len(languages) {
 			t.Errorf("Expected %d languages, got %d", len(languages), len(detectedLangs))
 		}
-		
+
 		// Verify the languages match (order matters)
 		for i, expectedLang := range languages {
 			if i < len(detectedLangs) && detectedLangs[i] != expectedLang {
 				t.Errorf("Expected language %s at index %d, got %s", expectedLang, i, detectedLangs[i])
 			}
 		}
-		
+
 		// Test primary language selection
 		primary, err := bridge.DetectPrimaryProjectLanguage("/path/to/polyglot-project")
 		if err != nil {
@@ -278,7 +279,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if primary != "go" {
 			t.Errorf("Expected 'go' as primary, got '%s'", primary)
 		}
-		
+
 		// Verify all expectations were met
 		bridge.AssertExpectations(t)
 	})
@@ -295,32 +296,32 @@ func TestDetectProjectLanguagesConfiguration(t *testing.T) {
 			"/docker-project":     {"dockerfile", "yaml", "shell"},
 			"/kubernetes-project": {"yaml", "helm", "shell"},
 		}
-		
+
 		for projectPath, expectedLanguages := range projectPatterns {
-			t.Run(fmt.Sprintf("pattern_%s", strings.TrimPrefix(projectPath, "/")), func(t *testing.T) {
+			t.Run("pattern_"+strings.TrimPrefix(projectPath, "/"), func(t *testing.T) {
 				bridge := &mocks.MockBridge{}
-				
+
 				// Set up mock expectation for this specific project path
 				bridge.On("DetectProjectLanguages", projectPath).Return(expectedLanguages, nil)
-				
+
 				languages, err := bridge.DetectProjectLanguages(projectPath)
 				if err != nil {
 					t.Errorf("Error detecting languages for %s: %v", projectPath, err)
 					return
 				}
-				
+
 				if len(languages) != len(expectedLanguages) {
 					t.Errorf("For %s: expected %d languages, got %d", projectPath, len(expectedLanguages), len(languages))
 					return
 				}
-				
+
 				// Verify the languages match (assuming order matters)
 				for i, expectedLang := range expectedLanguages {
 					if i < len(languages) && languages[i] != expectedLang {
 						t.Errorf("For %s at index %d: expected %s, got %s", projectPath, i, expectedLang, languages[i])
 					}
 				}
-				
+
 				// Verify all expectations were met
 				bridge.AssertExpectations(t)
 			})

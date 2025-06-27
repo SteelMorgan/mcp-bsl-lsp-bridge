@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"fmt"
+	"errors"
 	"rockerboo/mcp-lsp-bridge/mocks"
 	"strings"
 	"testing"
@@ -39,7 +39,7 @@ func TestWorkspaceDiagnosticsTool(t *testing.T) {
 			name:            "workspace diagnostics error",
 			workspaceUri:    "/home/rockerboo/code/mcp-lsp-bridge",
 			mockDiagnostics: nil,
-			mockError:       fmt.Errorf("workspace diagnostics failed"),
+			mockError:       errors.New("workspace diagnostics failed"),
 			expectError:     true,
 			description:     "Should handle workspace diagnostics errors",
 		},

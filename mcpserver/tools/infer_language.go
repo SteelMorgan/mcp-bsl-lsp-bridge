@@ -32,7 +32,7 @@ func InferLanguageTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			language, err := bridge.InferLanguage(filePath)
 
 			if err != nil {
-				return mcp.NewToolResultError(fmt.Sprintf("No language found for extension %s", ext)), nil
+				return mcp.NewToolResultError("No language found for extension " + ext), nil
 			}
 
 			logger.Info("infer_language: Successfully inferred language",

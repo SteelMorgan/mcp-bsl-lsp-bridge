@@ -201,7 +201,7 @@ func (c *MCPTestClient) testToolCall(toolName string, arguments map[string]inter
 	duration := time.Since(start)
 
 	result := &TestResult{
-		TestName: fmt.Sprintf("Tool: %s", toolName),
+		TestName: "Tool: " + toolName,
 		Duration: duration,
 		Response: response,
 	}

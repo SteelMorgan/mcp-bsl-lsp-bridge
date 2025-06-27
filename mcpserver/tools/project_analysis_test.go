@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"testing"
 
@@ -390,7 +390,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 			workspaceUri: "file:///nonexistent",
 			setupMock: func(bridge *mocks.MockBridge) {
 				// This case expects DetectProjectLanguages to fail
-				bridge.On("DetectProjectLanguages", "file:///nonexistent").Return([]string{}, fmt.Errorf("project not found"))
+				bridge.On("DetectProjectLanguages", "file:///nonexistent").Return([]string{}, errors.New("project not found"))
 			},
 			expectError: true,
 			errorMsg:    "project not found",
@@ -401,7 +401,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 			setupMock: func(bridge *mocks.MockBridge) {
 				// This case expects DetectProjectLanguages to succeed, and then GetMultiLanguageClients to fail
 				bridge.On("DetectProjectLanguages", "file:///workspace").Return([]string{"go"}, nil)
-				bridge.On("GetMultiLanguageClients", []string{"go"}).Return(map[string]lsp.LanguageClientInterface{}, fmt.Errorf("failed to create clients"))
+				bridge.On("GetMultiLanguageClients", []string{"go"}).Return(map[string]lsp.LanguageClientInterface{}, errors.New("failed to create clients"))
 			},
 			expectError: true,
 			errorMsg:    "failed to create clients",

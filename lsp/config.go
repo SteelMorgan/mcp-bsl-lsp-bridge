@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -94,7 +95,7 @@ func GetProjectRootMarkers() []ProjectRootMarker {
 // to determine all languages used in the project, returning them in priority order
 func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]string, error) {
 	if projectPath == "" {
-		return nil, fmt.Errorf("project path cannot be empty")
+		return nil, errors.New("project path cannot be empty")
 	}
 
 	// Check if directory exists
@@ -171,7 +172,7 @@ func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]string, e
 	}
 
 	if len(result) == 0 {
-		return nil, fmt.Errorf("no recognizable project languages found")
+		return nil, errors.New("no recognizable project languages found")
 	}
 
 	return result, nil
@@ -185,7 +186,7 @@ func (c LSPServerConfig) DetectPrimaryProjectLanguage(projectPath string) (strin
 	}
 
 	if len(languages) == 0 {
-		return "", fmt.Errorf("no project language detected")
+		return "", errors.New("no project language detected")
 	}
 
 	return languages[0], nil

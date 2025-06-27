@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/interfaces"
+	"rockerboo/mcp-lsp-bridge/logger"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -42,10 +42,10 @@ func RegisterProjectLanguageDetectionTool(mcpServer ToolServer, bridge interface
 			}
 
 			logger.Info("detect_project_languages: Primary language detected",
-				fmt.Sprintf("Language: %s", primaryLanguage),
+				"Language: "+primaryLanguage,
 			)
 
-			return mcp.NewToolResultText(fmt.Sprintf("Primary language: %s", primaryLanguage)), nil
+			return mcp.NewToolResultText("Primary language: " + primaryLanguage), nil
 
 		case "all":
 			fallthrough

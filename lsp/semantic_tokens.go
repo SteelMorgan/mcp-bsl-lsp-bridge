@@ -1,7 +1,7 @@
 package lsp
 
 import (
-	"fmt"
+	"errors"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
@@ -136,7 +136,7 @@ func (p *SemanticTokenParser) FindTypes(
 // GetTokenTypeFromServerCapabilities extracts token types from server capabilities
 func GetTokenTypeFromServerCapabilities(capabilities *protocol.ServerCapabilities) ([]string, []string, error) {
 	if capabilities.SemanticTokensProvider == nil {
-		return nil, nil, fmt.Errorf("server does not support semantic tokens")
+		return nil, nil, errors.New("server does not support semantic tokens")
 	}
 
 	var tokenTypes, tokenModifiers []string
@@ -150,11 +150,11 @@ func GetTokenTypeFromServerCapabilities(capabilities *protocol.ServerCapabilitie
 		tokenTypes = provider.Legend.TokenTypes
 		tokenModifiers = provider.Legend.TokenModifiers
 	default:
-		return nil, nil, fmt.Errorf("unsupported semantic tokens provider type")
+		return nil, nil, errors.New("unsupported semantic tokens provider type")
 	}
 
 	if len(tokenTypes) == 0 {
-		return nil, nil, fmt.Errorf("no token types provided by server")
+		return nil, nil, errors.New("no token types provided by server")
 	}
 
 	return tokenTypes, tokenModifiers, nil

@@ -1,7 +1,7 @@
 package tools
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 	"testing"
 
@@ -55,7 +55,7 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 			// Set up mock expectations based on test case
 			if tc.expectError {
 				// For error cases, mock should return an error
-				bridge.On("InferLanguage", tc.uri).Return(lsp.Language(""), fmt.Errorf("unknown language"))
+				bridge.On("InferLanguage", tc.uri).Return(lsp.Language(""), errors.New("unknown language"))
 			} else {
 				// For success cases, mock should return the expected language
 				bridge.On("InferLanguage", tc.uri).Return(tc.mockLanguage, nil)
@@ -247,7 +247,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				if _, exists := tc.mockConfig.LanguageServers[tc.language]; exists {
 					if tc.expectError && tc.mockClient == nil {
 						// This test case expects an error when getting the client
-						bridge.On("GetClientForLanguageInterface", string(tc.language)).Return(nil, fmt.Errorf("failed to create client"))
+						bridge.On("GetClientForLanguageInterface", string(tc.language)).Return(nil, errors.New("failed to create client"))
 					} else if tc.mockClient != nil {
 						// This test case expects success
 						bridge.On("GetClientForLanguageInterface", string(tc.language)).Return(tc.mockClient, nil)
@@ -337,13 +337,13 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 			switch tc.mode {
 			case "primary":
 				if tc.expectError {
-					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return("", fmt.Errorf("detection failed"))
+					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return("", errors.New("detection failed"))
 				} else {
 					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return(tc.mockPrimary, nil)
 				}
 			default: // "all"
 				if tc.expectError {
-					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]string(nil), fmt.Errorf("detection failed"))
+					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]string(nil), errors.New("detection failed"))
 				} else {
 					bridge.On("DetectProjectLanguages", tc.projectPath).Return(tc.mockLanguages, nil)
 				}
@@ -416,7 +416,7 @@ func TestSignatureHelpToolExecution(t *testing.T) {
 	bridge.On("GetSignatureHelp", "file:///test.go", uint32(10), uint32(15)).Return(&successResult, nil)
 
 	// Expectation for error case
-	bridge.On("GetSignatureHelp", "file:///error.go", uint32(10), uint32(15)).Return((*protocol.SignatureHelp)(nil), fmt.Errorf("signature help failed"))
+	bridge.On("GetSignatureHelp", "file:///error.go", uint32(10), uint32(15)).Return((*protocol.SignatureHelp)(nil), errors.New("signature help failed"))
 
 	// Test successful signature help
 	result, err := bridge.GetSignatureHelp("file:///test.go", 10, 15)
@@ -461,7 +461,7 @@ func TestCodeActionsToolExecution(t *testing.T) {
 	bridge.On("GetCodeActions", "file:///test.go", uint32(10), uint32(5), uint32(10), uint32(15)).Return(successResult, nil)
 
 	// Expectation for error case
-	bridge.On("GetCodeActions", "file:///error.go", uint32(10), uint32(5), uint32(10), uint32(15)).Return([]protocol.CodeAction(nil), fmt.Errorf("code actions failed"))
+	bridge.On("GetCodeActions", "file:///error.go", uint32(10), uint32(5), uint32(10), uint32(15)).Return([]protocol.CodeAction(nil), errors.New("code actions failed"))
 
 	// Test successful code actions
 	result, err := bridge.GetCodeActions("file:///test.go", 10, 5, 10, 15)
@@ -509,7 +509,7 @@ func TestFormatDocumentToolExecution(t *testing.T) {
 	bridge.On("FormatDocument", "file:///test.go", uint32(4), true).Return(successResult, nil)
 
 	// Expectation for error case
-	bridge.On("FormatDocument", "file:///error.go", uint32(4), true).Return([]protocol.TextEdit(nil), fmt.Errorf("formatting failed"))
+	bridge.On("FormatDocument", "file:///error.go", uint32(4), true).Return([]protocol.TextEdit(nil), errors.New("formatting failed"))
 
 	// Test successful formatting
 	result, err := bridge.FormatDocument("file:///test.go", 4, true)
@@ -563,7 +563,7 @@ func TestRenameToolExecution(t *testing.T) {
 
 	// Expectation for error case
 	// Assuming "InvalidName" is the new name that would cause an error
-	bridge.On("RenameSymbol", "file:///test.go", uint32(10), uint32(5), "InvalidName", true).Return((*protocol.WorkspaceEdit)(nil), fmt.Errorf("formatting failed"))
+	bridge.On("RenameSymbol", "file:///test.go", uint32(10), uint32(5), "InvalidName", true).Return((*protocol.WorkspaceEdit)(nil), errors.New("formatting failed"))
 
 	// Test successful rename
 	result, err := bridge.RenameSymbol("file:///test.go", 10, 5, "newName", true)
@@ -604,7 +604,7 @@ func TestImplementationToolExecution(t *testing.T) {
 
 	// Expectation for error case
 	// When FindImplementations is called with "file:///error.go", 10, 5, it should return nil and an error.
-	bridge.On("FindImplementations", "file:///error.go", uint32(10), uint32(5)).Return([]protocol.Location(nil), fmt.Errorf("implementation search failed"))
+	bridge.On("FindImplementations", "file:///error.go", uint32(10), uint32(5)).Return([]protocol.Location(nil), errors.New("implementation search failed"))
 
 	// Test successful implementation search
 	result, err := bridge.FindImplementations("file:///test.go", 10, 5)
@@ -643,7 +643,7 @@ func TestCallHierarchyToolExecution(t *testing.T) {
 	}
 
 	bridge.On("PrepareCallHierarchy", "file:///test.go", uint32(10), uint32(5)).Return(successResult, nil)
-	bridge.On("PrepareCallHierarchy", "file:///error.go", uint32(10), uint32(5)).Return([]protocol.CallHierarchyItem(nil), fmt.Errorf("call hierarchy failed"))
+	bridge.On("PrepareCallHierarchy", "file:///error.go", uint32(10), uint32(5)).Return([]protocol.CallHierarchyItem(nil), errors.New("call hierarchy failed"))
 
 	// Test successful call hierarchy preparation
 	result, err := bridge.PrepareCallHierarchy("file:///test.go", 10, 5)

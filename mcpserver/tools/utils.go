@@ -78,9 +78,9 @@ func symbolKindToString(kind protocol.SymbolKind) string {
 func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]) string {
 	switch v := contents.Value.(type) {
 	case protocol.MarkupContent:
-		return fmt.Sprintf("=== HOVER INFORMATION ===\n%s", v.Value)
+		return "=== HOVER INFORMATION ===\n" + v.Value
 	case string:
-		return fmt.Sprintf("=== HOVER INFORMATION ===\n%s", v)
+		return "=== HOVER INFORMATION ===\n" + v
 	case []any:
 		var result strings.Builder
 		result.WriteString("=== HOVER INFORMATION ===\n")

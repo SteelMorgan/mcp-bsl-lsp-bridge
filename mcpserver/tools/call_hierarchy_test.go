@@ -2,7 +2,7 @@ package tools
 
 import (
 	"errors"
-	"fmt"
+
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/mocks"
@@ -214,7 +214,7 @@ func TestCallHierarchyTool(t *testing.T) {
 				bridge.On("PrepareCallHierarchy", tc.uri, tc.line, tc.character).Return([]protocol.CallHierarchyItem{}, errors.New("mock error"))
 			} else {
 				bridge.On("PrepareCallHierarchy", tc.uri, tc.line, tc.character).Return(tc.mockItems, nil)
-				
+
 				// Set up incoming/outgoing call expectations if items exist
 				if len(tc.mockItems) > 0 {
 					if tc.direction == "incoming" || tc.direction == "both" {
@@ -297,7 +297,7 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 		{protocol.SymbolKindNamespace, "namespace", "Namespace/package"},
 	}
 	for _, symbolType := range symbolTypes {
-		t.Run(fmt.Sprintf("call_hierarchy_%s", symbolType.name), func(t *testing.T) {
+		t.Run("call_hierarchy_"+symbolType.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
 			// Create mock call hierarchy item
@@ -409,11 +409,11 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 func TestCallHierarchyEdgeCases(t *testing.T) {
 	t.Run("recursive function calls", func(t *testing.T) {
 		bridge := &mocks.MockBridge{}
-		
+
 		// Mock the PrepareCallHierarchy call
-		expectedItems := []protocol.CallHierarchyItem{{/* your expected item structure */}}
+		expectedItems := []protocol.CallHierarchyItem{{ /* your expected item structure */ }}
 		bridge.On("PrepareCallHierarchy", "file:///recursive.go", uint32(10), uint32(5)).Return(expectedItems, nil)
-		
+
 		items, err := bridge.PrepareCallHierarchy("file:///recursive.go", 10, 5)
 		if err != nil {
 			t.Errorf("Error preparing call hierarchy for recursive function: %v", err)
@@ -421,25 +421,25 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		if len(items) == 0 {
 			t.Error("Expected call hierarchy items for recursive function")
 		}
-		
+
 		bridge.AssertExpectations(t)
 	})
-	
+
 	t.Run("deeply nested call chains", func(t *testing.T) {
 		bridge := &mocks.MockBridge{}
-		
+
 		// Mock the PrepareCallHierarchy call
-		expectedItems := []protocol.CallHierarchyItem{{/* your expected item structure */}}
+		expectedItems := []protocol.CallHierarchyItem{{ /* your expected item structure */ }}
 		bridge.On("PrepareCallHierarchy", "file:///deep.go", uint32(25), uint32(10)).Return(expectedItems, nil)
-		
+
 		// Mock incoming calls
 		expectedIncoming := []protocol.CallHierarchyIncomingCall{{}, {}, {}} // 3 items
 		bridge.On("GetIncomingCalls", expectedItems[0]).Return(expectedIncoming, nil)
-		
+
 		// Mock outgoing calls
 		expectedOutgoing := []protocol.CallHierarchyOutgoingCall{{}, {}, {}} // 3 items
 		bridge.On("GetOutgoingCalls", expectedItems[0]).Return(expectedOutgoing, nil)
-		
+
 		items, err := bridge.PrepareCallHierarchy("file:///deep.go", 25, 10)
 		if err != nil {
 			t.Errorf("Error preparing call hierarchy for deeply nested calls: %v", err)
@@ -447,7 +447,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		if len(items) == 0 {
 			t.Error("Expected call hierarchy items for deeply nested function")
 		}
-		
+
 		// Test that we can get both incoming and outgoing calls
 		incoming, err := bridge.GetIncomingCalls(items[0])
 		if err != nil {
@@ -456,7 +456,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		if len(incoming) != 3 {
 			t.Errorf("Expected 3 incoming calls, got %d", len(incoming))
 		}
-		
+
 		outgoing, err := bridge.GetOutgoingCalls(items[0])
 		if err != nil {
 			t.Errorf("Error getting outgoing calls: %v", err)
@@ -464,7 +464,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		if len(outgoing) != 3 {
 			t.Errorf("Expected 3 outgoing calls, got %d", len(outgoing))
 		}
-		
+
 		bridge.AssertExpectations(t)
 	})
 }

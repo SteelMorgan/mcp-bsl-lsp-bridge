@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -282,7 +283,7 @@ func TestMCPToolIntegration_LSPDisconnectTool(t *testing.T) {
 	result, err := client.CallTool(ctx, mcp.CallToolRequest{
 		Request: mcp.Request{Method: "tools/call"},
 		Params: mcp.CallToolParams{
-			Name:    "lsp_disconnect",
+			Name:      "lsp_disconnect",
 			Arguments: map[string]any{},
 		},
 	})
@@ -295,9 +296,9 @@ func TestMCPToolIntegration_LSPDisconnectTool(t *testing.T) {
 }
 func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
-	mockBridge.On("InferLanguage", "file:///invalid.xyz").Return(lsp.Language(""), fmt.Errorf("unsupported file type")).Once()
+	mockBridge.On("InferLanguage", "file:///invalid.xyz").Return(lsp.Language(""), errors.New("unsupported file type")).Once()
 
-	mockBridge.On("GetHoverInformation", "file:///invalid.xyz", uint32(10), uint32(5)).Return((*protocol.Hover)(nil), fmt.Errorf("unsupported file type")).Once()
+	mockBridge.On("GetHoverInformation", "file:///invalid.xyz", uint32(10), uint32(5)).Return((*protocol.Hover)(nil), errors.New("unsupported file type")).Once()
 
 	// Initialize tool and handler directly
 	tool, handler := HoverTool(mockBridge)
@@ -333,6 +334,7 @@ func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 	mockBridge.AssertExpectations(t)
 	t.Logf("Integration test 'error handling integration' completed successfully")
 }
+
 // // TestMCPToolIntegration tests the complete MCP tool request/response cycle
 // func TestMCPToolIntegration(t *testing.T) {
 // 	testCases := []struct {
