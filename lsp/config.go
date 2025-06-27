@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"rockerboo/mcp-lsp-bridge/logger"
 	"strings"
 )
 
@@ -111,6 +112,8 @@ func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]string, e
 	if projectPath == "" {
 		return nil, errors.New("project path cannot be empty")
 	}
+
+	logger.Info(fmt.Sprintf("Detecting project languages in '%s'", projectPath))
 
 	// Check if directory exists
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {

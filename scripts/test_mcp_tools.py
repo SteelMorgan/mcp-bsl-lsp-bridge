@@ -72,9 +72,6 @@ class MCPToolRunner:
         command_str = command_str.strip()
         
         # Regex to capture the tool name and the raw parameter string.
-        # It allows optional '● ', 'lsp:', optional ' (MCP)', and flexible spacing.
-        # Group 1: tool_name (e.g., signature_help)
-        # Group 2: raw_params_string (e.g., uri="...", line=..., character=...)
         match = re.match(
             r'^(?:●\s*)?lsp:(\w+)\s*(?:\(MCP\))?\s*\((.*)\)$',
             command_str
@@ -90,25 +87,10 @@ class MCPToolRunner:
         logger.info(f"params string: {params_str}")
         
         params = {}
-        if params_str: # Only try to parse if there's a parameter string
-            # This regex aims to capture key="value" or key='value' pairs.
-            # It might be too strict or not correctly handling escaped quotes within values if they existed.
-            # Let's try a slightly different approach for capturing quoted strings.
-            
-            # We need to match:
-            # 1. A key (word characters)
-            # 2. Optional whitespace, a colon, optional whitespace
-            # 3. A value enclosed in either double or single quotes.
-            
-            # Regex to find key=value pairs, supporting both double and single quotes for values.
-            # It captures:
-            # Group 1: key (e.g., uri, line)
-            # Group 2: value inside double quotes (e.g., "file://...")
-            # Group 3: value inside single quotes (e.g., '5')
-            
-            # Adjusted regex: Try to be more forgiving with spacing around quotes and keys.
-            # This regex specifically tries to capture double-quoted strings OR single-quoted strings.
-            param_regex = r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([\w.-]+))'
+        if params_str:
+            # Updated regex to handle URLs and complex values
+            # This pattern matches quoted strings (single or double) OR unquoted values up to comma/end
+            param_regex = r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\s)]+))'
             param_matches = re.findall(param_regex, params_str)
 
             if not param_matches and params_str.strip():
@@ -128,8 +110,9 @@ class MCPToolRunner:
                 else:
                     params[key] = value
 
-        logger.info(f"Parsed command: Tool='{tool_name}', Params={params}") # Log parsed params
+        logger.info(f"Parsed command: Tool='{tool_name}', Params={params}")
         return tool_name, params
+
     def run_mcp_tool(self, tool_name, params):
         """
         Run MCP tool by sending JSON-RPC request via stdio

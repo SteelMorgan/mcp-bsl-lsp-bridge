@@ -332,58 +332,75 @@ func handleDocumentSymbols(bridge interfaces.BridgeInterface, query string, offs
 		docUri = normalizeURI(query)
 	}
 
-	response.WriteString("=== DOCUMENT SYMBOLS ===\n")
-	fmt.Fprintf(response, "Document: %s\n", docUri)
-
 	symbols, err := bridge.GetDocumentSymbols(docUri)
 	if err != nil {
 		logger.Error("Document symbols query failed", fmt.Sprintf("URI: %s, Error: %v", docUri, err))
-		fmt.Fprintf(response, "Error: Failed to get document symbols: %v\n", err)
-
+		fmt.Fprintf(response, "ERROR: %v\n", err)
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
 	if len(symbols) == 0 {
-		response.WriteString("No symbols found in document.\n")
+		response.WriteString("NO_SYMBOLS\n")
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
-	// Apply pagination to document symbols
+	// Apply pagination
 	totalCount := len(symbols)
-
-	// Handle offset
 	if offset >= totalCount {
-		fmt.Fprintf(response, "Offset %d exceeds total results (%d). No results to display.\n", offset, totalCount)
+		fmt.Fprintf(response, "OFFSET_EXCEEDED: %d >= %d\n", offset, totalCount)
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
-	// Apply offset and limit
 	end := min(offset+limit, totalCount)
-
 	paginatedSymbols := symbols[offset:end]
-	resultCount := len(paginatedSymbols)
 
-	// Format pagination info
-	if offset > 0 || end < totalCount {
-		fmt.Fprintf(response, "Showing symbols %d-%d of %d total:\n", offset+1, offset+resultCount, totalCount)
-	} else {
-		fmt.Fprintf(response, "Found %d symbols:\n", totalCount)
-	}
+	// Structured header
+	fmt.Fprintf(response, "SYMBOLS|%s|%d|%d|%d\n", docUri, offset, len(paginatedSymbols), totalCount)
 
-	// Format symbols with hierarchy
+	// Compact symbol format
 	for i, sym := range paginatedSymbols {
-		formatDocumentSymbolWithTargeting(response, sym, 0, offset+i+1, docUri)
+		formatCompactSymbol(response, &sym, offset+i+1)
 	}
 
-	// Show pagination info
+	// Pagination indicator
 	if end < totalCount {
-		remaining := totalCount - end
-		fmt.Fprintf(response, "\n... and %d more symbols available (use offset=%d to see next page)\n", remaining, end)
+		fmt.Fprintf(response, "MORE|%d\n", totalCount-end)
 	}
 
 	return mcp.NewToolResultText(response.String()), nil
 }
 
+func formatCompactSymbol(response *strings.Builder, sym *protocol.DocumentSymbol, index int) {
+	// Format: INDEX|NAME|KIND|LINE:COL|RANGE_END
+	startLine := sym.Range.Start.Line
+	startChar := sym.Range.Start.Character
+	endLine := sym.Range.End.Line
+	endChar := sym.Range.End.Character
+	
+	fmt.Fprintf(response, "%d|%s|%s|%d:%d|%d:%d\n",
+	index, sym.Name, symbolKindToString(sym.Kind),
+	startLine, startChar, endLine, endChar)
+	
+	// Format children with indentation
+	for _, child := range sym.Children {
+		formatCompactSymbolChild(response, &child, index, 1)
+	}
+}
+
+func formatCompactSymbolChild(response *strings.Builder, sym *protocol.DocumentSymbol, parentIndex, depth int) {
+	indent := strings.Repeat("  ", depth)
+	startLine := sym.Range.Start.Line
+	startChar := sym.Range.Start.Character
+	
+	fmt.Fprintf(response, "%s%d.%d|%s|%s|%d:%d\n",
+	indent, parentIndex, depth, sym.Name, symbolKindToString(sym.Kind),
+	startLine, startChar)
+	
+	// Recursively format children
+	for _, child := range sym.Children {
+		formatCompactSymbolChild(response, &child, parentIndex, depth+1)
+	}
+}
 // handleReferences handles the 'references' analysis type
 func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
 	// For references, search for the symbol first
