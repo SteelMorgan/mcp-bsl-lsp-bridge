@@ -52,6 +52,7 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			}
 
 			limit := 20
+
 			if limitVal, err := request.RequireInt("limit"); err == nil {
 				if limitVal > 0 && limitVal <= 100 {
 					limit = limitVal
@@ -83,12 +84,15 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 
 			// Use the first available client in priority order
 			var lspClient *lsp.LanguageClient
+
 			var activeLanguage string
+
 			for _, lang := range languages {
 				if client, exists := clients[lang]; exists {
 					if typedClient, ok := client.(*lsp.LanguageClient); ok {
 						lspClient = typedClient
 						activeLanguage = lang
+
 						break
 					}
 				}
@@ -99,6 +103,7 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			}
 
 			var response strings.Builder
+
 			fmt.Fprintf(&response, "Project Analysis: %s\n", analysisType)
 			fmt.Fprintf(&response, "Query: %s\n", query)
 			fmt.Fprintf(&response, "Workspace: %s\n", workspaceUri)
@@ -169,9 +174,11 @@ func formatDocumentSymbolWithTargeting(response *strings.Builder, symbol protoco
 	if depth == 0 {
 		fmt.Fprintf(response, "%s%d. %s (%s)\n",
 			indent, number, symbol.Name, kindStr)
+
 		if docUri != "" {
 			fmt.Fprintf(response, "%s    URI: %s\n", indent, docUri)
 		}
+
 		fmt.Fprintf(response, "%s    Range: line=%d, character=%d to line=%d, character=%d\n",
 			indent, startLine, startChar, endLine, endChar)
 
@@ -228,6 +235,7 @@ func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset,
 		logger.Error("Workspace symbols query failed", fmt.Sprintf("Language: %s, Query: %s, Error: %v", activeLanguage, query, err))
 		response.WriteString("=== WORKSPACE SYMBOLS ===\n")
 		fmt.Fprintf(response, "Error: Failed to get workspace symbols for language '%s': %v\n", activeLanguage, err)
+
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
@@ -255,7 +263,6 @@ func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset,
 
 	for i, symbol := range paginatedSymbols {
 		switch v := symbol.Location.Value.(type) {
-
 		case protocol.Location:
 			// Extract filename from URI
 			uri := string(v.Uri)
@@ -282,6 +289,7 @@ func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset,
 
 			// Provide agent-optimized targeting coordinates
 			nameLen := len(symbol.Name)
+
 			response.WriteString("\tTarget coordinates for hover/references/definitions:\n")
 			fmt.Fprintf(response, "\t - Primary: line=%d, character=%d\n", startLine, startChar)
 
@@ -293,10 +301,12 @@ func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset,
 
 			// Provide the most reliable coordinate for hover operations
 			bestHoverChar := startChar
+
 			if nameLen > 1 {
 				offset := min(nameLen/2, 5)
 				bestHoverChar = startChar + uint32(offset)
 			}
+
 			fmt.Fprintf(response, "\tRecommended hover coordinate: uri=\"%s\", line=%d, character=%d\n",
 				uri, startLine, bestHoverChar)
 		default:
@@ -309,6 +319,7 @@ func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset,
 		remaining := totalCount - end
 		fmt.Fprintf(response, "\n... and %d more results available (use offset=%d to see next page)\n", remaining, end)
 	}
+
 	return mcp.NewToolResultText(response.String()), nil
 }
 
@@ -328,6 +339,7 @@ func handleDocumentSymbols(bridge interfaces.BridgeInterface, query string, offs
 	if err != nil {
 		logger.Error("Document symbols query failed", fmt.Sprintf("URI: %s, Error: %v", docUri, err))
 		fmt.Fprintf(response, "Error: Failed to get document symbols: %v\n", err)
+
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
@@ -368,6 +380,7 @@ func handleDocumentSymbols(bridge interfaces.BridgeInterface, query string, offs
 		remaining := totalCount - end
 		fmt.Fprintf(response, "\n... and %d more symbols available (use offset=%d to see next page)\n", remaining, end)
 	}
+
 	return mcp.NewToolResultText(response.String()), nil
 }
 
@@ -378,10 +391,12 @@ func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.Language
 	if err != nil {
 		response.WriteString("=== REFERENCES ===\n")
 		fmt.Fprintf(response, "Error: Cannot find references - workspace symbols search failed: %v\n", err)
+
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
 	response.WriteString("=== REFERENCES ===\n")
+
 	if len(symbols) == 0 {
 		fmt.Fprintf(response, "No symbols found matching the query '%s'.\n", query)
 		return mcp.NewToolResultText(response.String()), nil
@@ -407,12 +422,14 @@ func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.Language
 		}
 
 		fmt.Fprintf(response, "Found %d references for symbol '%s':\n", len(references), symbol.Name)
+
 		for i, ref := range references {
 			fmt.Fprintf(response, "%d. %v\n", i+1, ref)
 		}
 	default:
 		return mcp.NewToolResultError(fmt.Sprintf("Unsupported reference format: %s", v)), nil
 	}
+
 	return mcp.NewToolResultText(response.String()), nil
 }
 
@@ -423,14 +440,15 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 	if err != nil {
 		response.WriteString("=== DEFINITIONS ===\n")
 		fmt.Fprintf(response, "Error: Cannot find definitions - workspace symbols search failed: %v\n", err)
+
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
 	response.WriteString("=== DEFINITIONS ===\n")
+
 	if len(symbols) == 0 {
 		fmt.Fprintf(response, "No symbols found matching the query '%s'.\n", query)
 		return mcp.NewToolResultText(response.String()), nil
-
 	} else if len(symbols) > 1 {
 		// If multiple symbols found, list them and ask for clarification
 		fmt.Fprintf(response, "Multiple symbols found matching the query '%s'.\n", query)
@@ -454,7 +472,9 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 				fmt.Fprintf(response, "%d. %s (Unsupported Location Type: %T)\n", i+1, symbol.Name, symbol.Location.Value)
 			}
 		}
+
 		fmt.Fprintf(response, "Please provide a more specific query or the full path to the file containing the desired symbol.\n")
+
 		return mcp.NewToolResultText(response.String()), nil
 	}
 
@@ -463,7 +483,6 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 	symbol := symbols[0]
 
 	switch v := symbol.Location.Value.(type) {
-
 	case protocol.Location:
 		uri := string(v.Uri)
 		line := v.Range.Start.Line
@@ -481,6 +500,7 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 		}
 
 		fmt.Fprintf(response, "Found %d definitions for symbol '%s':\n", len(definitions), symbol.Name)
+
 		for i, def := range definitions {
 			// A definition can be LocationLink or Location (protocol.Or2[protocol.LocationLink, protocol.Location])
 			// Need to switch on the value of the Or2
@@ -512,12 +532,14 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 	default:
 		return mcp.NewToolResultError(fmt.Sprintf("Unexpected symbol location format from workspace search: %T\n", v)), nil
 	}
+
 	return mcp.NewToolResultText(response.String()), nil
 }
 
 // handleTextSearch handles the 'text_search' analysis type
 func handleTextSearch(bridge interfaces.BridgeInterface, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
 	response.WriteString("=== TEXT SEARCH ===\n")
+
 	searchResults, err := bridge.SearchTextInWorkspace(activeLanguage, query)
 	if err != nil {
 		fmt.Fprintf(response, "Text search failed: %v\n", err)
@@ -560,5 +582,6 @@ func handleTextSearch(bridge interfaces.BridgeInterface, query string, offset, l
 		remaining := totalCount - end
 		fmt.Fprintf(response, "\n... and %d more results available (use offset=%d to see next page)\n", remaining, end)
 	}
+
 	return mcp.NewToolResultText(response.String()), nil
 }

@@ -151,7 +151,6 @@ func TestLSPConnectTool(t *testing.T) {
 			if tc.mockClient != nil {
 				bridge.On("GetClientForLanguageInterface", tc.language).Return(tc.mockClient, nil)
 			} else if tc.expectError && tc.name == "client creation failure" {
-
 				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), fmt.Errorf("failed to create client for language: %s", tc.language))
 			} else if tc.expectError {
 				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), errors.New("client creation failed")).Maybe()
@@ -162,6 +161,7 @@ func TestLSPConnectTool(t *testing.T) {
 			if err != nil {
 				t.Errorf("Could not create MCP server: %v", err)
 			}
+
 			RegisterLSPConnectTool(mcpServer, bridge)
 
 			// Test configuration retrieval
@@ -170,6 +170,7 @@ func TestLSPConnectTool(t *testing.T) {
 				if !tc.expectError {
 					t.Error("Expected config but got nil")
 				}
+
 				return
 			}
 
@@ -179,6 +180,7 @@ func TestLSPConnectTool(t *testing.T) {
 				if !tc.expectError {
 					t.Errorf("Expected language server config for %s", tc.language)
 				}
+
 				return
 			}
 
@@ -193,6 +195,7 @@ func TestLSPConnectTool(t *testing.T) {
 					t.Errorf("Unexpected error: %v", err)
 					return
 				}
+
 				if client == nil {
 					t.Error("Expected client but got nil")
 				}
@@ -228,9 +231,11 @@ func TestLSPConnectValidation(t *testing.T) {
 		if !exists {
 			t.Error("Expected Go language server config")
 		}
+
 		if goConfig.Command == "" {
 			t.Error("Expected Go language server to have command")
 		}
+
 		if len(goConfig.Filetypes) == 0 {
 			t.Error("Expected Go language server to have filetypes")
 		}
@@ -240,6 +245,7 @@ func TestLSPConnectValidation(t *testing.T) {
 		if !exists {
 			t.Error("Expected invalid language server config for testing")
 		}
+
 		if invalidConfig.Command != "" {
 			t.Error("Expected invalid config to have empty command")
 		}
@@ -274,9 +280,11 @@ func TestLSPConnectValidation(t *testing.T) {
 				t.Errorf("Expected %s language server config", lang)
 				continue
 			}
+
 			if serverConfig.Command == "" {
 				t.Errorf("Expected %s language server to have command", lang)
 			}
+
 			if len(serverConfig.Filetypes) == 0 {
 				t.Errorf("Expected %s language server to have filetypes", lang)
 			}

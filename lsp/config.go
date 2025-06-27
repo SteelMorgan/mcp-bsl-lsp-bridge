@@ -15,6 +15,7 @@ func LoadLSPConfig(path string) (config *LSPServerConfig, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file: %w", err)
 	}
+
 	defer func() {
 		if closeErr := file.Close(); closeErr != nil && err == nil {
 			err = closeErr
@@ -126,6 +127,7 @@ func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]string, e
 			if strings.HasPrefix(name, ".") && name != "." {
 				return filepath.SkipDir
 			}
+
 			if name == "node_modules" || name == "target" || name == "build" || name == "dist" {
 				return filepath.SkipDir
 			}

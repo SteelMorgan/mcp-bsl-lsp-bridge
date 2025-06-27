@@ -220,6 +220,7 @@ func TestCallHierarchyTool(t *testing.T) {
 					if tc.direction == "incoming" || tc.direction == "both" {
 						bridge.On("GetIncomingCalls", mock.Anything).Return(tc.mockIncoming, nil)
 					}
+
 					if tc.direction == "outgoing" || tc.direction == "both" {
 						bridge.On("GetOutgoingCalls", mock.Anything).Return(tc.mockOutgoing, nil)
 					}
@@ -231,6 +232,7 @@ func TestCallHierarchyTool(t *testing.T) {
 			if err != nil {
 				t.Errorf("Could not start the server: %v", err)
 			}
+
 			RegisterCallHierarchyTool(mcpServer, bridge)
 
 			// Test call hierarchy preparation
@@ -239,8 +241,10 @@ func TestCallHierarchyTool(t *testing.T) {
 				if err == nil {
 					t.Error("Expected error but got none")
 				}
+
 				return
 			}
+
 			if err != nil {
 				t.Errorf("Unexpected error in call hierarchy preparation: %v", err)
 				return
@@ -257,6 +261,7 @@ func TestCallHierarchyTool(t *testing.T) {
 					if err != nil {
 						t.Errorf("Unexpected error getting incoming calls: %v", err)
 					}
+
 					if len(incoming) != len(tc.mockIncoming) {
 						t.Errorf("Expected %d incoming calls, got %d", len(tc.mockIncoming), len(incoming))
 					}
@@ -270,6 +275,7 @@ func TestCallHierarchyTool(t *testing.T) {
 					if err != nil {
 						t.Errorf("Unexpected error getting outgoing calls: %v", err)
 					}
+
 					if len(outgoing) != len(tc.mockOutgoing) {
 						t.Errorf("Expected %d outgoing calls, got %d", len(tc.mockOutgoing), len(outgoing))
 					}
@@ -375,6 +381,7 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 				t.Errorf("Error preparing call hierarchy for %s: %v", symbolType.description, err)
 				return
 			}
+
 			if len(items) != 1 {
 				t.Errorf("Expected 1 item for %s, got %d", symbolType.description, len(items))
 				return
@@ -385,6 +392,7 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error getting incoming calls for %s: %v", symbolType.description, err)
 			}
+
 			if len(incoming) != 1 {
 				t.Errorf("Expected 1 incoming call for %s, got %d", symbolType.description, len(incoming))
 			}
@@ -394,6 +402,7 @@ func TestCallHierarchySymbolTypes(t *testing.T) {
 			if err != nil {
 				t.Errorf("Error getting outgoing calls for %s: %v", symbolType.description, err)
 			}
+
 			if len(outgoing) != 1 {
 				t.Errorf("Expected 1 outgoing call for %s, got %d", symbolType.description, len(outgoing))
 			}
@@ -418,6 +427,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error preparing call hierarchy for recursive function: %v", err)
 		}
+
 		if len(items) == 0 {
 			t.Error("Expected call hierarchy items for recursive function")
 		}
@@ -444,6 +454,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error preparing call hierarchy for deeply nested calls: %v", err)
 		}
+
 		if len(items) == 0 {
 			t.Error("Expected call hierarchy items for deeply nested function")
 		}
@@ -453,6 +464,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error getting incoming calls: %v", err)
 		}
+
 		if len(incoming) != 3 {
 			t.Errorf("Expected 3 incoming calls, got %d", len(incoming))
 		}
@@ -461,6 +473,7 @@ func TestCallHierarchyEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error getting outgoing calls: %v", err)
 		}
+
 		if len(outgoing) != 3 {
 			t.Errorf("Expected 3 outgoing calls, got %d", len(outgoing))
 		}

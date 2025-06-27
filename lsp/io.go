@@ -19,8 +19,10 @@ func (rwc *stdioReadWriteCloser) Write(p []byte) (n int, err error) {
 func (rwc *stdioReadWriteCloser) Close() error {
 	err1 := rwc.stdin.Close()
 	err2 := rwc.stdout.Close()
+
 	if err1 != nil {
 		return err1
 	}
+
 	return err2
 }

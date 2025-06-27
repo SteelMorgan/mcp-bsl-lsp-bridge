@@ -35,6 +35,7 @@ func (r *IntegrationCallToolRequest) RequireString(key string) (string, error) {
 			return str, nil
 		}
 	}
+
 	return "", fmt.Errorf("missing or invalid string parameter: %s", key)
 }
 
@@ -51,6 +52,7 @@ func (r *IntegrationCallToolRequest) RequireInt(key string) (int, error) {
 			return int(v), nil
 		}
 	}
+
 	return 0, fmt.Errorf("missing or invalid int parameter: %s", key)
 }
 
@@ -60,6 +62,7 @@ func (r *IntegrationCallToolRequest) OptionalString(key string, defaultValue str
 			return str
 		}
 	}
+
 	return defaultValue
 }
 
@@ -69,6 +72,7 @@ func (r *IntegrationCallToolRequest) OptionalBool(key string, defaultValue bool)
 			return b
 		}
 	}
+
 	return defaultValue
 }
 
@@ -89,6 +93,7 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 		Handler: handler,
 	})
 	require.NoError(t, err, "Could not start server")
+
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -144,6 +149,7 @@ func TestMCPToolIntegration_DiagnosticsTool(t *testing.T) {
 		Handler: handler,
 	})
 	require.NoError(t, err, "Could not start server")
+
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -162,14 +168,17 @@ func TestMCPToolIntegration_DiagnosticsTool(t *testing.T) {
 	assert.False(t, result.IsError, "Expected successful result, got error")
 
 	assert.NotEmpty(t, result.Content, "Expected diagnostic content")
+
 	for _, content := range result.Content {
 		// Change this line to assert to value type
 		textContent, ok := content.(mcp.TextContent)
 		assert.True(t, ok, "Expected TextContent, got %T", content)
 		assert.NotEmpty(t, textContent.Text, "Expected diagnostic content")
+
 		expectedDiag := "=== DIAGNOSTICS ===\n\nWARNINGS (1):\n1. unused variable\n"
 		assert.Equal(t, expectedDiag, textContent.Text, "Unexpected diagnostic text")
 	}
+
 	mockBridge.AssertExpectations(t)
 	t.Logf("Integration test 'diagnostics tool integration' completed successfully")
 }
@@ -184,6 +193,7 @@ func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 		Handler: handler,
 	})
 	require.NoError(t, err, "Could not start server")
+
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -204,15 +214,19 @@ func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 	assert.NotEmpty(t, result.Content, "Expected language result content")
 
 	found := false
+
 	for _, content := range result.Content {
 		// Assert to value type
 		textContent, ok := content.(mcp.TextContent)
 		assert.True(t, ok, "Expected TextContent, got %T", content)
+
 		if textContent.Text != "" {
 			found = true
+
 			assert.Equal(t, "go", textContent.Text, "Expected inferred language 'go'")
 		}
 	}
+
 	assert.True(t, found, "Expected language result content")
 	mockBridge.AssertExpectations(t)
 	t.Logf("Integration test 'infer language tool integration' completed successfully")
@@ -244,6 +258,7 @@ func TestMCPToolIntegration_LSPConnectTool(t *testing.T) {
 		Handler: handler,
 	})
 	require.NoError(t, err, "Could not start server")
+
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -276,6 +291,7 @@ func TestMCPToolIntegration_LSPDisconnectTool(t *testing.T) {
 		Handler: handler,
 	})
 	require.NoError(t, err, "Could not start server")
+
 	defer mcpServer.Close()
 
 	client := mcpServer.Client()
@@ -307,6 +323,7 @@ func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 		Handler: handler,
 	})
 	require.NoError(t, err, "Could not start server")
+
 	defer mcpServer.Close()
 
 	ctx := context.Background()
@@ -729,6 +746,7 @@ func TestMCPToolParameterValidation(t *testing.T) {
 				if tc.expectError && !hasError {
 					t.Error("Expected parameter validation error")
 				}
+
 				if !tc.expectError && hasError {
 					t.Errorf("Unexpected parameter validation error: %v, %v, %v", err1, err2, err3)
 				}
@@ -738,6 +756,7 @@ func TestMCPToolParameterValidation(t *testing.T) {
 				if tc.expectError && err == nil {
 					t.Error("Expected parameter validation error")
 				}
+
 				if !tc.expectError && err != nil {
 					t.Errorf("Unexpected parameter validation error: %v", err)
 				}
@@ -747,6 +766,7 @@ func TestMCPToolParameterValidation(t *testing.T) {
 				if tc.expectError && err == nil {
 					t.Error("Expected parameter validation error")
 				}
+
 				if !tc.expectError && err != nil {
 					t.Errorf("Unexpected parameter validation error: %v", err)
 				}

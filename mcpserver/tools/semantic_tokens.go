@@ -75,6 +75,7 @@ func SemanticTokensTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 
 func formatTokensByType(positions []lsp.TokenPosition) string {
 	var response strings.Builder
+
 	tokensByType := make(map[string][]lsp.TokenPosition)
 
 	// Group tokens by type
@@ -85,6 +86,7 @@ func formatTokensByType(positions []lsp.TokenPosition) string {
 	// Format output
 	for tokenType, tokens := range tokensByType {
 		fmt.Fprintf(&response, "%s tokens:\n", tokenType)
+
 		for _, token := range tokens {
 			fmt.Fprintf(&response, "  - '%s' at %d:%d\n",
 				token.Text,
@@ -92,6 +94,7 @@ func formatTokensByType(positions []lsp.TokenPosition) string {
 				token.Range.Start.Character,
 			)
 		}
+
 		response.WriteString("\n")
 	}
 

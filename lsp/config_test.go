@@ -20,6 +20,7 @@ func createTempProjectWithFiles(t *testing.T, files map[string]string) string {
 	// Create files in the temp directory
 	for filename, content := range files {
 		filePath := filepath.Join(tempDir, filename)
+
 		err := os.WriteFile(filePath, []byte(content), 0644)
 		if err != nil {
 			t.Fatalf("Failed to create file %s: %v", filename, err)
@@ -199,9 +200,9 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 }
 
 func cleanupDir(t *testing.T, dir string) func() {
-    return func() {
-        if err := os.RemoveAll(dir); err != nil {
-            t.Logf("Failed to remove temp dir: %v", err)
-        }
-    }
+	return func() {
+		if err := os.RemoveAll(dir); err != nil {
+			t.Logf("Failed to remove temp dir: %v", err)
+		}
+	}
 }

@@ -110,6 +110,7 @@ func TestHoverTool(t *testing.T) {
 			if err != nil {
 				t.Errorf("Could not setup MCP server: %v", err)
 			}
+
 			RegisterHoverTool(mcpServer, bridge)
 
 			// Just check that the server was created successfully

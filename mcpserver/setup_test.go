@@ -27,6 +27,7 @@ func TestMCPServerSetup(t *testing.T) {
 		if !nameField.IsValid() {
 			t.Fatal("Could not access server name")
 		}
+
 		if nameField.String() != "mcp-lsp-bridge" {
 			t.Errorf("Expected server name 'mcp-lsp-bridge', got %s", nameField.String())
 		}
@@ -36,6 +37,7 @@ func TestMCPServerSetup(t *testing.T) {
 		if !versionField.IsValid() {
 			t.Fatal("Could not access server version")
 		}
+
 		if versionField.String() != "1.0.0" {
 			t.Errorf("Expected server version '1.0.0', got %s", versionField.String())
 		}

@@ -13,10 +13,12 @@ import (
 // Initialize sends an initialize request to the language server
 func (lc *LanguageClient) Initialize(params protocol.InitializeParams) (*protocol.InitializeResult, error) {
 	var result protocol.InitializeResult
+
 	err := lc.SendRequest("initialize", params, &result, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 
@@ -46,6 +48,7 @@ func (lc *LanguageClient) DidOpen(uri string, languageId protocol.LanguageKind, 
 			Text:       text,
 		},
 	}
+
 	return lc.SendNotification("textDocument/didOpen", params)
 }
 
@@ -58,6 +61,7 @@ func (lc *LanguageClient) DidChange(uri string, version int32, changes []protoco
 		},
 		ContentChanges: changes,
 	}
+
 	return lc.SendNotification("textDocument/didChange", params)
 }
 
@@ -71,6 +75,7 @@ func (lc *LanguageClient) DidSave(uri string, text *string) error {
 	if text != nil {
 		params["text"] = *text
 	}
+
 	return lc.SendNotification("textDocument/didSave", params)
 }
 
@@ -81,17 +86,20 @@ func (lc *LanguageClient) DidClose(uri string) error {
 			Uri: protocol.DocumentUri(uri),
 		},
 	}
+
 	return lc.SendNotification("textDocument/didClose", params)
 }
 
 func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.WorkspaceSymbol, error) {
 	var result []protocol.WorkspaceSymbol
+
 	err := lc.SendRequest("workspace/symbol", protocol.WorkspaceSymbolParams{
 		Query: query,
 	}, &result, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -100,6 +108,7 @@ func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.WorkspaceSy
 func (lc *LanguageClient) Definition(uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
 	// Use raw JSON response to handle both Location[] and LocationLink[] formats
 	var rawResult json.RawMessage
+
 	err := lc.SendRequest("textDocument/definition", protocol.DefinitionParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
@@ -115,6 +124,7 @@ func (lc *LanguageClient) Definition(uri string, line, character uint32) ([]prot
 
 	// First try to unmarshal as LocationLink[]
 	var links []protocol.Or2[protocol.LocationLink, protocol.Location]
+
 	err = json.Unmarshal(rawResult, &links)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal definition response: %w", err)
@@ -126,6 +136,7 @@ func (lc *LanguageClient) Definition(uri string, line, character uint32) ([]prot
 // References finds all references to a symbol at a given position
 func (lc *LanguageClient) References(uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
 	var result []protocol.Location
+
 	err := lc.SendRequest("textDocument/references", protocol.ReferenceParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
@@ -141,12 +152,14 @@ func (lc *LanguageClient) References(uri string, line, character uint32, include
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
 // Hover provides hover information at a given position
 func (lc *LanguageClient) Hover(uri string, line, character uint32) (*protocol.Hover, error) {
 	var result protocol.Hover
+
 	err := lc.SendRequest("textDocument/hover", protocol.HoverParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
@@ -159,6 +172,7 @@ func (lc *LanguageClient) Hover(uri string, line, character uint32) (*protocol.H
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 
@@ -206,6 +220,7 @@ func (lc *LanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSymbol
 // Implementation finds implementations of a symbol at a given position
 func (lc *LanguageClient) Implementation(uri string, line, character uint32) ([]protocol.Location, error) {
 	var result []protocol.Location
+
 	err := lc.SendRequest("textDocument/implementation", protocol.ImplementationParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
@@ -218,6 +233,7 @@ func (lc *LanguageClient) Implementation(uri string, line, character uint32) ([]
 	if err != nil {
 		return nil, err
 	}
+
 	return result, nil
 }
 
@@ -234,6 +250,7 @@ func (lc *LanguageClient) SignatureHelp(uri string, line, character uint32) (*pr
 	}
 
 	var rawResponse json.RawMessage
+
 	err := lc.SendRequest("textDocument/signatureHelp", params, &rawResponse, 5*time.Second)
 	if err != nil {
 		return nil, err
@@ -245,15 +262,18 @@ func (lc *LanguageClient) SignatureHelp(uri string, line, character uint32) (*pr
 	}
 
 	var result protocol.SignatureHelp
+
 	err = json.Unmarshal(rawResponse, &result)
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 
 func (lc *LanguageClient) SemanticTokens(uri string) (*protocol.SemanticTokens, error) {
 	var result protocol.SemanticTokens
+
 	err := lc.SendRequest("textDocument/semanticTokens", protocol.SemanticTokensParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
@@ -262,11 +282,13 @@ func (lc *LanguageClient) SemanticTokens(uri string) (*protocol.SemanticTokens, 
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }
 
 func (lc *LanguageClient) SemanticTokensRange(uri string, startLine, startCharacter, endLine, endCharacter uint32) (*protocol.SemanticTokens, error) {
 	var result protocol.SemanticTokens
+
 	err := lc.SendRequest("textDocument/semanticTokens/range", protocol.SemanticTokensRangeParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
@@ -285,5 +307,6 @@ func (lc *LanguageClient) SemanticTokensRange(uri string, startLine, startCharac
 	if err != nil {
 		return nil, err
 	}
+
 	return &result, nil
 }

@@ -56,6 +56,7 @@ func InitLogger(cfg LoggerConfig) error {
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %v", err)
 	}
+
 	logFile = file
 
 	// Store configuration
@@ -85,6 +86,7 @@ func rotateLogFiles(cfg LoggerConfig) {
 		sort.Slice(files, func(i, j int) bool {
 			fiA, _ := os.Stat(files[i])
 			fiB, _ := os.Stat(files[j])
+
 			return fiA.ModTime().Before(fiB.ModTime())
 		})
 
@@ -136,6 +138,7 @@ func Debug(v ...any) {
 func Close() {
 	logMutex.Lock()
 	defer logMutex.Unlock()
+
 	if logFile != nil {
 		err := logFile.Close()
 		if err != nil {

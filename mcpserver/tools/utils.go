@@ -83,7 +83,9 @@ func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.M
 		return "=== HOVER INFORMATION ===\n" + v
 	case []any:
 		var result strings.Builder
+
 		result.WriteString("=== HOVER INFORMATION ===\n")
+
 		for i, item := range v {
 			if i > 0 {
 				result.WriteString("\n---\n")
@@ -97,6 +99,7 @@ func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.M
 				result.WriteString(fmt.Sprintf("%v", item))
 			}
 		}
+
 		return result.String()
 	default:
 		return fmt.Sprintf("=== HOVER INFORMATION ===\nContent: %v", contents)
@@ -106,6 +109,7 @@ func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.M
 // Helper function to format signature help
 func formatSignatureHelp(sigHelp protocol.SignatureHelpResponse) string {
 	var result strings.Builder
+
 	result.WriteString("=== SIGNATURE HELP ===\n")
 
 	// For now, just return a basic representation until we can inspect the actual structure
@@ -117,6 +121,7 @@ func formatSignatureHelp(sigHelp protocol.SignatureHelpResponse) string {
 // Helper function to format diagnostics
 func formatDiagnostics(diagnostics []any) string {
 	var result strings.Builder
+
 	result.WriteString("=== DIAGNOSTICS ===\n")
 
 	if len(diagnostics) == 0 {
@@ -140,13 +145,16 @@ func formatDiagnostics(diagnostics []any) string {
 	formatDiagnosticGroup := func(title string, diags []protocol.Diagnostic) {
 		if len(diags) > 0 {
 			result.WriteString(fmt.Sprintf("\n%s (%d):\n", title, len(diags)))
+
 			for i, diag := range diags {
 				result.WriteString(fmt.Sprintf("%d. %s",
 					i+1,
 					diag.Message))
+
 				if diag.Source != "" {
 					result.WriteString(fmt.Sprintf(" [%s]", diag.Source))
 				}
+
 				result.WriteString("\n")
 			}
 		}
@@ -163,6 +171,7 @@ func formatDiagnostics(diagnostics []any) string {
 // Helper function to format code actions
 func formatCodeActions(actions []protocol.CodeAction) string {
 	var result strings.Builder
+
 	result.WriteString("=== CODE ACTIONS ===\n")
 
 	if len(actions) == 0 {
@@ -174,13 +183,16 @@ func formatCodeActions(actions []protocol.CodeAction) string {
 
 	for i, codeAction := range actions {
 		result.WriteString(fmt.Sprintf("%d. %s", i+1, codeAction.Title))
+
 		if codeAction.Kind != nil {
 			result.WriteString(fmt.Sprintf(" (%s)", string(*codeAction.Kind)))
 		}
+
 		result.WriteString("\n")
 
 		if len(codeAction.Diagnostics) > 0 {
 			result.WriteString("   Addresses diagnostics:\n")
+
 			for _, diag := range codeAction.Diagnostics {
 				result.WriteString(fmt.Sprintf("   - %s\n", diag.Message))
 			}
@@ -193,6 +205,7 @@ func formatCodeActions(actions []protocol.CodeAction) string {
 // Helper function to format text edits
 func formatTextEdits(edits []protocol.TextEdit) string {
 	var result strings.Builder
+
 	result.WriteString("=== DOCUMENT FORMATTING ===\n")
 
 	if len(edits) == 0 {
@@ -269,6 +282,7 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 	}
 
 	var result strings.Builder
+
 	result.WriteString("=== RENAME PREVIEW ===\n")
 
 	totalFiles := 0
@@ -289,6 +303,7 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 				if uriStart != -1 {
 					uriPart := docChangeStr[uriStart+4:]
 					uriEnd := strings.Index(uriPart, " ")
+
 					if uriEnd != -1 {
 						uri := uriPart[:uriEnd]
 						totalFiles++
@@ -304,6 +319,7 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 						// Extract individual edits using pattern matching
 						editsSection := docChangeStr
 						editNum := 1
+
 						for {
 							newTextStart := strings.Index(editsSection, "NewText:")
 							if newTextStart == -1 {
@@ -312,10 +328,12 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 
 							// Extract NewText value
 							newTextPart := editsSection[newTextStart+8:]
+
 							newTextEnd := strings.Index(newTextPart, " Range:")
 							if newTextEnd == -1 {
 								break
 							}
+
 							newText := newTextPart[:newTextEnd]
 
 							// Extract Range information
@@ -323,6 +341,7 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 							if rangeStart != -1 {
 								rangePart := newTextPart[rangeStart+7:]
 								rangeEnd := strings.Index(rangePart, "}}")
+
 								if rangeEnd != -1 {
 									rangeInfo := rangePart[:rangeEnd]
 
@@ -330,10 +349,12 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 									if strings.Contains(rangeInfo, "Line:") {
 										// Extract line numbers from "Start:{Character:5 Line:6}" pattern
 										linePattern := "Line:"
+
 										lineStart := strings.Index(rangeInfo, linePattern)
 										if lineStart != -1 {
 											linePart := rangeInfo[lineStart+5:]
 											lineEndIdx := strings.IndexAny(linePart, " }")
+
 											if lineEndIdx != -1 {
 												lineNumStr := linePart[:lineEndIdx]
 												result.WriteString(fmt.Sprintf("   %d. Line %s: Replace with %s\n",
@@ -395,6 +416,7 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 // Helper function to format implementations
 func formatImplementations(implementations []protocol.Location) string {
 	var result strings.Builder
+
 	result.WriteString("=== IMPLEMENTATIONS ===\n")
 
 	if len(implementations) == 0 {
@@ -426,6 +448,7 @@ func formatWorkspaceDiagnostics(diagnostics []protocol.WorkspaceDiagnosticReport
 	}
 
 	var result strings.Builder
+
 	result.WriteString("=== Workspace Diagnostics ===\n\n")
 
 	totalIssues := 0
@@ -466,6 +489,7 @@ func getDiagnosticSeverityString(severity *protocol.DiagnosticSeverity) string {
 	if severity == nil {
 		return "Unknown"
 	}
+
 	switch *severity {
 	case protocol.DiagnosticSeverityError:
 		return "Error"

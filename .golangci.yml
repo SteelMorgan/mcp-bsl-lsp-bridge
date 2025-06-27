@@ -3,6 +3,7 @@ version: '2'
 linters:
   enable:
     - testifylint
+    - perfsprint
   settings:
     testifylint:
       # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).

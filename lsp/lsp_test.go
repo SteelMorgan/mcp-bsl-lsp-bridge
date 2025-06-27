@@ -12,10 +12,12 @@ func TestNewLanguageClient(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
+
 	_, err = client.Connect()
 	if err != nil {
 		t.Fatalf("Failed to connect to language client: %v", err)
 	}
+
 	defer closeClient(t, client)
 
 	// Check basic initialization
@@ -33,10 +35,12 @@ func TestLanguageClientMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
+
 	_, err = client.Connect()
 	if err != nil {
 		t.Fatalf("Failed to connect to language client: %v", err)
 	}
+
 	defer closeClient(t, client)
 
 	// Perform some requests to generate metrics
@@ -76,6 +80,7 @@ func TestLanguageClientClose(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
+
 	_, err = client.Connect()
 	if err != nil {
 		t.Fatalf("Failed to connect to language client: %v", err)
@@ -101,10 +106,12 @@ func TestSendRequestErrorHandling(t *testing.T) {
 	if err != nil {
 		t.Fatal("Expected error when creating client with nonexistent command")
 	}
+
 	connected_client, err := client.Connect()
 	if err == nil {
 		t.Fatalf("Expected to error when connecting to client: %v", err)
 	}
+
 	if connected_client != nil {
 		t.Error("Expected nil client when creation fails")
 		closeClient(t, client) // Clean up if somehow not nil
@@ -116,10 +123,12 @@ func TestClientCapabilitiesAndServerCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create language client: %v", err)
 	}
+
 	_, err = client.Connect()
 	if err != nil {
 		t.Fatalf("Failed to connect to language client: %v", err)
 	}
+
 	defer closeClient(t, client)
 
 	// Test client capabilities
@@ -149,6 +158,7 @@ func BenchmarkLanguageClientCreation(b *testing.B) {
 		if err != nil {
 			b.Fatalf("Failed to create language client: %v", err)
 		}
+
 		if err := client.Close(); err != nil {
 			b.Logf("failed to close client: %v", err)
 		}
@@ -160,6 +170,7 @@ func BenchmarkSendRequest(b *testing.B) {
 	if err != nil {
 		b.Fatalf("Failed to create language client: %v", err)
 	}
+
 	defer func() {
 		if err := client.Close(); err != nil {
 			b.Logf("failed to close client: %v", err)

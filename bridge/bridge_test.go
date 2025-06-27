@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // Test helper functions
 func createTestBridge() *MCPLSPBridge {
 	config := &lsp.LSPServerConfig{
@@ -38,6 +37,7 @@ func createTestBridge() *MCPLSPBridge {
 			".js": "javascript",
 		},
 	}
+
 	return NewMCPLSPBridge(config)
 }
 
@@ -46,6 +46,7 @@ func createTempFile(t *testing.T, name, content string) string {
 	filePath := filepath.Join(tmpDir, name)
 	err := os.WriteFile(filePath, []byte(content), 0644)
 	require.NoError(t, err)
+
 	return filePath
 }
 
@@ -453,6 +454,7 @@ func TestApplyTextEditsToContent(t *testing.T) {
 	result, err := applyTextEditsToContent(content, edits)
 
 	require.NoError(t, err)
+
 	expected := "line 1\nmodified line 2\nline 3"
 	assert.Equal(t, expected, result)
 }
@@ -474,6 +476,7 @@ func TestApplyTextEditsToContentMultiLine(t *testing.T) {
 	result, err := applyTextEditsToContent(content, edits)
 
 	require.NoError(t, err)
+
 	expected := "line 1\nreplaced content\nline 4"
 	assert.Equal(t, expected, result)
 }

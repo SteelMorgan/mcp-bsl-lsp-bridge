@@ -28,6 +28,7 @@ func createTestConfig() *lsp.LSPServerConfig {
 			},
 		}
 	}
+
 	return config
 }
 
@@ -71,6 +72,7 @@ func TestInferLanguage(t *testing.T) {
 				if err == nil {
 					t.Errorf("Expected error for file %s", tc.filePath)
 				}
+
 				return
 			}
 

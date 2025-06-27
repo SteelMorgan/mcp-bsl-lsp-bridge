@@ -63,6 +63,7 @@ func (dr *DirectoryResolver) isRoot() (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("failed to get current user: %w", err)
 	}
+
 	return u.Uid == "0", nil
 }
 
@@ -75,6 +76,7 @@ func (dr *DirectoryResolver) maybeEnsureDir(dir string) (string, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
+
 	return dir, nil
 }
 
@@ -86,6 +88,7 @@ func (dr *DirectoryResolver) GetLogDirectory() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to check if user is root: %w", err)
 	}
+
 	if isR {
 		return dr.maybeEnsureDir(filepath.Join("/", "var", "log", dr.appName))
 	}
@@ -106,6 +109,7 @@ func (dr *DirectoryResolver) getUserLogDirectory() (string, error) {
 		if baseDir == "" {
 			baseDir = filepath.Join(u.HomeDir, "AppData", "Local")
 		}
+
 		return dr.maybeEnsureDir(filepath.Join(baseDir, dr.appName, "logs"))
 	}
 
@@ -126,6 +130,7 @@ func (dr *DirectoryResolver) GetDataDirectory() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to check if user is root: %w", err)
 	}
+
 	if isR {
 		return dr.maybeEnsureDir(filepath.Join("/", "var", "lib", dr.appName))
 	}
@@ -140,6 +145,7 @@ func (dr *DirectoryResolver) GetDataDirectory() (string, error) {
 		if baseDir == "" {
 			baseDir = filepath.Join(u.HomeDir, "AppData", "Local")
 		}
+
 		return dr.maybeEnsureDir(filepath.Join(baseDir, dr.appName))
 	}
 
@@ -159,6 +165,7 @@ func (dr *DirectoryResolver) GetCacheDirectory() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to check if user is root: %w", err)
 	}
+
 	if isR {
 		return dr.maybeEnsureDir(filepath.Join("/", "var", "cache", dr.appName))
 	}
@@ -173,6 +180,7 @@ func (dr *DirectoryResolver) GetCacheDirectory() (string, error) {
 		if baseDir == "" {
 			baseDir = filepath.Join(u.HomeDir, "AppData", "Local", "Temp")
 		}
+
 		return dr.maybeEnsureDir(filepath.Join(baseDir, dr.appName))
 	}
 
@@ -192,6 +200,7 @@ func (dr *DirectoryResolver) GetConfigDirectory() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to check if user is root: %w", err)
 	}
+
 	if isR {
 		return dr.maybeEnsureDir(filepath.Join("/", "etc", dr.appName))
 	}
@@ -206,6 +215,7 @@ func (dr *DirectoryResolver) GetConfigDirectory() (string, error) {
 		if configDir == "" {
 			configDir = filepath.Join(u.HomeDir, "AppData", "Roaming")
 		}
+
 		return dr.maybeEnsureDir(filepath.Join(configDir, dr.appName))
 	}
 

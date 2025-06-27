@@ -72,6 +72,7 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 				if err == nil {
 					t.Error("Expected error but got none")
 				}
+
 				return
 			}
 
@@ -163,6 +164,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 				t.Error("Expected config but got nil")
 				return
 			}
+
 			if tc.expectError && config == nil {
 				// Assert expectations and return early for this error case
 				bridge.AssertExpectations(t)
@@ -171,6 +173,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 
 			// Extract file extension (simulate filepath.Ext)
 			var ext string
+
 			for i := len(tc.filePath) - 1; i >= 0; i-- {
 				if tc.filePath[i] == '.' {
 					ext = tc.filePath[i:]
@@ -183,6 +186,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 				t.Errorf("Expected to find language for extension %s", ext)
 				return
 			}
+
 			if tc.expectError && !found {
 				// Assert expectations and return early for this error case
 				bridge.AssertExpectations(t)
@@ -261,7 +265,9 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				if !tc.expectError {
 					t.Error("Expected config but got nil")
 				}
+
 				bridge.AssertExpectations(t)
+
 				return
 			}
 
@@ -270,7 +276,9 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				if !tc.expectError {
 					t.Errorf("Expected language server config for %s", tc.language)
 				}
+
 				bridge.AssertExpectations(t)
+
 				return
 			}
 
@@ -279,13 +287,16 @@ func TestLSPConnectToolExecution(t *testing.T) {
 				if err == nil {
 					t.Error("Expected error but got none")
 				}
+
 				bridge.AssertExpectations(t)
+
 				return
 			}
 
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				bridge.AssertExpectations(t)
+
 				return
 			}
 
@@ -357,14 +368,19 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 					if err == nil {
 						t.Error("Expected error but got none")
 					}
+
 					bridge.AssertExpectations(t)
+
 					return
 				}
+
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 					bridge.AssertExpectations(t)
+
 					return
 				}
+
 				if primary != tc.mockPrimary {
 					t.Errorf("Expected primary language %s, got %s", tc.mockPrimary, primary)
 				}
@@ -374,17 +390,23 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 					if err == nil {
 						t.Error("Expected error but got none")
 					}
+
 					bridge.AssertExpectations(t)
+
 					return
 				}
+
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 					bridge.AssertExpectations(t)
+
 					return
 				}
+
 				if len(languages) != len(tc.mockLanguages) {
 					t.Errorf("Expected %d languages, got %d", len(tc.mockLanguages), len(languages))
 					bridge.AssertExpectations(t)
+
 					return
 				}
 				// Optionally, you could also check the actual content of the slice
@@ -427,6 +449,7 @@ func TestSignatureHelpToolExecution(t *testing.T) {
 	// Validate the structure of the result
 	signatures := result.Signatures
 	label := signatures[0].Label
+
 	if len(signatures) != 1 {
 		t.Errorf("Expected 1 signature, got %d", len(signatures))
 	} else if label != "func(param string) error" {
@@ -438,6 +461,7 @@ func TestSignatureHelpToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
+
 	if err.Error() != "signature help failed" {
 		t.Errorf("Expected error message 'signature help failed', got '%s'", err.Error())
 	}
@@ -484,6 +508,7 @@ func TestCodeActionsToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
+
 	if err != nil && err.Error() != "code actions failed" {
 		t.Errorf("Expected error message 'code actions failed', got '%s'", err.Error())
 	}
@@ -532,6 +557,7 @@ func TestFormatDocumentToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
+
 	if err != nil && err.Error() != "formatting failed" {
 		t.Errorf("Expected error message 'formatting failed', got '%s'", err.Error())
 	}
@@ -622,6 +648,7 @@ func TestImplementationToolExecution(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error but got none")
 	}
+
 	expectedErrMsg := "implementation search failed"
 	if err != nil && err.Error() != expectedErrMsg {
 		t.Errorf("Expected error message \"%s\", got \"%s\"", expectedErrMsg, err.Error())
@@ -650,6 +677,7 @@ func TestCallHierarchyToolExecution(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
+
 	if len(result) == 0 {
 		t.Error("Expected call hierarchy items but got empty result")
 	}

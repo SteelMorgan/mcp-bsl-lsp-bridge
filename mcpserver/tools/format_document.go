@@ -57,6 +57,7 @@ func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeIn
 			// Return success message with applied changes
 			content := formatTextEdits(edits)
 			content += "\n✅ FORMATTING APPLIED ✅\nAll formatting changes have been applied to the file."
+
 			return mcp.NewToolResultText(content), nil
 		} else {
 			// Just preview the changes
@@ -64,6 +65,7 @@ func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeIn
 			if len(edits) > 0 {
 				content += "\n💡 To apply these changes, use: format_document with apply='true'"
 			}
+
 			return mcp.NewToolResultText(content), nil
 		}
 	})

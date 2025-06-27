@@ -11,29 +11,29 @@ type MockBridge struct {
 	mock.Mock
 }
 
-// func (m *MockBridge) GetClientForLanguageInterface(language string) (*lsp.LanguageClientInterface, error) {
-// 	args := m.Called(language)
-// 	return args.Get(0).(*lsp.LanguageClientInterface), args.Error(1)
-// }
+//	func (m *MockBridge) GetClientForLanguageInterface(language string) (*lsp.LanguageClientInterface, error) {
+//		args := m.Called(language)
+//		return args.Get(0).(*lsp.LanguageClientInterface), args.Error(1)
+//	}
 func (m *MockBridge) GetClientForLanguageInterface(language string) (lsp.LanguageClientInterface, error) {
-    args := m.Called(language)
-    
-    // Safe type assertion with error checking
-    if args.Get(0) == nil {
-        return nil, args.Error(1)
-    }
-    
-    // Try to assert to the interface type
-    if client, ok := args.Get(0).(lsp.LanguageClientInterface); ok {
-        return client, args.Error(1)
-    }
-    
-    // If that fails, it might be the concrete mock type, so convert it
-    if mockClient, ok := args.Get(0).(*MockLanguageClient); ok {
-        return mockClient, args.Error(1)
-    }
-    
-    return nil, args.Error(1)
+	args := m.Called(language)
+
+	// Safe type assertion with error checking
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	// Try to assert to the interface type
+	if client, ok := args.Get(0).(lsp.LanguageClientInterface); ok {
+		return client, args.Error(1)
+	}
+
+	// If that fails, it might be the concrete mock type, so convert it
+	if mockClient, ok := args.Get(0).(*MockLanguageClient); ok {
+		return mockClient, args.Error(1)
+	}
+
+	return nil, args.Error(1)
 }
 
 func (m *MockBridge) InferLanguage(filePath string) (lsp.Language, error) {
@@ -41,6 +41,7 @@ func (m *MockBridge) InferLanguage(filePath string) (lsp.Language, error) {
 	if args.Get(0) == nil {
 		return lsp.Language(""), args.Error(1)
 	}
+
 	return args.Get(0).(lsp.Language), args.Error(1)
 }
 

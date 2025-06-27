@@ -38,6 +38,7 @@ func NewMCPTestClient() (*MCPTestClient, error) {
 	// Build the project first
 	buildCmd := exec.Command("go", "build", "-o", "mcp-lsp-bridge", ".")
 	buildCmd.Dir = ".."
+
 	if err := buildCmd.Run(); err != nil {
 		return nil, fmt.Errorf("failed to build project: %v", err)
 	}
@@ -79,6 +80,7 @@ func NewMCPTestClient() (*MCPTestClient, error) {
 		if closeErr != nil {
 			log.Printf("failed to close client: %v", closeErr)
 		}
+
 		return nil, fmt.Errorf("failed to initialize client: %v", err)
 	}
 
@@ -93,21 +95,25 @@ func (c *MCPTestClient) Close() error {
 			return fmt.Errorf("failed to close stdin: %v", err)
 		}
 	}
+
 	if c.stdout != nil {
 		err := c.stdout.Close()
 		if err != nil {
 			return fmt.Errorf("failed to close stdout: %v", err)
 		}
 	}
+
 	if c.stderr != nil {
 		err := c.stderr.Close()
 		if err != nil {
 			return fmt.Errorf("failed to close stderr: %v", err)
 		}
 	}
+
 	if c.cmd != nil && c.cmd.Process != nil {
 		return c.cmd.Process.Kill()
 	}
+
 	return nil
 }
 
@@ -133,6 +139,7 @@ func (c *MCPTestClient) sendRequest(method string, params any) (map[string]any, 
 
 	// Read response
 	response := make([]byte, 4096)
+
 	n, err := c.stdout.Read(response)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %v", err)
@@ -209,10 +216,12 @@ func (c *MCPTestClient) testToolCall(toolName string, arguments map[string]inter
 	if err != nil {
 		result.Success = false
 		result.Error = err.Error()
+
 		return result, err
 	}
 
 	result.Success = true
+
 	return result, nil
 }
 
@@ -232,10 +241,12 @@ func (c *MCPTestClient) testListTools() (*TestResult, error) {
 	if err != nil {
 		result.Success = false
 		result.Error = err.Error()
+
 		return result, err
 	}
 
 	result.Success = true
+
 	return result, nil
 }
 
@@ -245,42 +256,52 @@ func (c *MCPTestClient) runAllTests() []*TestResult {
 
 	// Test 1: List Tools
 	fmt.Println("🔍 Testing: List Tools")
+
 	if result, err := c.testListTools(); err != nil {
 		fmt.Printf("❌ Failed: %v\n", err)
+
 		results = append(results, result)
 	} else {
 		fmt.Printf("✅ Success: Found tools\n")
+
 		results = append(results, result)
 	}
 
 	// Test 2: Infer Language Tool
 	fmt.Println("🔍 Testing: Infer Language Tool")
+
 	inferArgs := map[string]interface{}{
 		"file_path": "/test/example.go",
 	}
 	if result, err := c.testToolCall("infer_language", inferArgs); err != nil {
 		fmt.Printf("❌ Failed: %v\n", err)
+
 		results = append(results, result)
 	} else {
 		fmt.Printf("✅ Success: Language inferred\n")
+
 		results = append(results, result)
 	}
 
 	// Test 3: LSP Connect Tool
 	fmt.Println("🔍 Testing: LSP Connect Tool")
+
 	connectArgs := map[string]interface{}{
 		"language": "go",
 	}
 	if result, err := c.testToolCall("lsp_connect", connectArgs); err != nil {
 		fmt.Printf("❌ Failed: %v\n", err)
+
 		results = append(results, result)
 	} else {
 		fmt.Printf("✅ Success: LSP connected\n")
+
 		results = append(results, result)
 	}
 
 	// Test 4: Analyze Code Tool
 	fmt.Println("🔍 Testing: Analyze Code Tool")
+
 	analyzeArgs := map[string]interface{}{
 		"uri":       "file:///test/example.go",
 		"line":      10,
@@ -288,20 +309,25 @@ func (c *MCPTestClient) runAllTests() []*TestResult {
 	}
 	if result, err := c.testToolCall("analyze_code", analyzeArgs); err != nil {
 		fmt.Printf("❌ Failed: %v\n", err)
+
 		results = append(results, result)
 	} else {
 		fmt.Printf("✅ Success: Code analyzed\n")
+
 		results = append(results, result)
 	}
 
 	// Test 5: LSP Disconnect Tool
 	fmt.Println("🔍 Testing: LSP Disconnect Tool")
+
 	disconnectArgs := map[string]interface{}{}
 	if result, err := c.testToolCall("lsp_disconnect", disconnectArgs); err != nil {
 		fmt.Printf("❌ Failed: %v\n", err)
+
 		results = append(results, result)
 	} else {
 		fmt.Printf("✅ Success: LSP disconnected\n")
+
 		results = append(results, result)
 	}
 
@@ -330,6 +356,7 @@ func generateReport(results []*TestResult) {
 		}
 
 		fmt.Printf("%-30s %s (%v)\n", result.TestName, status, result.Duration)
+
 		if !result.Success {
 			fmt.Printf("   Error: %s\n", result.Error)
 		}
@@ -396,6 +423,7 @@ func main() {
 		if err := os.MkdirAll("scripts", 0755); err != nil {
 			log.Fatalf("Failed to create scripts directory: %v", err)
 		}
+
 		if err := os.Chdir("scripts"); err != nil {
 			log.Fatalf("Failed to change to scripts directory: %v", err)
 		}
@@ -405,6 +433,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create MCP test client: %v", err)
 	}
+
 	defer func() {
 		if err := client.Close(); err != nil {
 			log.Printf("failed to close client: %v", err)

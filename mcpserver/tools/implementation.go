@@ -51,7 +51,7 @@ func ImplementationTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 
 			// Format and return result
 			content := formatImplementations(implementations)
+
 			return mcp.NewToolResultText(content), nil
 		}
-
 }

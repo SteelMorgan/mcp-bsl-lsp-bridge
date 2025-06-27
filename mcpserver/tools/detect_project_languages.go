@@ -66,11 +66,13 @@ func RegisterProjectLanguageDetectionTool(mcpServer ToolServer, bridge interface
 
 			// Format the result
 			result := "Detected languages (in priority order):\n"
+
 			for i, lang := range languages {
 				priority := "Primary"
 				if i > 0 {
 					priority = "Secondary"
 				}
+
 				result += fmt.Sprintf("%d. %s (%s)\n", i+1, lang, priority)
 			}
 

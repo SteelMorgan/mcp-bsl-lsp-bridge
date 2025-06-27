@@ -73,6 +73,7 @@ func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandler
 				// Return success message with applied changes
 				content := formatWorkspaceEdit(result)
 				content += "\n✅ RENAME APPLIED ✅\nAll rename changes have been applied across the codebase."
+
 				return mcp.NewToolResultText(content), nil
 			} else {
 				// Just preview the changes
@@ -80,6 +81,7 @@ func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandler
 				if content != "=== RENAME PREVIEW ===\nWorkspace edit: <nil>" {
 					content += "\n💡 To apply these changes, use: rename with apply='true'"
 				}
+
 				return mcp.NewToolResultText(content), nil
 			}
 		}

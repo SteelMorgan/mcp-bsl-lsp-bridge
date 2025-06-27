@@ -28,6 +28,7 @@ func TestAnalyzeCodeTool_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not start MCP server: %v", err)
 	}
+
 	RegisterAnalyzeCodeTool(mcpServer, bridge)
 
 	// Test language inference
@@ -43,6 +44,7 @@ func TestAnalyzeCodeTool_Success(t *testing.T) {
 		t.Errorf("Unexpected error in client creation: %v", err)
 		return
 	}
+
 	if client == nil {
 		t.Error("Expected client but got nil")
 	}
@@ -62,6 +64,7 @@ func TestAnalyzeCodeTool_LanguageInferenceFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not start MCP server: %v", err)
 	}
+
 	RegisterAnalyzeCodeTool(mcpServer, bridge)
 
 	// Test language inference - should fail
@@ -87,6 +90,7 @@ func TestAnalyzeCodeTool_ClientCreationFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not start MCP server: %v", err)
 	}
+
 	RegisterAnalyzeCodeTool(mcpServer, bridge)
 
 	// Test language inference - should succeed
@@ -118,9 +122,11 @@ func TestAnalyzeCodeUtilityFunctions(t *testing.T) {
 		if result.Hover == nil {
 			t.Error("Expected hover information")
 		}
+
 		if result.Diagnostics == nil {
 			t.Error("Expected diagnostics slice to be initialized")
 		}
+
 		if result.CodeActions == nil {
 			t.Error("Expected code actions slice to be initialized")
 		}

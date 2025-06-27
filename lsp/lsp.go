@@ -42,6 +42,7 @@ func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeR
 	}
 
 	var hoverResult protocol.HoverResponse
+
 	err := client.SendRequest("textDocument/hover", hoverParams, &hoverResult, 5*time.Second)
 	if err == nil {
 		result.Hover = &hoverResult
@@ -59,6 +60,7 @@ func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeR
 	}
 
 	var completionResult protocol.CompletionResponse
+
 	err = client.SendRequest("textDocument/completion", completionParams, &completionResult, 5*time.Second)
 	if err == nil {
 		result.Completion = &completionResult
@@ -76,6 +78,7 @@ func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeR
 	}
 
 	var signatureResult protocol.SignatureHelpResponse
+
 	err = client.SendRequest("textDocument/signatureHelp", signatureParams, &signatureResult, 5*time.Second)
 	if err == nil {
 		result.SignatureHelp = &signatureResult
@@ -99,6 +102,7 @@ func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeR
 	}
 
 	var codeActions []protocol.CodeAction
+
 	err = client.SendRequest("textDocument/codeAction", actionParams, &codeActions, 5*time.Second)
 	if err == nil {
 		result.CodeActions = codeActions

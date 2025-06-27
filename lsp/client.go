@@ -16,7 +16,6 @@ import (
 
 // NewLanguageClient creates a new Language Server Protocol client
 func NewLanguageClient(command string, args ...string) (LanguageClientInterface, error) {
-
 	client := LanguageClient{
 		command:            command,
 		args:               args,
@@ -56,10 +55,13 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		closeErr := stdin.Close()
+
 		cancel()
+
 		if closeErr != nil {
 			return nil, fmt.Errorf("failed to close stdin pipe: %w", closeErr)
 		}
+
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
@@ -70,12 +72,15 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 			cancel()
 			return nil, fmt.Errorf("failed to close stdin pipe: %w", stdCloseErr)
 		}
+
 		stdOutClose := stdout.Close()
 		if stdOutClose != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to close stdout pipe: %w", stdOutClose)
 		}
+
 		cancel()
+
 		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
 	}
 
@@ -86,17 +91,21 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 			cancel()
 			return nil, fmt.Errorf("failed to close stdin pipe: %w", stdinCloseErr)
 		}
+
 		stdoutCloseErr := stdout.Close()
 		if stdoutCloseErr != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to close stdout pipe: %w", stdoutCloseErr)
 		}
+
 		stderrCloseErr := stderr.Close()
 		if stderrCloseErr != nil {
 			cancel()
 			return nil, fmt.Errorf("failed to close stderr pipe: %w", stderrCloseErr)
 		}
+
 		cancel()
+
 		return nil, fmt.Errorf("failed to start command: %w", err)
 	}
 
@@ -125,15 +134,18 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 	// Handle stderr in background
 	go func() {
 		buf := make([]byte, 1024)
+
 		for {
 			n, err := stderr.Read(buf)
 			if err != nil {
 				break
 			}
+
 			if n > 0 {
 				logger.Debug(fmt.Sprintf("[%s SERVER STDERR]: %s", lc.command, buf[:n]))
 			}
 		}
+
 		stderrCloseErr := stderr.Close()
 		if stderrCloseErr != nil {
 			logger.Warn(fmt.Errorf("failed to close stderr pipe: %w", stderrCloseErr))
@@ -181,6 +193,7 @@ func (lc *LanguageClient) Close() error {
 		case <-time.After(2 * time.Second):
 			// Force kill if it doesn't exit
 			_ = lc.cmd.Process.Kill()
+
 			<-done // Wait for it to actually exit
 		}
 	}
@@ -223,6 +236,7 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	// Reset status to connected if we have a valid connection
 	if lc.status == StatusError && lc.ctx.Err() == nil && lc.conn != nil {
 		lc.status = StatusConnected
+
 		logger.Info("LSP client status reset from error to connected")
 	}
 
@@ -297,6 +311,7 @@ func (lc *LanguageClient) SetupSemanticTokens() error {
 	logger.Debug(fmt.Sprintf("SetupSemanticTokens: Token Types: %+v, Token Modifiers: %+v", tokenTypes, tokenModifiers))
 
 	lc.tokenParser = NewSemanticTokenParser(tokenTypes, tokenModifiers)
+
 	return nil
 }
 

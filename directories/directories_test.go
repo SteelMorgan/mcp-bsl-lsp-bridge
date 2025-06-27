@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 // MockUserProvider is a mock implementation of UserProvider
@@ -21,6 +21,7 @@ func (m *MockUserProvider) Current() (*user.User, error) {
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
+
 	return args.Get(0).(*user.User), args.Error(1)
 }
 
@@ -147,6 +148,7 @@ func TestDirectoryResolver_DirectoryEnsuring(t *testing.T) {
 				if !tt.isRoot {
 					testUser.HomeDir = tempDir
 				}
+
 				mockUserProvider.On("Current").Return(&testUser, nil)
 			}
 
@@ -156,6 +158,7 @@ func TestDirectoryResolver_DirectoryEnsuring(t *testing.T) {
 				if key == "XDG_CONFIG_HOME" {
 					value = filepath.Join(tempDir, "custom-config")
 				}
+
 				mockEnvProvider.On("Getenv", key).Return(value)
 			}
 
@@ -192,6 +195,7 @@ func TestDirectoryResolver_DirectoryEnsuring(t *testing.T) {
 
 			// Call the appropriate function
 			var got string
+
 			var err error
 			switch tt.function {
 			case "config":
@@ -211,6 +215,7 @@ func TestDirectoryResolver_DirectoryEnsuring(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
+
 			require.NoError(t, err)
 
 			// Check directory existence and path correctness
@@ -298,9 +303,11 @@ func TestNewDirectoryResolver(t *testing.T) {
 
 			// Setup mocks (even though NewDirectoryResolver doesn't use them)
 			mockUserProvider.On("Current").Return(tt.mockUser, tt.mockUserErr)
+
 			for key, value := range tt.mockEnvVars {
 				mockEnvProvider.On("Getenv", key).Return(value)
 			}
+
 			mockEnvProvider.On("Getenv", mock.AnythingOfType("string")).Return("")
 
 			got := NewDirectoryResolver(tt.appName, mockUserProvider, mockEnvProvider, tt.shouldEnsureDir)

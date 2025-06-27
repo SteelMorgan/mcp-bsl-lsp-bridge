@@ -20,10 +20,12 @@ func TestLoggerInitialization(t *testing.T) {
 		LogLevel:    "debug",
 		MaxLogFiles: 3,
 	}
+
 	err := InitLogger(cfg)
 	if err != nil {
 		t.Fatalf("Failed to initialize logger: %v", err)
 	}
+
 	defer Close()
 
 	// Check if log file was created
@@ -90,10 +92,12 @@ func TestLogLevels(t *testing.T) {
 				LogLevel:    tc.logLevel,
 				MaxLogFiles: 3,
 			}
+
 			err := InitLogger(cfg)
 			if err != nil {
 				t.Fatalf("Failed to initialize logger: %v", err)
 			}
+
 			defer Close()
 
 			// Log the message
@@ -153,10 +157,12 @@ func TestLogRotation(t *testing.T) {
 					LogLevel:    "info",
 					MaxLogFiles: tc.maxLogFiles,
 				}
+
 				err := InitLogger(cfg)
 				if err != nil {
 					t.Fatalf("Failed to initialize logger: %v", err)
 				}
+
 				defer Close()
 
 				// Log some content
@@ -243,6 +249,7 @@ func TestEmptyLogPath(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Failed to initialize logger: %v", err)
 			}
+
 			defer Close()
 
 			// Log some messages

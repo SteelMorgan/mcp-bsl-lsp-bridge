@@ -37,6 +37,7 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 				logger.Error("get_range_content: Start line parsing failed", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid start_line parameter: %v", err)), nil
 			}
+
 			startLine := uint32(startLineInt)
 
 			startCharInt, err := request.RequireInt("start_character")
@@ -44,6 +45,7 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 				logger.Error("get_range_content: Start character parsing failed", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid start_character parameter: %v", err)), nil
 			}
+
 			startCharacter := uint32(startCharInt)
 
 			endLineInt, err := request.RequireInt("end_line")
@@ -51,6 +53,7 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 				logger.Error("get_range_content: End line parsing failed", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid end_line parameter: %v", err)), nil
 			}
+
 			endLine := uint32(endLineInt)
 
 			endCharInt, err := request.RequireInt("end_character")
@@ -58,6 +61,7 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 				logger.Error("get_range_content: End character parsing failed", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid end_character parameter: %v", err)), nil
 			}
+
 			endCharacter := uint32(endCharInt)
 
 			logger.Info(fmt.Sprintf("GetRangeContent Tool: Parsed URI: %s, Range: %d:%d - %d:%d", uri, startLine, startCharacter, endLine, endCharacter))
@@ -83,6 +87,7 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 
 			// Extract content based on line and character indices
 			var resultLines []string
+
 			if startLine == endLine {
 				// Single line range
 				line := lines[startLine]
@@ -93,16 +98,17 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 					// Corrected mcp.NewToolResultError format string and arguments
 					return mcp.NewToolResultError(fmt.Sprintf("Invalid character range on line %d: %d to %d", startLine, startCharacter, endCharacter)), nil
 				}
+
 				resultLines = append(resultLines, line[startCharacter:endCharacter])
 			} else {
 				// Multi-line range
-
 				// First line (from start_character to end of line)
 				firstLine := lines[startLine]
 				if startCharacter > uint32(len(firstLine)) {
 					logger.Error("get_range_content: Invalid start character on first line", fmt.Errorf("invalid start character on line %d: %d", startLine, startCharacter))
 					return mcp.NewToolResultError(fmt.Sprintf("Invalid start character on line %d: %d", startLine, startCharacter)), nil
 				}
+
 				resultLines = append(resultLines, firstLine[startCharacter:])
 
 				// Middle lines (full lines)
@@ -122,6 +128,7 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 					logger.Error("get_range_content: Invalid end character on last line", fmt.Errorf("invalid end character on line %d: %d", endLine, endCharacter))
 					return mcp.NewToolResultError(fmt.Sprintf("Invalid end character on line %d: %d", endLine, endCharacter)), nil
 				}
+
 				resultLines = append(resultLines, lastLine[:endCharacter])
 			}
 

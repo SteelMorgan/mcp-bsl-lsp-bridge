@@ -64,8 +64,11 @@ func main() {
 
 	// Parse command line flags
 	var confPath string
+
 	var logPath string
+
 	var logLevel string
+
 	flag.StringVar(&confPath, "config", defaultConfigPath, "Path to LSP configuration file")
 	flag.StringVar(&confPath, "c", defaultConfigPath, "Path to LSP configuration file (short)")
 	flag.StringVar(&logPath, "log-path", "", "Path to log file (overrides config and default)")
@@ -123,6 +126,7 @@ func main() {
 	if logPath != "" {
 		logConfig.LogPath = logPath
 	}
+
 	if logLevel != "" {
 		logConfig.LogLevel = logLevel
 	}
@@ -150,6 +154,7 @@ func main() {
 
 	// Start MCP server
 	logger.Info("Starting MCP server...")
+
 	if err := server.ServeStdio(mcpServer); err != nil {
 		logger.Error("MCP server error: " + err.Error())
 	}

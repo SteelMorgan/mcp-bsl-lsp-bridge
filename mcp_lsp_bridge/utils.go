@@ -36,18 +36,22 @@ func simplifyForJSON(v any, visited map[uintptr]bool) any {
 		if val.IsNil() {
 			return nil
 		}
+
 		ptr := val.Pointer()
 		if visited[ptr] {
 			return "<circular reference>"
 		}
+
 		visited[ptr] = true
 		defer delete(visited, ptr)
+
 		return simplifyForJSON(val.Elem().Interface(), visited)
 	}
 
 	// For structs, process each field
 	if val.Kind() == reflect.Struct {
 		result := make(map[string]any)
+
 		typ := val.Type()
 		for i := range val.NumField() {
 			field := typ.Field(i)
@@ -58,6 +62,7 @@ func simplifyForJSON(v any, visited map[uintptr]bool) any {
 				}
 			}
 		}
+
 		return result
 	}
 

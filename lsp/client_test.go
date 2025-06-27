@@ -63,6 +63,7 @@ func TestLanguageClient_SendRequest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("could not construct receiver type: %v", err)
 			}
+
 			_, err = lc.Connect()
 			if err != nil {
 				t.Fatalf("could not connect receiver type: %v", err)
@@ -80,8 +81,10 @@ func TestLanguageClient_SendRequest(t *testing.T) {
 					if !tt.wantErr {
 						t.Errorf("SendRequest() failed: %v", gotErr)
 					}
+
 					return
 				}
+
 				if tt.wantErr {
 					t.Fatal("SendRequest() succeeded unexpectedly")
 				}

@@ -63,6 +63,7 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			}
 
 			var result strings.Builder
+
 			result.WriteString("=== CALL HIERARCHY ===\n")
 			result.WriteString(fmt.Sprintf("Prepared %d call hierarchy items\n\n", len(items)))
 

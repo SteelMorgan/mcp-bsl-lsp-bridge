@@ -59,6 +59,7 @@ func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerF
 			}
 
 			content := formatHoverContent(result.Contents)
+
 			return mcp.NewToolResultText(content), nil
 		}
 }

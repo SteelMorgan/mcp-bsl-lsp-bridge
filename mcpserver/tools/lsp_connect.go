@@ -39,6 +39,7 @@ func LSPConnectTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 				logger.Error("lsp_connect: No language server configured",
 					"Language: "+language,
 				)
+
 				return mcp.NewToolResultError("No language server configured for " + language), nil
 			}
 
@@ -48,6 +49,7 @@ func LSPConnectTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 				logger.Error("lsp_connect: Failed to set up LSP client",
 					fmt.Sprintf("Language: %s, Error: %v", language, err),
 				)
+
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to set up LSP client: %v", err)), nil
 			}
 
@@ -57,5 +59,4 @@ func LSPConnectTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 
 			return mcp.NewToolResultText("Connected to LSP for " + language), nil
 		}
-
 }

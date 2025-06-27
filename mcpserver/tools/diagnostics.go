@@ -36,6 +36,7 @@ func DiagnosticTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 
 			// Format and return result
 			content := formatDiagnostics(diagnostics)
+
 			return mcp.NewToolResultText(content), nil
 		}
 }

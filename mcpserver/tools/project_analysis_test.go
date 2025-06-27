@@ -69,6 +69,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 				for _, lang := range tc.mockLanguages {
 					mockClients[lang] = &lsp.LanguageClient{}
 				}
+
 				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
 				bridge.On("SearchTextInWorkspace", "go", tc.query).Return(tc.mockResults, nil)
 			}
@@ -159,6 +160,7 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 				for _, lang := range tc.mockLanguages {
 					mockClients[lang] = &lsp.LanguageClient{}
 				}
+
 				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
 				bridge.On("FindSymbolReferences", "go", "file:///main.go", uint32(5), uint32(0), true).Return(tc.mockReferences, nil)
 			}
@@ -246,6 +248,7 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 				for _, lang := range tc.mockLanguages {
 					mockClients[lang] = &lsp.LanguageClient{}
 				}
+
 				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
 				bridge.On("FindSymbolDefinitions", "go", "file:///main.go", uint32(5), uint32(0)).Return(tc.mockDefinitions, nil)
 			}
@@ -339,6 +342,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 				for _, lang := range tc.mockLanguages {
 					mockClients[lang] = &lsp.LanguageClient{}
 				}
+
 				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
 				bridge.On("SearchTextInWorkspace", "go", tc.query).Return(tc.mockResults, nil)
 			}
@@ -420,6 +424,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 				Handler: handler,
 			})
 			require.NoError(t, err, "Could not start server")
+
 			defer mcpServer.Close()
 
 			// Variable to hold the actual error encountered during the operations
@@ -445,6 +450,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 					t.Error("Expected an error but got none.")
 					return
 				}
+
 				if !strings.Contains(actualErr.Error(), tc.errorMsg) {
 					t.Errorf("Expected error message to contain '%s', got: %v", tc.errorMsg, actualErr)
 				}

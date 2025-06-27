@@ -34,6 +34,7 @@ func TestInferLanguageToolHandler(t *testing.T) {
 	if err != nil {
 		t.Errorf("Could not make a MCP server: %v", err)
 	}
+
 	RegisterInferLanguageTool(mcpServer, bridge)
 
 	// Test successful inference
@@ -42,10 +43,12 @@ func TestInferLanguageToolHandler(t *testing.T) {
 		if config == nil {
 			t.Fatal("Expected config to be available")
 		}
+
 		language, found := config.ExtensionLanguageMap[".go"]
 		if !found {
 			t.Fatal("Expected .go extension to be mapped")
 		}
+
 		if language != "go" {
 			t.Errorf("Expected 'go', got '%s'", language)
 		}
@@ -57,6 +60,7 @@ func TestInferLanguageToolHandler(t *testing.T) {
 		if config == nil {
 			t.Fatal("Expected config to be available")
 		}
+
 		_, found := config.ExtensionLanguageMap[".unknown"]
 		if found {
 			t.Error("Expected .unknown extension to not be found")
@@ -126,6 +130,7 @@ func TestHoverToolHandler(t *testing.T) {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
 				}
+
 				if tc.expectedInResult != "" && result != nil {
 					// Test formatting
 					formatted := formatHoverContent(result.Contents)
@@ -157,10 +162,12 @@ func TestDiagnosticsToolHandler(t *testing.T) {
 			Severity: &hint, // Or Warning, Error, Information
 		}
 		bridge.On("GetDiagnostics", "file:///test.go").Return([]any{mockDiagnostic}, nil)
+
 		result, err := bridge.GetDiagnostics("file:///test.go")
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
+
 		formatted := formatDiagnostics(result)
 		if !strings.Contains(formatted, "DIAGNOSTICS") {
 			t.Errorf("Expected formatted result to contain 'DIAGNOSTICS'")
@@ -171,6 +178,7 @@ func TestDiagnosticsToolHandler(t *testing.T) {
 	t.Run("diagnostics error", func(t *testing.T) {
 		// Return empty slice instead of nil when there's an error
 		bridge.On("GetDiagnostics", "file:///error.go").Return([]any{}, errors.New("diagnostics failed"))
+
 		_, err := bridge.GetDiagnostics("file:///error.go")
 		if err == nil {
 			t.Error("Expected error but got none")
@@ -214,6 +222,7 @@ func TestUtilityFunctions(t *testing.T) {
 
 	t.Run("formatSignatureHelp", func(t *testing.T) {
 		sigHelp := protocol.SignatureHelpResponse{}
+
 		result := formatSignatureHelp(sigHelp)
 		if !strings.Contains(result, "SIGNATURE HELP") {
 			t.Error("Expected result to contain 'SIGNATURE HELP'")
@@ -230,6 +239,7 @@ func TestUtilityFunctions(t *testing.T) {
 				NewText: "formatted",
 			},
 		}
+
 		result := formatTextEdits(edits)
 		if !strings.Contains(result, "DOCUMENT FORMATTING") {
 			t.Error("Expected result to contain 'DOCUMENT FORMATTING'")
@@ -238,6 +248,7 @@ func TestUtilityFunctions(t *testing.T) {
 
 	t.Run("formatWorkspaceEdit", func(t *testing.T) {
 		edit := protocol.WorkspaceEdit{Changes: map[protocol.DocumentUri][]protocol.TextEdit{}}
+
 		result := formatWorkspaceEdit(&edit)
 		if !strings.Contains(result, "RENAME PREVIEW") {
 			t.Error("Expected result to contain 'RENAME PREVIEW'")
@@ -253,6 +264,7 @@ func TestUtilityFunctions(t *testing.T) {
 				},
 			},
 		}
+
 		result := formatImplementations(impls)
 		if !strings.Contains(result, "IMPLEMENTATIONS") {
 			t.Error("Expected result to contain 'IMPLEMENTATIONS'")

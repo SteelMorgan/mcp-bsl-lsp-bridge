@@ -47,6 +47,7 @@ func (p *SemanticTokenParser) FindTokensByType(
 	baseRange protocol.Range,
 ) ([]TokenPosition, error) {
 	var results []TokenPosition
+
 	targetTypeSet := make(map[string]bool)
 	for _, t := range targetTypes {
 		targetTypeSet[t] = true
@@ -76,6 +77,7 @@ func (p *SemanticTokenParser) FindTokensByType(
 		if tokenTypeIndex >= uint32(len(p.tokenTypes)) {
 			continue // Skip invalid token types
 		}
+
 		tokenType := p.tokenTypes[tokenTypeIndex]
 
 		// Check if this is a token type we're looking for

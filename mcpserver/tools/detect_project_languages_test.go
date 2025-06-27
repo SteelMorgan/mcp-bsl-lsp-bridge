@@ -129,7 +129,6 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 				} else {
 					bridge.On("DetectProjectLanguages", tc.projectPath).Return(tc.mockLanguages, nil)
 				}
-
 				// Don't set up primary language detection for default mode since we're not calling it
 			}
 
@@ -145,12 +144,15 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 					if err == nil {
 						t.Error("Expected error but got none")
 					}
+
 					return
 				}
+
 				if err != nil {
 					t.Errorf("Unexpected error in primary language detection: %v", err)
 					return
 				}
+
 				if tc.mockPrimary != "" && primary != tc.mockPrimary {
 					t.Errorf("Expected primary language %s, got %s", tc.mockPrimary, primary)
 				}
@@ -163,12 +165,15 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 					if err == nil {
 						t.Error("Expected error but got none")
 					}
+
 					return
 				}
+
 				if err != nil {
 					t.Errorf("Unexpected error in language detection: %v", err)
 					return
 				}
+
 				if len(languages) != len(tc.mockLanguages) {
 					t.Errorf("Expected %d languages, got %d", len(tc.mockLanguages), len(languages))
 				}
@@ -201,6 +206,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
+
 		if len(languages) != 0 {
 			t.Errorf("Expected 0 languages, got %d", len(languages))
 		}
@@ -227,9 +233,11 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
+
 		if len(languages) != 1 {
 			t.Errorf("Expected 1 language, got %d", len(languages))
 		}
+
 		if languages[0] != "go" {
 			t.Errorf("Expected 'go', got '%s'", languages[0])
 		}
@@ -239,6 +247,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
+
 		if primary != "go" {
 			t.Errorf("Expected 'go', got '%s'", primary)
 		}
@@ -260,6 +269,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
+
 		if len(detectedLangs) != len(languages) {
 			t.Errorf("Expected %d languages, got %d", len(languages), len(detectedLangs))
 		}
@@ -276,6 +286,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		}
+
 		if primary != "go" {
 			t.Errorf("Expected 'go' as primary, got '%s'", primary)
 		}

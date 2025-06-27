@@ -63,6 +63,7 @@ func CodeActionTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 
 			// Format and return result
 			content := formatCodeActions(actions)
+
 			return mcp.NewToolResultText(content), nil
 		}
 }

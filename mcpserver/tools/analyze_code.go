@@ -90,6 +90,7 @@ func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandle
 
 			// Count completion suggestions by checking the length of the CompletionResponse
 			completionCount := 0
+
 			if result.Completion != nil {
 				// Use reflection to handle different CompletionResponse types
 				completionValue := reflect.ValueOf(result.Completion)
