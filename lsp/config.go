@@ -11,7 +11,20 @@ import (
 
 // LoadLSPConfig loads the LSP configuration from a JSON file
 func LoadLSPConfig(path string) (config *LSPServerConfig, err error) {
-	file, err := os.Open(path)
+	// Clean and validate the path
+	cleanPath := filepath.Clean(path)
+
+	// Ensure it's not an absolute path to system directories
+	if filepath.IsAbs(cleanPath) {
+		return nil, errors.New("absolute paths not allowed")
+	}
+
+	// Check for path traversal attempts
+	if strings.Contains(cleanPath, "..") {
+		return nil, errors.New("path traversal not allowed")
+	}
+
+	file, err := os.Open(cleanPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file: %w", err)
 	}

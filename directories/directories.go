@@ -73,7 +73,7 @@ func (dr *DirectoryResolver) maybeEnsureDir(dir string) (string, error) {
 		return dir, nil
 	}
 
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0700); err != nil {
 		return "", fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 

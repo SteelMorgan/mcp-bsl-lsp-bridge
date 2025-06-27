@@ -44,7 +44,7 @@ func InitLogger(cfg LoggerConfig) error {
 	}
 
 	// Ensure log directory exists
-	if err := os.MkdirAll(filepath.Dir(cfg.LogPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.LogPath), 0700); err != nil {
 		return fmt.Errorf("failed to create log directory: %v", err)
 	}
 
@@ -52,7 +52,7 @@ func InitLogger(cfg LoggerConfig) error {
 	rotateLogFiles(cfg)
 
 	// Open log file with append mode and create if not exists
-	file, err := os.OpenFile(cfg.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(cfg.LogPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %v", err)
 	}

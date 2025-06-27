@@ -17,10 +17,11 @@ import (
 )
 
 // NewMCPLSPBridge creates a new bridge instance with provided configuration and client factory
-func NewMCPLSPBridge(config *lsp.LSPServerConfig) *MCPLSPBridge {
+func NewMCPLSPBridge(config *lsp.LSPServerConfig, allowedDirectories []string) *MCPLSPBridge {
 	bridge := &MCPLSPBridge{
-		clients: make(map[lsp.Language]lsp.LanguageClientInterface),
-		config:  config,
+		clients:            make(map[lsp.Language]lsp.LanguageClientInterface),
+		config:             config,
+		allowedDirectories: allowedDirectories,
 	}
 
 	return bridge
@@ -42,12 +43,48 @@ func DefaultConnectionConfig() ConnectionAttemptConfig {
 	}
 }
 
+func (b *MCPLSPBridge) IsAllowedDirectory(path string) (string, error) {
+	// Clean the path to resolve .. and . elements
+	cleanPath := filepath.Clean(path)
+
+	// Convert to absolute path
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid file path: %w", err)
+	}
+
+	isAllowedDirectory := false
+	for _, allowedDirectory := range b.allowedDirectories {
+		if isWithinAllowedDirectory(absPath, allowedDirectory) {
+			isAllowedDirectory = true
+			break
+		}
+	}
+
+	if !isAllowedDirectory {
+		return "", fmt.Errorf("file path is not allowed: %s", absPath)
+	}
+
+	return absPath, nil
+}
+
 // validateAndConnectClient attempts to validate and establish a language server connection using the injected factory
 func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig lsp.LanguageServerConfig, config ConnectionAttemptConfig) (lsp.LanguageClientInterface, error) {
 	// Attempt connection with retry mechanism
 	var lastErr error
 
 	startTime := time.Now()
+
+	// Get current working directory
+	dir, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	absPath, err := b.IsAllowedDirectory(dir)
+	if err != nil {
+		return nil, fmt.Errorf("file path is not allowed: %s", err)
+	}
 
 	for attempt := 0; attempt < config.MaxRetries; attempt++ {
 		// Check if total timeout exceeded
@@ -56,7 +93,7 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 		}
 
 		// Create language client using the factory
-		var lc lsp.LanguageClientInterface
+		var lc *lsp.LanguageClient
 
 		var err error
 
@@ -75,32 +112,19 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 			continue
 		}
 
-		// Get current working directory
-		dir, err := os.Getwd()
-		if err != nil {
-			lastErr = fmt.Errorf("failed to get current directory: %w", err)
-
-			err = lc.Close()
-			if err != nil {
-				return nil, err
-			}
-
-			time.Sleep(config.RetryDelay)
-
-			continue
-		}
-
-		root_path := "file://" + dir
+		root_path := "file://" + absPath
 		root_uri := protocol.DocumentUri(root_path)
 		process_id := int32(os.Getpid())
 
 		// Prepare initialization parameters
 		workspaceFolders := []protocol.WorkspaceFolder{
 			{
-				Uri:  protocol.URI("file://" + dir),
-				Name: filepath.Base(dir),
+				Uri:  protocol.URI("file://" + absPath),
+				Name: filepath.Base(absPath),
 			},
 		}
+
+		lc.SetProjectRoots([]string{dir})
 
 		semanticTokens := protocol.SemanticTokensClientCapabilities{
 			TokenTypes: []string{
@@ -530,6 +554,24 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client lsp.LanguageClientInterface, ur
 	// Remove file:// prefix to get the actual file path
 	filePath := strings.TrimPrefix(uri, "file://")
 
+	projectRoots := client.ProjectRoots()
+
+	// Clean the path to resolve .. and . elements
+	cleanPath := filepath.Clean(filePath)
+
+	// Convert to absolute path
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return fmt.Errorf("invalid file path: %w", err)
+	}
+
+	for _, allowedBaseDir := range projectRoots {
+		// Validate against allowed base directory
+		if !isWithinAllowedDirectory(absPath, allowedBaseDir) {
+			return errors.New("access denied: path outside allowed directory")
+		}
+	}
+
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
@@ -724,15 +766,46 @@ func (b *MCPLSPBridge) FormatDocument(uri string, tabSize uint32, insertSpaces b
 	return result, nil
 }
 
+func (b *MCPLSPBridge) IsPathAllowed(filePath string) bool {
+	// Clean the path to resolve .. and . elements
+	cleanPath := filepath.Clean(filePath)
+
+	// Convert to absolute path
+	absPath, err := filepath.Abs(cleanPath)
+	if err != nil {
+		return false
+	}
+
+	isAllowedDirectory := false
+	for _, allowedDirectory := range b.allowedDirectories {
+		if isWithinAllowedDirectory(absPath, allowedDirectory) {
+			isAllowedDirectory = true
+			break
+		}
+	}
+
+	return isAllowedDirectory
+}
+
 // ApplyTextEdits applies text edits to a file
 func (b *MCPLSPBridge) ApplyTextEdits(uri string, edits []protocol.TextEdit) error {
 	// Convert URI to file path
 	filePath := strings.TrimPrefix(uri, "file://")
 
+	// Check if file path is allowed
+	if !b.IsPathAllowed(filePath) {
+		return fmt.Errorf("file path is not allowed: %s", filePath)
+	}
+
 	// Read current file content
-	content, err := os.ReadFile(filePath)
+	content, err := os.ReadFile(filePath) // #nosec G304
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	stat, err := os.Stat(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to get file stats for %s: %w", filePath, err)
 	}
 
 	// Apply edits to content
@@ -742,7 +815,7 @@ func (b *MCPLSPBridge) ApplyTextEdits(uri string, edits []protocol.TextEdit) err
 	}
 
 	// Write modified content back to file
-	err = os.WriteFile(filePath, []byte(modifiedContent), 0o644)
+	err = os.WriteFile(filePath, []byte(modifiedContent), stat.Mode())
 	if err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
@@ -1125,4 +1198,9 @@ func (b *MCPLSPBridge) executeWorkspaceDiagnosticRequest(client lsp.LanguageClie
 	}
 
 	return result, nil
+}
+
+func isWithinAllowedDirectory(path, baseDir string) bool {
+	absBase, _ := filepath.Abs(baseDir)
+	return strings.HasPrefix(path, absBase+string(filepath.Separator))
 }

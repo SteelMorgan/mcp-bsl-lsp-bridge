@@ -11,10 +11,6 @@ type MockBridge struct {
 	mock.Mock
 }
 
-//	func (m *MockBridge) GetClientForLanguageInterface(language string) (*lsp.LanguageClientInterface, error) {
-//		args := m.Called(language)
-//		return args.Get(0).(*lsp.LanguageClientInterface), args.Error(1)
-//	}
 func (m *MockBridge) GetClientForLanguageInterface(language string) (lsp.LanguageClientInterface, error) {
 	args := m.Called(language)
 
@@ -28,11 +24,6 @@ func (m *MockBridge) GetClientForLanguageInterface(language string) (lsp.Languag
 		return client, args.Error(1)
 	}
 
-	// If that fails, it might be the concrete mock type, so convert it
-	if mockClient, ok := args.Get(0).(*MockLanguageClient); ok {
-		return mockClient, args.Error(1)
-	}
-
 	return nil, args.Error(1)
 }
 
@@ -43,6 +34,20 @@ func (m *MockBridge) InferLanguage(filePath string) (lsp.Language, error) {
 	}
 
 	return args.Get(0).(lsp.Language), args.Error(1)
+}
+
+func (m *MockBridge) ProjectRoots() ([]string, error) {
+	args := m.Called()
+	return args.Get(0).([]string), args.Error(1)
+}
+
+func (m *MockBridge) SetProjectRoots(paths []string) {
+	m.Called(paths)
+}
+
+func (m *MockBridge) IsAllowedDirectory(path string) (string, error) {
+	args := m.Called(path)
+	return args.Get(0).(string), args.Error(1)
 }
 
 func (m *MockBridge) CloseAllClients() {

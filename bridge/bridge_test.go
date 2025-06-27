@@ -38,13 +38,13 @@ func createTestBridge() *MCPLSPBridge {
 		},
 	}
 
-	return NewMCPLSPBridge(config)
+	return NewMCPLSPBridge(config, []string{"/tmp"})
 }
 
 func createTempFile(t *testing.T, name, content string) string {
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, name)
-	err := os.WriteFile(filePath, []byte(content), 0644)
+	err := os.WriteFile(filePath, []byte(content), 0600)
 	require.NoError(t, err)
 
 	return filePath
@@ -58,7 +58,7 @@ func TestNewMCPLSPBridge(t *testing.T) {
 		},
 	}
 
-	bridge := NewMCPLSPBridge(config)
+	bridge := NewMCPLSPBridge(config, []string{"/tmp"})
 
 	assert.NotNil(t, bridge)
 	assert.NotNil(t, bridge.clients)
@@ -328,6 +328,10 @@ func TestGetDocumentSymbols(t *testing.T) {
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("ProjectRoots").Return([]string{"."})
+	mockClient.On("SetProjectRoots", []string{"."})
+
+	mockClient.SetProjectRoots([]string{"."})
 
 	bridge.clients["go"] = mockClient
 
@@ -350,7 +354,6 @@ func TestGetDocumentSymbols(t *testing.T) {
 		},
 	}
 
-	mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
 	mockClient.On("DocumentSymbols", testURI).Return(expectedSymbols, nil)
 
 	result, err := bridge.GetDocumentSymbols(testFile)
@@ -368,6 +371,7 @@ func TestGetSignatureHelp(t *testing.T) {
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
 	bridge.clients["go"] = mockClient
 
@@ -405,6 +409,7 @@ func TestGetHoverInformation(t *testing.T) {
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
 	bridge.clients["go"] = mockClient
 
@@ -489,6 +494,7 @@ func TestRenameSymbol(t *testing.T) {
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
 	bridge.clients["go"] = mockClient
 
@@ -540,6 +546,7 @@ func TestFindImplementations(t *testing.T) {
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
 	bridge.clients["go"] = mockClient
 
@@ -629,6 +636,7 @@ func TestGetClientForLanguageInterface(t *testing.T) {
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
 	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
 	bridge.clients["go"] = mockClient
 

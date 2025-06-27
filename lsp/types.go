@@ -33,6 +33,8 @@ type LanguageClient struct {
 
 	tokenParser *SemanticTokenParser
 
+	workspacePaths []string
+
 	// Connection management
 	command         string
 	args            []string
@@ -75,6 +77,8 @@ type LanguageClientInterface interface {
 	GetMetrics() ClientMetrics
 	IsConnected() bool
 	Status() ClientStatus
+	ProjectRoots() []string
+	SetProjectRoots(paths []string)
 
 	// Lifecycle methods
 	Initialize(params protocol.InitializeParams) (*protocol.InitializeResult, error)

@@ -55,6 +55,16 @@ func (m *MockLanguageClient) Status() lsp.ClientStatus {
 	return args.Get(0).(lsp.ClientStatus)
 }
 
+func (m *MockLanguageClient) ProjectRoots() []string {
+	args := m.Called()
+
+	return args.Get(0).([]string)
+}
+
+func (m *MockLanguageClient) SetProjectRoots(roots []string) {
+	m.Called(roots)
+}
+
 // Lifecycle methods
 func (m *MockLanguageClient) Initialize(params protocol.InitializeParams) (*protocol.InitializeResult, error) {
 	args := m.Called(params)

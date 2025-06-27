@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -15,7 +16,13 @@ import (
 )
 
 // NewLanguageClient creates a new Language Server Protocol client
-func NewLanguageClient(command string, args ...string) (LanguageClientInterface, error) {
+func NewLanguageClient(command string, args ...string) (*LanguageClient, error) {
+
+	err := sanitizeArgs(args)
+	if err != nil {
+		return nil, err
+	}
+
 	client := LanguageClient{
 		command:            command,
 		args:               args,
@@ -34,6 +41,20 @@ func NewLanguageClient(command string, args ...string) (LanguageClientInterface,
 	return &client, nil
 }
 
+func sanitizeArgs(args []string) error {
+	for _, arg := range args {
+		// Block shell metacharacters that could be dangerous if LSP server processes them
+		if strings.ContainsAny(arg, ";|&$`") {
+			return fmt.Errorf("dangerous character in argument: %s", arg)
+		}
+		// Block command substitution patterns
+		if strings.Contains(arg, "$(") || strings.Contains(arg, "`") {
+			return fmt.Errorf("command substitution not allowed: %s", arg)
+		}
+	}
+	return nil
+}
+
 func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 	// Log the LSP server connection attempt
 	logger.Info(fmt.Sprintf("Connecting to LSP server: %s %v", lc.command, lc.args))
@@ -44,7 +65,7 @@ func (lc *LanguageClient) Connect() (LanguageClientInterface, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Start the external process
-	cmd := exec.CommandContext(ctx, lc.command, lc.args...)
+	cmd := exec.CommandContext(ctx, lc.command, lc.args...) // #nosec G204
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -161,6 +182,13 @@ func (ls *LanguageClient) IsConnected() bool {
 
 func (ls *LanguageClient) Status() ClientStatus {
 	return ls.status
+}
+
+func (lc *LanguageClient) ProjectRoots() []string {
+	return lc.workspacePaths
+}
+func (lc *LanguageClient) SetProjectRoots(paths []string) {
+	lc.workspacePaths = paths
 }
 
 // Close closes the language client and cleans up resources

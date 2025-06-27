@@ -37,6 +37,8 @@ type BridgeInterface interface {
 	GetIncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error)
 	GetOutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error)
 
+	IsAllowedDirectory(path string) (string, error)
+
 	// Document symbol operations
 	GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol, error)
 }

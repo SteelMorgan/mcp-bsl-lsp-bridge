@@ -104,7 +104,7 @@ func TestLogLevels(t *testing.T) {
 			tc.logFunc(tc.logMessage)
 
 			// Read log file and check contents
-			content, err := os.ReadFile(logPath)
+			content, err := os.ReadFile(logPath) // #nosec G304
 			if err != nil {
 				t.Fatalf("Failed to read log file: %v", err)
 			}

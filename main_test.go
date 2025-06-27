@@ -33,7 +33,7 @@ func createTestConfig() *lsp.LSPServerConfig {
 }
 
 func TestNewMCPLSPBridge(t *testing.T) {
-	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
+	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig(), []string{})
 
 	if bridgeInstance == nil {
 		t.Fatal("NewMCPLSPBridge returned nil")
@@ -50,7 +50,7 @@ func TestNewMCPLSPBridge(t *testing.T) {
 }
 
 func TestInferLanguage(t *testing.T) {
-	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
+	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig(), []string{})
 
 	testCases := []struct {
 		filePath   string
@@ -90,7 +90,7 @@ func TestInferLanguage(t *testing.T) {
 
 // Benchmark client creation
 func BenchmarkGetClientForLanguage(b *testing.B) {
-	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig())
+	bridgeInstance := bridge.NewMCPLSPBridge(createTestConfig(), []string{})
 	languages := []string{"go"}
 
 	for i := 0; b.Loop(); i++ {

@@ -4,7 +4,11 @@ linters:
   enable:
     - testifylint
     - perfsprint
+    - gosec
   settings:
+    gosec:
+      excludes:
+        - G115
     testifylint:
       # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
       # Default: false

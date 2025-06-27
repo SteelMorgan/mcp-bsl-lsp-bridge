@@ -21,7 +21,7 @@ func createTempProjectWithFiles(t *testing.T, files map[string]string) string {
 	for filename, content := range files {
 		filePath := filepath.Join(tempDir, filename)
 
-		err := os.WriteFile(filePath, []byte(content), 0644)
+		err := os.WriteFile(filePath, []byte(content), 0600)
 		if err != nil {
 			t.Fatalf("Failed to create file %s: %v", filename, err)
 		}

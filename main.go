@@ -143,8 +143,13 @@ func main() {
 
 	logger.Info("Starting MCP-LSP Bridge...")
 
+	cwd, err := os.Getwd()
+	if err != nil {
+		panic("Failed to get current working directory: " + err.Error())
+	}
+
 	// Create and initialize the bridge
-	bridgeInstance := bridge.NewMCPLSPBridge(config)
+	bridgeInstance := bridge.NewMCPLSPBridge(config, []string{cwd})
 
 	// Setup MCP server with bridge
 	mcpServer := mcpserver.SetupMCPServer(bridgeInstance)

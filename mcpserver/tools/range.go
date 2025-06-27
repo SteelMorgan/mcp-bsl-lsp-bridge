@@ -69,7 +69,13 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			filePath := normalizeURI(uri)
 			filePath = strings.TrimPrefix(filePath, "file://")
 
-			content, err := os.ReadFile(filePath)
+			absPath, err := bridge.IsAllowedDirectory(filePath)
+			if err != nil {
+				logger.Error("get_range_content: File path parsing failed", err)
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid file path: %v", err)), nil
+			}
+
+			content, err := os.ReadFile(absPath) // #nosec G304
 			if err != nil {
 				logger.Error("get_range_content: Failed to read file", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to read file %s: %v", filePath, err)), nil
