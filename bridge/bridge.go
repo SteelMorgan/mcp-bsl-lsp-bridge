@@ -197,12 +197,10 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 				logger.Warn("Semantic tokens not supported")
 
 				supportsSemanticTokens = false
-			case protocol.SemanticTokensOptions:
-				logger.Info("Semantic tokens supported")
+			logger.Debug("Semantic tokens supported")
 
 				supportsSemanticTokens = true
-			case protocol.SemanticTokensRegistrationOptions:
-				logger.Info("Semantic tokens supported")
+			logger.Debug("Semantic tokens supported")
 
 				supportsSemanticTokens = true
 			default:
@@ -231,18 +229,18 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ls
 
 		// Log server info and capabilities
 		if result.ServerInfo != nil {
-			logger.Info(fmt.Sprintf("Initialize result - Server Info: %+v", *result.ServerInfo))
+			logger.Debug(fmt.Sprintf("Initialize result - Server Info: %+v", *result.ServerInfo))
 		}
 
-		logger.Info(fmt.Sprintf("Initialize result - Capabilities: %+v", result.Capabilities))
+		logger.Debug(fmt.Sprintf("Initialize result - Capabilities: %+v", result.Capabilities))
 
 		// Enhanced logging for Workspace and WorkspaceFolders capabilities
 		if result.Capabilities.Workspace != nil {
-			logger.Info(fmt.Sprintf("Workspace Capabilities: %+v", *result.Capabilities.Workspace))
+			logger.Debug(fmt.Sprintf("Workspace Capabilities: %+v", *result.Capabilities.Workspace))
 
 			// Specifically log WorkspaceFolders support
 			if result.Capabilities.Workspace.WorkspaceFolders != nil {
-				logger.Info(fmt.Sprintf("WorkspaceFolders Support: Supported = %v",
+				logger.Debug(fmt.Sprintf("WorkspaceFolders Support: Supported = %v",
 					*result.Capabilities.Workspace.WorkspaceFolders))
 			} else {
 				logger.Warn("WorkspaceFolders Capability is nil")
@@ -282,7 +280,7 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClient
 		if existingClient.Context().Err() == nil {
 			// Reset status to connected if it was in error state but context is still valid
 			metrics := existingClient.GetMetrics()
-			logger.Info(fmt.Sprintf("GetClientForLanguage: Existing client for %s, metrics: %+v", language, metrics))
+			logger.Debug(fmt.Sprintf("GetClientForLanguage: Existing client for %s, metrics: %+v", language, metrics))
 
 			return existingClient, nil
 		}
@@ -496,7 +494,7 @@ func normalizeURI(uri string) string {
 // GetHoverInformation gets hover information for a symbol at a specific position
 func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error) {
 	// Extensive debug logging
-	logger.Info(fmt.Sprintf("GetHoverInformation: Starting hover request for URI: %s, Line: %d, Character: %d", uri, line, character))
+	logger.Debug(fmt.Sprintf("GetHoverInformation: Starting hover request for URI: %s, Line: %d, Character: %d", uri, line, character))
 
 	// Normalize URI to ensure proper file:// scheme
 	normalizedURI := normalizeURI(uri)
@@ -588,7 +586,7 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client lsp.LanguageClientInterface, ur
 		return fmt.Errorf("failed to send didOpen notification: %w", err)
 	}
 
-	logger.Info(fmt.Sprintf("Document opened in LSP server: %s (language: %s)", uri, language))
+	logger.Debug(fmt.Sprintf("Document opened in LSP server: %s (language: %s)", uri, language))
 
 	return nil
 }
@@ -597,7 +595,7 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client lsp.LanguageClientInterface, ur
 func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol, error) {
 	// Normalize URI to ensure proper file:// scheme
 	normalizedURI := normalizeURI(uri)
-	logger.Info(fmt.Sprintf("GetDocumentSymbols: Starting request for URI: %s -> %s", uri, normalizedURI))
+	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Starting request for URI: %s -> %s", uri, normalizedURI))
 
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
@@ -606,7 +604,7 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 		return nil, fmt.Errorf("failed to infer language: %w", err)
 	}
 
-	logger.Info(fmt.Sprintf("GetDocumentSymbols: Inferred language: %s", language))
+	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Inferred language: %s", language))
 
 	// Get language client
 	client, err := b.GetClientForLanguage(string(language))
@@ -617,7 +615,7 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 
 	// Additional debugging: check client status
 	metrics := client.GetMetrics()
-	logger.Info(fmt.Sprintf("GetDocumentSymbols: Client metrics: %+v", metrics))
+	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Client metrics: %+v", metrics))
 
 	// Ensure the document is opened in the language server
 	err = b.ensureDocumentOpen(client, normalizedURI, string(language))
@@ -633,7 +631,7 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 		return nil, fmt.Errorf("document symbols request failed: %w", err)
 	}
 
-	logger.Info(fmt.Sprintf("GetDocumentSymbols: Found %d symbols", len(symbols)))
+	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Found %d symbols", len(symbols)))
 
 	return symbols, nil
 }
@@ -688,7 +686,7 @@ func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character uint32) (*pr
 		return nil, nil // Return empty, or you could return a specific error
 	}
 
-	logger.Info(fmt.Sprintf("GetSignatureHelp: Found signature help for position %d:%d", line, character))
+	logger.Debug(fmt.Sprintf("GetSignatureHelp: Found signature help for position %d:%d", line, character))
 
 	return signatureHelp, nil
 }
@@ -875,7 +873,7 @@ func applyTextEditsToContent(content string, edits []protocol.TextEdit) (string,
 func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
 	// Normalize URI to ensure proper file:// scheme
 	normalizedURI := normalizeURI(uri)
-	logger.Info(fmt.Sprintf("RenameSymbol: Starting rename request for URI: %s -> %s, Line: %d, Character: %d, NewName: %s", uri, normalizedURI, line, character, newName))
+	logger.Debug(fmt.Sprintf("RenameSymbol: Starting rename request for URI: %s -> %s, Line: %d, Character: %d, NewName: %s", uri, normalizedURI, line, character, newName))
 
 	// Infer language from URI
 	language, err := b.InferLanguage(uri)
@@ -884,7 +882,7 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName 
 		return nil, fmt.Errorf("failed to infer language: %w", err)
 	}
 
-	logger.Info(fmt.Sprintf("RenameSymbol: Inferred language: %s", language))
+	logger.Debug(fmt.Sprintf("RenameSymbol: Inferred language: %s", language))
 
 	// Get language client
 	client, err := b.GetClientForLanguage(string(language))
@@ -910,7 +908,7 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName 
 		NewName: newName,
 	}
 
-	logger.Info("RenameSymbol: Sending rename request to language server")
+	logger.Debug("RenameSymbol: Sending rename request to language server")
 
 	var result protocol.WorkspaceEdit
 
@@ -921,24 +919,24 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName 
 	}
 
 	// Log the response details
-	logger.Info(fmt.Sprintf("RenameSymbol: Received rename response. Changes: %+v, DocumentChanges: %+v", result.Changes, result.DocumentChanges))
+	logger.Debug(fmt.Sprintf("RenameSymbol: Received rename response. Changes: %+v, DocumentChanges: %+v", result.Changes, result.DocumentChanges))
 
 	return &result, nil
 }
 
 // ApplyWorkspaceEdit applies a workspace edit to multiple files
 func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) error {
-	logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Processing workspace edit. Changes: %+v, DocumentChanges: %+v", workspaceEdit.Changes, workspaceEdit.DocumentChanges))
+	logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Processing workspace edit. Changes: %+v, DocumentChanges: %+v", workspaceEdit.Changes, workspaceEdit.DocumentChanges))
 
 	// Handle DocumentChanges format (preferred by most language servers)
 	if workspaceEdit.DocumentChanges != nil {
 		for _, docChange := range workspaceEdit.DocumentChanges {
-			logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Processing document change of type: %T", docChange.Value))
+			logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Processing document change of type: %T", docChange.Value))
 
 			// DocumentChanges is []Or4[TextDocumentEdit, CreateFile, RenameFile, DeleteFile]
 			// We only handle TextDocumentEdit for now
 			if textDocEdit, ok := docChange.Value.(protocol.TextDocumentEdit); ok {
-				logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Found TextDocumentEdit for URI: %s", textDocEdit.TextDocument.Uri))
+				logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Found TextDocumentEdit for URI: %s", textDocEdit.TextDocument.Uri))
 
 				// Convert protocol.TextEdit to []any for ApplyTextEdits
 				textEdits := make([]protocol.TextEdit, len(textDocEdit.Edits))
@@ -947,7 +945,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 					// Edits might also be a union type, extract the actual TextEdit
 					if actualEdit, ok := edit.Value.(protocol.TextEdit); ok {
 						textEdits[i] = actualEdit
-						logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Edit %d - Line %d:%d-%d:%d, NewText: '%s'",
+						logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Edit %d - Line %d:%d-%d:%d, NewText: '%s'",
 							i+1, actualEdit.Range.Start.Line, actualEdit.Range.Start.Character,
 							actualEdit.Range.End.Line, actualEdit.Range.End.Character, actualEdit.NewText))
 					} else {
@@ -958,7 +956,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 
 				// Apply the edits
 				if len(textEdits) > 0 {
-					logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Applying %d text edits to %s", len(textEdits), textDocEdit.TextDocument.Uri))
+					logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Applying %d text edits to %s", len(textEdits), textDocEdit.TextDocument.Uri))
 
 					err := b.ApplyTextEdits(string(textDocEdit.TextDocument.Uri), textEdits)
 					if err != nil {
@@ -967,7 +965,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 				}
 			} else {
 				// Handle other types (CreateFile, RenameFile, DeleteFile) if needed
-				logger.Info(fmt.Sprintf("ApplyWorkspaceEdit: Skipping non-TextDocumentEdit change: %T", docChange.Value))
+				logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Skipping non-TextDocumentEdit change: %T", docChange.Value))
 			}
 		}
 	}
@@ -1018,7 +1016,7 @@ func (b *MCPLSPBridge) FindImplementations(uri string, line, character uint32) (
 		return nil, fmt.Errorf("implementation request failed: %w", err)
 	}
 
-	logger.Info(fmt.Sprintf("FindImplementations: Found %d implementations", len(implementations)))
+	logger.Debug(fmt.Sprintf("FindImplementations: Found %d implementations", len(implementations)))
 
 	return implementations, nil
 }
