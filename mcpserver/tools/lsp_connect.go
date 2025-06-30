@@ -6,7 +6,6 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
-	"rockerboo/mcp-lsp-bridge/lsp"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -28,34 +27,14 @@ func LSPConnectTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			// Check if language server is configured
-			config := bridge.GetConfig()
-			if config == nil {
-				logger.Error("lsp_connect: No configuration available")
-				return mcp.NewToolResultError("No configuration available"), nil
-			}
+			_, err = bridge.GetClientForLanguage(language)
 
-			if _, exists := config.LanguageServers[lsp.Language(language)]; !exists {
-				logger.Error("lsp_connect: No language server configured",
-					"Language: "+language,
-				)
-
-				return mcp.NewToolResultError("No language server configured for " + language), nil
-			}
-
-			// Attempt to get or create the LSP client
-			_, err = bridge.GetClientForLanguageInterface(language)
 			if err != nil {
-				logger.Error("lsp_connect: Failed to set up LSP client",
+				logger.Error("lsp_connect: Failed to get LSP client",
 					fmt.Sprintf("Language: %s, Error: %v", language, err),
 				)
-
-				return mcp.NewToolResultError(fmt.Sprintf("Failed to set up LSP client: %v", err)), nil
+				return mcp.NewToolResultError("Failed to get LSP client for " + language), nil
 			}
-
-			logger.Info("lsp_connect: Successfully connected to LSP",
-				"Language: "+language,
-			)
 
 			return mcp.NewToolResultText("Connected to LSP for " + language), nil
 		}

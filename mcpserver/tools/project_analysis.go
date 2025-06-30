@@ -76,8 +76,13 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 				return mcp.NewToolResultError("No languages detected in project"), nil
 			}
 
+			var languageStrings []string
+			for _, lang := range languages {
+				languageStrings = append(languageStrings, string(lang))
+			}
+
 			// Try to get clients for multiple languages with fallback
-			clients, err := bridge.GetMultiLanguageClients(languages)
+			clients, err := bridge.GetMultiLanguageClients(languageStrings)
 			if err != nil || len(clients) == 0 {
 				return mcp.NewToolResultError("No LSP clients available for detected languages"), nil
 			}
@@ -85,7 +90,7 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			// Use the first available client in priority order
 			var lspClient *lsp.LanguageClient
 
-			var activeLanguage string
+			var activeLanguage lsp.Language
 
 			for _, lang := range languages {
 				if client, exists := clients[lang]; exists {
@@ -154,7 +159,7 @@ func normalizeURI(uri string) string {
 }
 
 // handleWorkspaceSymbols handles the 'workspace_symbols' analysis type
-func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset, limit int, workspaceUri string, languages []string, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
+func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset, limit int, workspaceUri string, languages []lsp.Language, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
 		logger.Error("Workspace symbols query failed", fmt.Sprintf("Language: %s, Query: %s, Error: %v", activeLanguage, query, err))
@@ -328,7 +333,7 @@ func formatCompactSymbolChild(response *strings.Builder, sym *protocol.DocumentS
 }
 
 // handleReferences handles the 'references' analysis type
-func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
+func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	// Search for the symbol first
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
@@ -349,7 +354,7 @@ func handleReferences(bridge interfaces.BridgeInterface, lspClient *lsp.Language
 		line := v.Range.Start.Line
 		character := v.Range.Start.Character
 
-		references, err := bridge.FindSymbolReferences(activeLanguage, uri, uint32(line), uint32(character), true)
+		references, err := bridge.FindSymbolReferences(string(activeLanguage), uri, uint32(line), uint32(character), true)
 		if err != nil {
 			fmt.Fprintf(response, "ERROR: %v\n", err)
 			return mcp.NewToolResultText(response.String()), nil
@@ -412,7 +417,7 @@ func formatCompactReference(response *strings.Builder, ref any, index int) {
 }
 
 // handleDefinitions handles the 'definitions' analysis type
-func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
+func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.LanguageClient, query string, offset, limit int, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	// For definitions, search for the symbol first
 	symbols, err := lspClient.WorkspaceSymbols(query)
 	if err != nil {
@@ -466,7 +471,7 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 		line := v.Range.Start.Line
 		character := v.Range.Start.Character
 
-		definitions, err := bridge.FindSymbolDefinitions(activeLanguage, uri, uint32(line), uint32(character))
+		definitions, err := bridge.FindSymbolDefinitions(string(activeLanguage), uri, uint32(line), uint32(character))
 		if err != nil {
 			fmt.Fprintf(response, "Failed to find definitions: %v\n", err)
 			return mcp.NewToolResultText(response.String()), nil
@@ -515,10 +520,10 @@ func handleDefinitions(bridge interfaces.BridgeInterface, lspClient *lsp.Languag
 }
 
 // handleTextSearch handles the 'text_search' analysis type
-func handleTextSearch(bridge interfaces.BridgeInterface, query string, offset, limit int, activeLanguage string, response *strings.Builder) (*mcp.CallToolResult, error) {
+func handleTextSearch(bridge interfaces.BridgeInterface, query string, offset, limit int, activeLanguage lsp.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
 	response.WriteString("=== TEXT SEARCH ===\n")
 
-	searchResults, err := bridge.SearchTextInWorkspace(activeLanguage, query)
+	searchResults, err := bridge.SearchTextInWorkspace(string(activeLanguage), query)
 	if err != nil {
 		fmt.Fprintf(response, "Text search failed: %v\n", err)
 		return mcp.NewToolResultText(response.String()), nil

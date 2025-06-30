@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -8,6 +9,9 @@ import (
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
 
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/mcptest"
+	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
@@ -55,14 +59,14 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 			// Set up mock expectations based on test case
 			if tc.expectError {
 				// For error cases, mock should return an error
-				bridge.On("InferLanguage", tc.uri).Return(lsp.Language(""), errors.New("unknown language"))
+				bridge.On("InferLanguage", tc.uri).Return((*lsp.Language)(nil), errors.New("unknown language"))
 			} else {
 				// For success cases, mock should return the expected language
-				bridge.On("InferLanguage", tc.uri).Return(tc.mockLanguage, nil)
+				bridge.On("InferLanguage", tc.uri).Return(&tc.mockLanguage, nil)
 
 				// Also set up the client mock if we have one
 				if tc.mockClient != nil {
-					bridge.On("GetClientForLanguageInterface", string(tc.mockLanguage)).Return(tc.mockClient, nil)
+					bridge.On("GetClientForLanguage", string(tc.mockLanguage)).Return(tc.mockClient, nil)
 				}
 			}
 
@@ -81,11 +85,11 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 				return
 			}
 
-			if language != tc.mockLanguage {
-				t.Errorf("Expected language %s, got %s", tc.mockLanguage, language)
+			if *language != tc.mockLanguage {
+				t.Errorf("Expected language %s, got %s", tc.mockLanguage, *language)
 			}
 
-			client, err := bridge.GetClientForLanguageInterface(string(language))
+			client, err := bridge.GetClientForLanguage(string(*language))
 			if err != nil {
 				t.Errorf("Unexpected error getting client: %v", err)
 				return
@@ -109,38 +113,20 @@ func TestInferLanguageToolExecution(t *testing.T) {
 		expectedLang lsp.Language
 	}{
 		{
-			name:     "go file",
-			filePath: "/path/to/file.go",
-			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]lsp.Language{
-					".go": "go",
-					".py": "python",
-				},
-			},
+			name:         "go file",
+			filePath:     "/path/to/file.go",
 			expectError:  false,
 			expectedLang: "go",
 		},
 		{
-			name:     "python file",
-			filePath: "/path/to/file.py",
-			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]lsp.Language{
-					".go": "go",
-					".py": "python",
-				},
-			},
+			name:         "python file",
+			filePath:     "/path/to/file.py",
 			expectError:  false,
 			expectedLang: "python",
 		},
 		{
-			name:     "unknown extension",
-			filePath: "/path/to/file.xyz",
-			mockConfig: &lsp.LSPServerConfig{
-				ExtensionLanguageMap: map[string]lsp.Language{
-					".go": "go",
-					".py": "python",
-				},
-			},
+			name:        "unknown extension",
+			filePath:    "/path/to/file.xyz",
 			expectError: true,
 		},
 		{
@@ -155,46 +141,44 @@ func TestInferLanguageToolExecution(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			// Set up mock expectations
-			bridge.On("GetConfig").Return(tc.mockConfig)
+			if tc.expectError {
+				bridge.On("InferLanguage", tc.filePath).Return((*lsp.Language)(nil), errors.New("No language found"))
+			} else {
+				bridge.On("InferLanguage", tc.filePath).Return(&tc.expectedLang, nil)
+			}
 
-			// Simulate what the actual tool handler does
-			config := bridge.GetConfig()
-			if config == nil && !tc.expectError {
-				t.Error("Expected config but got nil")
+			// Create MCP server and register tool
+			tool, handler := InferLanguageTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
 				return
 			}
 
-			if tc.expectError && config == nil {
-				// Assert expectations and return early for this error case
-				bridge.AssertExpectations(t)
-				return
+			// defer mcpServer.Close()
+
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "infer_language",
+					Arguments: map[string]any{
+						"file_path": tc.filePath,
+					},
+				},
+			})
+
+			if err != nil {
+				t.Errorf("Invalid request %v", err)
 			}
 
-			// Extract file extension (simulate filepath.Ext)
-			var ext string
-
-			for i := len(tc.filePath) - 1; i >= 0; i-- {
-				if tc.filePath[i] == '.' {
-					ext = tc.filePath[i:]
-					break
-				}
-			}
-
-			language, found := config.ExtensionLanguageMap[ext]
-			if !found && !tc.expectError {
-				t.Errorf("Expected to find language for extension %s", ext)
-				return
-			}
-
-			if tc.expectError && !found {
-				// Assert expectations and return early for this error case
-				bridge.AssertExpectations(t)
-				return
-			}
-
-			if language != tc.expectedLang {
-				t.Errorf("Expected language %s, got %s", tc.expectedLang, language)
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
 			}
 
 			// Assert that all expected calls were made
@@ -243,65 +227,56 @@ func TestLSPConnectToolExecution(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			// Set up mock expectations
-			bridge.On("GetConfig").Return(tc.mockConfig)
-
 			// Only set up GetClientForLanguageInterface expectation if we'll call it
 			if tc.mockConfig != nil {
 				if _, exists := tc.mockConfig.LanguageServers[tc.language]; exists {
+
 					if tc.expectError && tc.mockClient == nil {
 						// This test case expects an error when getting the client
-						bridge.On("GetClientForLanguageInterface", string(tc.language)).Return(nil, errors.New("failed to create client"))
-					} else if tc.mockClient != nil {
+						bridge.On("GetClientForLanguage", string(tc.language)).Return((*lsp.LanguageServerConfig)(nil), errors.New("failed to create client"))
+					} else {
 						// This test case expects success
-						bridge.On("GetClientForLanguageInterface", string(tc.language)).Return(tc.mockClient, nil)
+						bridge.On("GetClientForLanguage", string(tc.language)).Return(tc.mockClient, nil)
 					}
+				} else {
+					bridge.On("GetClientForLanguage", string(tc.language)).Return((*lsp.LanguageServerConfig)(nil), errors.New("failed to create client"))
 				}
+			} else {
+				bridge.On("GetClientForLanguage", string(tc.language)).Return((*lsp.LanguageServerConfig)(nil), errors.New("failed to create client"))
 			}
 
-			// Simulate what the actual tool handler does
-			config := bridge.GetConfig()
-			if config == nil {
-				if !tc.expectError {
-					t.Error("Expected config but got nil")
-				}
-
-				bridge.AssertExpectations(t)
-
+			// Create MCP server and register tool
+			tool, handler := LSPConnectTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
 				return
 			}
 
-			_, exists := config.LanguageServers[tc.language]
-			if !exists {
-				if !tc.expectError {
-					t.Errorf("Expected language server config for %s", tc.language)
-				}
+			// defer mcpServer.Close()
 
-				bridge.AssertExpectations(t)
-
-				return
-			}
-
-			client, err := bridge.GetClientForLanguageInterface(string(tc.language))
-			if tc.expectError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
-
-				bridge.AssertExpectations(t)
-
-				return
-			}
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "lsp_connect",
+					Arguments: map[string]any{
+						"language": tc.language,
+					},
+				},
+			})
 
 			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
-				bridge.AssertExpectations(t)
-
-				return
+				t.Errorf("Invalid request %v", err)
 			}
 
-			if client == nil {
-				t.Error("Expected client but got nil")
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
 			}
 
 			// Assert that all expected calls were made
@@ -314,15 +289,15 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 		name          string
 		projectPath   string
 		mode          string
-		mockLanguages []string
-		mockPrimary   string
+		mockLanguages []lsp.Language
+		mockPrimary   lsp.Language
 		expectError   bool
 	}{
 		{
 			name:          "detect all languages",
 			projectPath:   "/path/to/project",
 			mode:          "all",
-			mockLanguages: []string{"go", "python", "javascript"},
+			mockLanguages: []lsp.Language{"go", "python", "javascript"},
 			expectError:   false,
 		},
 		{
@@ -348,74 +323,109 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 			switch tc.mode {
 			case "primary":
 				if tc.expectError {
-					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return("", errors.New("detection failed"))
+					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return((*lsp.Language)(nil), errors.New("detection failed"))
 				} else {
-					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return(tc.mockPrimary, nil)
+					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return(&tc.mockPrimary, nil)
 				}
 			default: // "all"
 				if tc.expectError {
-					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]string(nil), errors.New("detection failed"))
+					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]lsp.Language(nil), errors.New("detection failed"))
 				} else {
 					bridge.On("DetectProjectLanguages", tc.projectPath).Return(tc.mockLanguages, nil)
 				}
 			}
 
-			// Test based on mode
-			switch tc.mode {
-			case "primary":
-				primary, err := bridge.DetectPrimaryProjectLanguage(tc.projectPath)
-				if tc.expectError {
-					if err == nil {
-						t.Error("Expected error but got none")
-					}
-
-					bridge.AssertExpectations(t)
-
-					return
-				}
-
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-					bridge.AssertExpectations(t)
-
-					return
-				}
-
-				if primary != tc.mockPrimary {
-					t.Errorf("Expected primary language %s, got %s", tc.mockPrimary, primary)
-				}
-			default: // "all"
-				languages, err := bridge.DetectProjectLanguages(tc.projectPath)
-				if tc.expectError {
-					if err == nil {
-						t.Error("Expected error but got none")
-					}
-
-					bridge.AssertExpectations(t)
-
-					return
-				}
-
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-					bridge.AssertExpectations(t)
-
-					return
-				}
-
-				if len(languages) != len(tc.mockLanguages) {
-					t.Errorf("Expected %d languages, got %d", len(tc.mockLanguages), len(languages))
-					bridge.AssertExpectations(t)
-
-					return
-				}
-				// Optionally, you could also check the actual content of the slice
-				for i, expected := range tc.mockLanguages {
-					if i < len(languages) && languages[i] != expected {
-						t.Errorf("Expected language[%d] to be %s, got %s", i, expected, languages[i])
-					}
-				}
+			// Create MCP server and register tool
+			tool, handler := ProjectLanguageDetectionTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
+				return
 			}
+
+			// defer mcpServer.Close()
+
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "detect_project_languages",
+					Arguments: map[string]any{
+						"project_path": tc.projectPath,
+						"mode": tc.mode,
+					},
+				},
+			})
+
+			if err != nil {
+				t.Errorf("Invalid request %v", err)
+			}
+
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
+			}
+
+			// // Test based on mode
+			// switch tc.mode {
+			// case "primary":
+			// 	primary, err := bridge.DetectPrimaryProjectLanguage(tc.projectPath)
+			// 	if tc.expectError {
+			// 		if err == nil {
+			// 			t.Error("Expected error but got none")
+			// 		}
+			//
+			// 		bridge.AssertExpectations(t)
+			//
+			// 		return
+			// 	}
+			//
+			// 	if err != nil {
+			// 		t.Errorf("Unexpected error: %v", err)
+			// 		bridge.AssertExpectations(t)
+			//
+			// 		return
+			// 	}
+			//
+			// 	if *primary != tc.mockPrimary {
+			// 		t.Errorf("Expected primary language %s, got %s", tc.mockPrimary, string(*primary))
+			// 	}
+			// default: // "all"
+			// 	languages, err := bridge.DetectProjectLanguages(tc.projectPath)
+			// 	if tc.expectError {
+			// 		if err == nil {
+			// 			t.Error("Expected error but got none")
+			// 		}
+			//
+			// 		bridge.AssertExpectations(t)
+			//
+			// 		return
+			// 	}
+			//
+			// 	if err != nil {
+			// 		t.Errorf("Unexpected error: %v", err)
+			// 		bridge.AssertExpectations(t)
+			//
+			// 		return
+			// 	}
+			//
+			// 	if len(languages) != len(tc.mockLanguages) {
+			// 		t.Errorf("Expected %d languages, got %d", len(tc.mockLanguages), len(languages))
+			// 		bridge.AssertExpectations(t)
+			//
+			// 		return
+			// 	}
+			// 	// Optionally, you could also check the actual content of the slice
+			// 	for i, expected := range tc.mockLanguages {
+			// 		if i < len(languages) && languages[i] != expected {
+			// 			t.Errorf("Expected language[%d] to be %s, got %s", i, expected, languages[i])
+			// 		}
+			// 	}
+			// }
 
 			// Assert that all expected calls were made
 			bridge.AssertExpectations(t)

@@ -21,7 +21,7 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 	// Code intelligence tools
 	tools.RegisterHoverTool(mcpServer, bridge)
 	tools.RegisterSignatureHelpTool(mcpServer, bridge)
-	tools.RegisterDiagnosticsTool(mcpServer, bridge)
+	// tools.RegisterDiagnosticsTool(mcpServer, bridge)
 	tools.RegisterSemanticTokensTool(mcpServer, bridge)
 
 	// Code improvement tools

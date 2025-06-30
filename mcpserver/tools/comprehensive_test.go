@@ -44,13 +44,13 @@ func TestInferLanguageToolHandler(t *testing.T) {
 			t.Fatal("Expected config to be available")
 		}
 
-		language, found := config.ExtensionLanguageMap[".go"]
-		if !found {
+		language, err := config.FindExtLanguage(".go")
+		if err != nil {
 			t.Fatal("Expected .go extension to be mapped")
 		}
 
-		if language != "go" {
-			t.Errorf("Expected 'go', got '%s'", language)
+		if *language != "go" {
+			t.Errorf("Expected 'go', got '%s'", string(*language))
 		}
 	})
 
@@ -61,8 +61,8 @@ func TestInferLanguageToolHandler(t *testing.T) {
 			t.Fatal("Expected config to be available")
 		}
 
-		_, found := config.ExtensionLanguageMap[".unknown"]
-		if found {
+		_, err := config.FindExtLanguage(".unknown")
+		if err == nil {
 			t.Error("Expected .unknown extension to not be found")
 		}
 	})

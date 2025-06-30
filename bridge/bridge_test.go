@@ -2,10 +2,11 @@ package bridge
 
 import (
 	"context"
-	"reflect"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"testing"
 	"time"
@@ -32,10 +33,15 @@ func createTestBridge(allowedDirs []string) *MCPLSPBridge {
 				Command: "typescript-language-server",
 				Args:    []string{"--stdio"},
 			},
+			"python": {
+				Command: "pyright-langserver",
+				Args:    []string{},
+			},
 		},
 		ExtensionLanguageMap: map[string]lsp.Language{
 			".go": "go",
 			".ts": "typescript",
+			".py": "python",
 			".js": "javascript",
 		},
 	}
@@ -120,7 +126,7 @@ func TestInferLanguage(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				assert.Equal(t, tt.want, *got)
 			}
 		})
 	}
@@ -414,7 +420,7 @@ func TestGetHoverInformation(t *testing.T) {
 	bridge.clients["go"] = mockClient
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 	testURI := "file://" + testFile
-	
+
 	expectedHover := &protocol.Hover{
 		Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{
 			Value: protocol.MarkupContent{
@@ -427,17 +433,18 @@ func TestGetHoverInformation(t *testing.T) {
 			End:   protocol.Position{Line: 2, Character: 9},
 		},
 	}
-	
+
 	mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
-	
+
 	// Mock expects the URI format that the bridge code actually uses
 	mockClient.On("Hover", testURI, uint32(2), uint32(7)).Return(expectedHover, nil)
-	
+
 	result, err := bridge.GetHoverInformation(testFile, 2, 7)
 	require.NoError(t, err)
 	assert.Equal(t, expectedHover, result)
 	mockClient.AssertExpectations(t)
 }
+
 // Test ApplyTextEditsToContent
 func TestApplyTextEditsToContent(t *testing.T) {
 	content := "line 1\nline 2\nline 3"
@@ -484,44 +491,266 @@ func TestApplyTextEditsToContentMultiLine(t *testing.T) {
 
 // Test RenameSymbol
 func TestRenameSymbol(t *testing.T) {
-	bridge := createTestBridge([]string{"/"})
-	mockClient := &mocks.MockLanguageClient{}
-	ctx := context.Background()
-	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
-	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
-	bridge.clients["go"] = mockClient
-	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-	testURI := "file://" + testFile
-	expectedWorkspaceEdit := protocol.WorkspaceEdit{
-		Changes: map[protocol.DocumentUri][]protocol.TextEdit{
-			protocol.DocumentUri(testURI): {
-				{
-					Range: protocol.Range{
-						Start: protocol.Position{Line: 2, Character: 5},
-						End:   protocol.Position{Line: 2, Character: 9},
+	t.Run("successful rename", func(t *testing.T) {
+		bridge := createTestBridge([]string{"/"})
+		mockClient := &mocks.MockLanguageClient{}
+		ctx := context.Background()
+		mockClient.On("Context").Return(ctx)
+		mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+		bridge.clients["go"] = mockClient
+
+		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
+		testURI := "file://" + testFile
+
+		expectedWorkspaceEdit := protocol.WorkspaceEdit{
+			Changes: map[protocol.DocumentUri][]protocol.TextEdit{
+				protocol.DocumentUri(testURI): {
+					{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 2, Character: 5},
+							End:   protocol.Position{Line: 2, Character: 9},
+						},
+						NewText: "newMain",
 					},
-					NewText: "newMain",
 				},
 			},
-		},
-	}
-	mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
-	mockClient.On("Rename", testURI, uint32(2), uint32(7), "newMain").Return(&expectedWorkspaceEdit, nil)
-	
-	result, err := bridge.RenameSymbol(testFile, 2, 7, "newMain", false)
-	require.NoError(t, err)
-	assert.Equal(t, &expectedWorkspaceEdit, result)
-	mockClient.AssertExpectations(t)
-}
-// Test GetDiagnostics
-func TestGetDiagnostics(t *testing.T) {
-	bridge := createTestBridge([]string{"/"})
+		}
 
-	result, err := bridge.GetDiagnostics("file:///test.go")
+		mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
+		mockClient.On("Rename", testURI, uint32(2), uint32(7), "newMain").Return(&expectedWorkspaceEdit, nil)
 
-	require.NoError(t, err)
-	assert.Empty(t, result) // Currently returns empty
+		result, err := bridge.RenameSymbol(testFile, 2, 7, "newMain", false)
+		require.NoError(t, err)
+		assert.Equal(t, &expectedWorkspaceEdit, result)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("infer language error", func(t *testing.T) {
+		bridge := createTestBridge([]string{"/"})
+
+		// Use a file with no extension or unsupported extension
+		testFile := "/tmp/test_file_no_extension"
+
+		result, err := bridge.RenameSymbol(testFile, 2, 7, "newName", false)
+
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "failed to infer language")
+	})
+
+	t.Run("get client for language error", func(t *testing.T) {
+		bridge := createTestBridge([]string{"/"})
+
+		// Use a supported file extension but don't register a client for that language
+		testFile := createTempFile(t, "test.go", "package main")
+
+		result, err := bridge.RenameSymbol(testFile, 2, 7, "newName", false)
+
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "failed to get client for language")
+	})
+
+	t.Run("ensure document open error - continues anyway", func(t *testing.T) {
+		bridge := createTestBridge([]string{"/"})
+		mockClient := &mocks.MockLanguageClient{}
+		ctx := context.Background()
+		mockClient.On("Context").Return(ctx)
+		mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+		bridge.clients["go"] = mockClient
+
+		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
+		testURI := "file://" + testFile
+
+		expectedWorkspaceEdit := protocol.WorkspaceEdit{
+			Changes: map[protocol.DocumentUri][]protocol.TextEdit{
+				protocol.DocumentUri(testURI): {
+					{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 2, Character: 5},
+							End:   protocol.Position{Line: 2, Character: 9},
+						},
+						NewText: "newMain",
+					},
+				},
+			},
+		}
+
+		// Simulate didOpen failure
+		mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(errors.New("failed to open document"))
+		// But rename should still succeed
+		mockClient.On("Rename", testURI, uint32(2), uint32(7), "newMain").Return(&expectedWorkspaceEdit, nil)
+
+		result, err := bridge.RenameSymbol(testFile, 2, 7, "newMain", false)
+
+		// Should succeed despite didOpen failure
+		require.NoError(t, err)
+		assert.Equal(t, &expectedWorkspaceEdit, result)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("client rename error", func(t *testing.T) {
+		bridge := createTestBridge([]string{"/"})
+		mockClient := &mocks.MockLanguageClient{}
+		ctx := context.Background()
+		mockClient.On("Context").Return(ctx)
+		mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+		bridge.clients["go"] = mockClient
+
+		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
+		testURI := "file://" + testFile
+
+		mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
+		// Simulate rename failure
+		mockClient.On("Rename", testURI, uint32(2), uint32(7), "newMain").Return((*protocol.WorkspaceEdit)(nil), errors.New("symbol not found"))
+
+		result, err := bridge.RenameSymbol(testFile, 2, 7, "newMain", false)
+
+		require.Error(t, err)
+		assert.Nil(t, result)
+		assert.Contains(t, err.Error(), "failed to rename symbol")
+		assert.Contains(t, err.Error(), "symbol not found")
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("client rename returns nil without error", func(t *testing.T) {
+		bridge := createTestBridge([]string{"/"})
+		mockClient := &mocks.MockLanguageClient{}
+		ctx := context.Background()
+		mockClient.On("Context").Return(ctx)
+		mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+		bridge.clients["go"] = mockClient
+
+		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
+		testURI := "file://" + testFile
+
+		mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
+		// Return nil result but no error (valid scenario)
+		mockClient.On("Rename", testURI, uint32(2), uint32(7), "newMain").Return((*protocol.WorkspaceEdit)(nil), nil)
+
+		result, err := bridge.RenameSymbol(testFile, 2, 7, "newMain", false)
+
+		require.NoError(t, err)
+		assert.Nil(t, result)
+		mockClient.AssertExpectations(t)
+	})
+
+	t.Run("URI normalization edge cases", func(t *testing.T) {
+		bridge := createTestBridge([]string{"/"})
+		mockClient := &mocks.MockLanguageClient{}
+		bridge.clients["go"] = mockClient
+
+		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
+
+		// Test with various URI formats
+		testCases := []string{
+			testFile,             // Regular path
+			"file://" + testFile, // Already normalized
+		}
+
+		expectedWorkspaceEdit := protocol.WorkspaceEdit{
+			Changes: map[protocol.DocumentUri][]protocol.TextEdit{
+				protocol.DocumentUri("file://" + testFile): {
+					{
+						Range: protocol.Range{
+							Start: protocol.Position{Line: 2, Character: 5},
+							End:   protocol.Position{Line: 2, Character: 9},
+						},
+						NewText: "newMain",
+					},
+				},
+			},
+		}
+
+		for _, uriInput := range testCases {
+			t.Run("URI input: "+uriInput, func(t *testing.T) {
+				// Reset mock expectations for each sub-test
+				mockClient.ExpectedCalls = nil
+				mockClient.Calls = nil
+
+				ctx := context.Background()
+				mockClient.On("Context").Return(ctx)
+				mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+				mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+				mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
+				mockClient.On("Rename", "file://"+testFile, uint32(2), uint32(7), "newMain").Return(&expectedWorkspaceEdit, nil)
+
+				result, err := bridge.RenameSymbol(uriInput, 2, 7, "newMain", false)
+
+				require.NoError(t, err)
+				assert.Equal(t, &expectedWorkspaceEdit, result)
+				mockClient.AssertExpectations(t)
+			})
+		}
+	})
+
+	t.Run("different language file types", func(t *testing.T) {
+		bridge := createTestBridge([]string{"/"})
+
+		// Test files with different extensions
+		testCases := []struct {
+			filename    string
+			content     string
+			language    lsp.Language
+			shouldError bool
+		}{
+			{"test.go", "package main", "go", false},
+			{"test.py", "print('hello')", "python", false},
+			{"test.js", "console.log('hello')", "javascript", false},
+			{"test.unknown", "some content", "", true}, // Should error on unknown extension
+		}
+
+		for _, tc := range testCases {
+			t.Run(fmt.Sprintf("Language: %s", tc.language), func(t *testing.T) {
+				if !tc.shouldError {
+					mockClient := &mocks.MockLanguageClient{}
+					ctx := context.Background()
+					mockClient.On("Context").Return(ctx)
+					mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+					mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+					bridge.clients[tc.language] = mockClient
+
+					testFile := createTempFile(t, tc.filename, tc.content)
+					testURI := "file://" + testFile
+
+					expectedWorkspaceEdit := protocol.WorkspaceEdit{
+						Changes: map[protocol.DocumentUri][]protocol.TextEdit{
+							protocol.DocumentUri(testURI): {
+								{
+									Range: protocol.Range{
+										Start: protocol.Position{Line: 0, Character: 0},
+										End:   protocol.Position{Line: 0, Character: 4},
+									},
+									NewText: "newName",
+								},
+							},
+						},
+					}
+
+					mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
+					mockClient.On("Rename", testURI, uint32(0), uint32(0), "newName").Return(&expectedWorkspaceEdit, nil)
+
+					result, err := bridge.RenameSymbol(testFile, 0, 0, "newName", false)
+
+					require.NoError(t, err)
+					assert.Equal(t, &expectedWorkspaceEdit, result)
+					mockClient.AssertExpectations(t)
+				} else {
+					testFile := createTempFile(t, tc.filename, tc.content)
+
+					result, err := bridge.RenameSymbol(testFile, 0, 0, "newName", false)
+
+					require.Error(t, err)
+					assert.Nil(t, result)
+					assert.Contains(t, err.Error(), "failed to infer language")
+				}
+			})
+		}
+	})
 }
 
 // Test FindImplementations
@@ -585,12 +814,13 @@ func TestPrepareCallHierarchy(t *testing.T) {
 		},
 	}
 	mockClient.On("PrepareCallHierarchy", testURI, uint32(2), uint32(7)).Return(expectedItems, nil)
-	
+
 	result, err := bridge.PrepareCallHierarchy(testURI, 2, 7)
 	require.NoError(t, err)
 	assert.Len(t, result, 1)
 	mockClient.AssertExpectations(t)
 }
+
 // Test GetIncomingCalls and GetOutgoingCalls (currently return empty)
 func TestGetIncomingOutgoingCalls(t *testing.T) {
 	bridge := createTestBridge([]string{"/"})
@@ -616,7 +846,7 @@ func TestGetClientForLanguageInterface(t *testing.T) {
 
 	bridge.clients["go"] = mockClient
 
-	result, err := bridge.GetClientForLanguageInterface("go")
+	result, err := bridge.GetClientForLanguage("go")
 
 	require.NoError(t, err)
 	assert.Equal(t, mockClient, result)
@@ -925,7 +1155,6 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		config             *lsp.LSPServerConfig
 		allowedDirectories []string
 		// Named input parameters for target function.
-		mockBridge   func() *mocks.MockBridge
 		uri          string
 		line         uint32
 		character    uint32
@@ -933,31 +1162,14 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		endCharacter uint32
 		want         []protocol.CodeAction
 		wantErr      bool
+		// Mock setup parameters
+		mockCodeActions []protocol.CodeAction
+		mockError       error
+		// Control which clients are available
+		setupClients bool
 	}{
 		{
-			name: "no code actions",
-			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{},
-				ExtensionLanguageMap: map[string]lsp.Language{
-					".go": "go",
-				},
-			},
-			allowedDirectories: []string{"."},
-			mockBridge: func() *mocks.MockBridge {
-				mockBridge := &mocks.MockBridge{}
-				mockBridge.On("GetCodeActions", mock.AnythingOfType("string"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return([]protocol.CodeAction{}, nil)
-				return mockBridge
-			},
-			uri:          "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
-			line:         1,
-			character:    1,
-			endLine:      1,
-			endCharacter: 1,
-			want:         []protocol.CodeAction{},
-			wantErr:      false,
-		},
-		{
-			name: "code actions",
+			name: "successful code actions",
 			config: &lsp.LSPServerConfig{
 				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {
@@ -968,16 +1180,6 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				ExtensionLanguageMap: map[string]lsp.Language{
 					".go": "go",
 				},
-			},
-			mockBridge: func() *mocks.MockBridge {
-				mockBridge := &mocks.MockBridge{}
-				mockBridge.On("GetCodeActions", mock.AnythingOfType("string"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return([]protocol.CodeAction{
-					{
-						Title: "Add import",
-						Kind:  &quickfix,
-					},
-				}, nil)
-				return mockBridge
 			},
 			allowedDirectories: []string{"."},
 			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
@@ -992,9 +1194,17 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				},
 			},
 			wantErr: false,
+			mockCodeActions: []protocol.CodeAction{
+				{
+					Title: "Add import",
+					Kind:  &quickfix,
+				},
+			},
+			mockError:    nil,
+			setupClients: true,
 		},
 		{
-			name: "error case",
+			name: "no code actions",
 			config: &lsp.LSPServerConfig{
 				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
 					"go": {
@@ -1006,10 +1216,52 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 					".go": "go",
 				},
 			},
-			mockBridge: func() *mocks.MockBridge {
-				mockBridge := &mocks.MockBridge{}
-				mockBridge.On("GetCodeActions", mock.AnythingOfType("string"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32"), mock.AnythingOfType("uint32")).Return([]protocol.CodeAction{}, errors.New("LSP server error"))
-				return mockBridge
+			allowedDirectories: []string{"."},
+			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
+			line:               1,
+			character:          1,
+			endLine:            1,
+			endCharacter:       1,
+			want:               []protocol.CodeAction{},
+			wantErr:            false,
+			mockCodeActions:    []protocol.CodeAction{},
+			mockError:          nil,
+			setupClients:       true,
+		},
+		{
+			name: "error - failed to infer language",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					"go": {
+						Command: "gopls",
+						Args:    []string{},
+					},
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+				},
+			},
+			allowedDirectories: []string{"."},
+			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.unknown", // unknown extension
+			line:               1,
+			character:          1,
+			endLine:            1,
+			endCharacter:       1,
+			want:               nil,
+			wantErr:            true,
+			mockCodeActions:    nil,
+			mockError:          nil,
+			setupClients:       false, // No clients needed for this test
+		},
+		{
+			name: "error - failed to get client for language",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					// No language server configured for Go
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+				},
 			},
 			allowedDirectories: []string{"."},
 			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
@@ -1019,32 +1271,453 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 			endCharacter:       1,
 			want:               nil,
 			wantErr:            true,
+			mockCodeActions:    nil,
+			mockError:          nil,
+			setupClients:       false, // No clients set up for this test
+		},
+		{
+			name: "error - client code actions failed",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					"go": {
+						Command: "gopls",
+						Args:    []string{},
+					},
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+				},
+			},
+			allowedDirectories: []string{"."},
+			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
+			line:               1,
+			character:          1,
+			endLine:            1,
+			endCharacter:       1,
+			want:               nil,
+			wantErr:            true,
+			mockCodeActions:    nil,
+			mockError:          errors.New("failed to get code actions from language server"),
+			setupClients:       true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			b := tt.mockBridge()
+			b := NewMCPLSPBridge(tt.config, tt.allowedDirectories)
+
+			// Only set up mock client if needed for this test
+			if tt.setupClients {
+				mockClient := &mocks.MockLanguageClient{}
+				b.clients["go"] = mockClient
+
+				// Set up mock expectations
+				mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+				mockClient.On("CodeActions", tt.uri, tt.line, tt.character, tt.endLine, tt.endCharacter).Return(tt.mockCodeActions, tt.mockError)
+				ctx := context.Background()
+				mockClient.On("Context").Return(ctx)
+
+				// Ensure mock expectations are checked at the end
+				defer mockClient.AssertExpectations(t)
+			}
+
 			got, gotErr := b.GetCodeActions(tt.uri, tt.line, tt.character, tt.endLine, tt.endCharacter)
-			
+
 			if tt.wantErr {
 				if gotErr == nil {
 					t.Fatal("GetCodeActions() succeeded unexpectedly, wanted error")
 				}
 				return
 			}
-			
+
 			if gotErr != nil {
 				t.Errorf("GetCodeActions() failed: %v", gotErr)
 				return
 			}
-			
+
 			// Compare the results
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GetCodeActions() = %v, want %v", got, tt.want)
 			}
-			
-			// Verify all expectations were met
-			b.AssertExpectations(t)
+		})
+	}
+}
+
+func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
+	diagnosticWarning := protocol.DiagnosticSeverityWarning
+	version := int32(1)
+	tests := []struct {
+		name string // description of this test case
+		// Named input parameters for receiver constructor.
+		config             *lsp.LSPServerConfig
+		allowedDirectories []string
+		// Named input parameters for target function.
+		workspaceUri string
+		identifier   string
+		want         []protocol.WorkspaceDiagnosticReport
+		wantErr      bool
+		// Mock setup parameters
+		mockDetectedLanguages []lsp.Language
+		mockDetectError       error
+		mockClientsSetup      map[lsp.Language]*mocks.MockLanguageClient          // language -> mock client
+		mockReports           map[lsp.Language]*protocol.WorkspaceDiagnosticReport // language -> report
+		mockReportErrors      map[lsp.Language]error                              // language -> error
+		serverConfig          *lsp.LanguageServerConfig
+		serverConfigError     error
+		setupClients          bool
+	}{
+		{
+			name: "successful workspace diagnostics - single language",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					"go": {
+						Command: "gopls",
+						Args:    []string{},
+					},
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+				},
+			},
+			allowedDirectories:    []string{"."},
+			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
+			identifier:            "workspace-1",
+			mockDetectedLanguages: []lsp.Language{"go"},
+			mockDetectError:       nil,
+			mockClientsSetup: map[lsp.Language]*mocks.MockLanguageClient{
+				"go": {},
+			},
+			mockReports: map[lsp.Language]*protocol.WorkspaceDiagnosticReport{
+				"go": {
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{
+						{
+							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
+								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Version: &version,
+								Items: []protocol.Diagnostic{
+									{
+										Range: protocol.Range{
+											Start: protocol.Position{Line: 1, Character: 0},
+											End:   protocol.Position{Line: 1, Character: 10},
+										},
+										Message:  "unused variable",
+										Severity: &diagnosticWarning,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			mockReportErrors: map[lsp.Language]error{
+				"go": nil,
+			},
+			want: []protocol.WorkspaceDiagnosticReport{
+				{
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{
+						{
+							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
+								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Version: &version,
+								Items: []protocol.Diagnostic{
+									{
+										Range: protocol.Range{
+											Start: protocol.Position{Line: 1, Character: 0},
+											End:   protocol.Position{Line: 1, Character: 10},
+										},
+										Message:  "unused variable",
+										Severity: &diagnosticWarning,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			wantErr:      false,
+			setupClients: true,
+		},
+		{
+			name: "successful workspace diagnostics - multiple languages",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					"go": {
+						Command: "gopls",
+						Args:    []string{},
+					},
+					"typescript": {
+						Command: "typescript-language-server",
+						Args:    []string{"--stdio"},
+					},
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+					".ts": "typescript",
+				},
+			},
+			allowedDirectories:    []string{"."},
+			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
+			identifier:            "workspace-1",
+			mockDetectedLanguages: []lsp.Language{"go", "typescript"},
+			mockDetectError:       nil,
+			mockClientsSetup: map[lsp.Language]*mocks.MockLanguageClient{
+				"go":         {},
+				"typescript": {},
+			},
+			mockReports: map[lsp.Language]*protocol.WorkspaceDiagnosticReport{
+				"go": {
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{
+						{
+							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
+								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Version: &version,
+								Items:   []protocol.Diagnostic{},
+							},
+						},
+					},
+				},
+				"typescript": {
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{
+						{
+							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
+								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/src/index.ts"),
+								Version: &version,
+								Items:   []protocol.Diagnostic{},
+							},
+						},
+					},
+				},
+			},
+			mockReportErrors: map[lsp.Language]error{
+				"go":         nil,
+				"typescript": nil,
+			},
+			want: []protocol.WorkspaceDiagnosticReport{
+				{
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{
+						{
+							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
+								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Version: &version,
+								Items:   []protocol.Diagnostic{},
+							},
+						},
+					},
+				},
+				{
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{
+						{
+							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
+								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/src/index.ts"),
+								Version: &version,
+								Items:   []protocol.Diagnostic{},
+							},
+						},
+					},
+				},
+			},
+			wantErr:      false,
+			setupClients: true,
+		},
+		{
+			name: "no languages detected",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					"go": {
+						Command: "gopls",
+						Args:    []string{},
+					},
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+				},
+			},
+			allowedDirectories:    []string{"."},
+			workspaceUri:          "file:///home/rockerboo/code/empty-project",
+			identifier:            "workspace-1",
+			mockDetectedLanguages: []lsp.Language{}, // No languages detected
+			mockDetectError:       nil,
+			mockClientsSetup:      map[lsp.Language]*mocks.MockLanguageClient{},
+			mockReports:           map[lsp.Language]*protocol.WorkspaceDiagnosticReport{},
+			mockReportErrors:      map[lsp.Language]error{},
+			want:                  []protocol.WorkspaceDiagnosticReport{}, // Empty result
+			wantErr:               false,
+			setupClients:          false,
+		},
+		{
+			name: "error - failed to detect project languages",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					"go": {
+						Command: "gopls",
+						Args:    []string{},
+					},
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+				},
+			},
+			allowedDirectories:    []string{"."},
+			workspaceUri:          "file:///invalid/path",
+			identifier:            "workspace-1",
+			mockDetectedLanguages: []lsp.Language{},
+			mockDetectError:       errors.New("failed to access workspace directory"),
+			mockClientsSetup:      map[lsp.Language]*mocks.MockLanguageClient{},
+			mockReports:           map[lsp.Language]*protocol.WorkspaceDiagnosticReport{},
+			mockReportErrors:      map[lsp.Language]error{},
+			want:                  []protocol.WorkspaceDiagnosticReport{},
+			wantErr:               false,
+			setupClients:          false,
+		},
+		{
+			name: "error - failed to get language clients",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					// No language servers configured
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+				},
+			},
+			allowedDirectories:    []string{"."},
+			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
+			identifier:            "workspace-1",
+			mockDetectedLanguages: []lsp.Language{"go"},
+			mockDetectError:       nil,
+			mockClientsSetup:      map[lsp.Language]*mocks.MockLanguageClient{},
+			mockReports:           map[lsp.Language]*protocol.WorkspaceDiagnosticReport{},
+			mockReportErrors:      map[lsp.Language]error{},
+			serverConfig:          &lsp.LanguageServerConfig{},
+			serverConfigError:     errors.New("Could not find server config"),
+			want:                  nil,
+			wantErr:               true,
+			setupClients:          true,
+		},
+		{
+			name: "partial success - one client fails, one succeeds",
+			config: &lsp.LSPServerConfig{
+				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+					"go": {
+						Command: "gopls",
+						Args:    []string{},
+					},
+					"typescript": {
+						Command: "typescript-language-server",
+						Args:    []string{"--stdio"},
+					},
+				},
+				ExtensionLanguageMap: map[string]lsp.Language{
+					".go": "go",
+					".ts": "typescript",
+				},
+			},
+			allowedDirectories:    []string{"."},
+			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
+			identifier:            "workspace-1",
+			mockDetectedLanguages: []lsp.Language{"go", "typescript"},
+			mockDetectError:       nil,
+			mockClientsSetup: map[lsp.Language]*mocks.MockLanguageClient{
+				"go":         {},
+				"typescript": {},
+			},
+			mockReports: map[lsp.Language]*protocol.WorkspaceDiagnosticReport{
+				"go": {
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{
+						{
+							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
+								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Version: &version,
+								Items:   []protocol.Diagnostic{},
+							},
+						},
+					},
+				},
+				"typescript": {
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{}, // This will be ignored due to error
+				},
+			},
+			mockReportErrors: map[lsp.Language]error{
+				"go":         nil,
+				"typescript": errors.New("typescript language server failed"),
+			},
+			want: []protocol.WorkspaceDiagnosticReport{
+				{
+					Items: []protocol.WorkspaceDocumentDiagnosticReport{
+						{
+							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
+								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Version: &version,
+								Items:   []protocol.Diagnostic{},
+							},
+						},
+					},
+				},
+			}, // Only Go report, TypeScript failed
+			wantErr:      false,
+			setupClients: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a mock config that can override DetectProjectLanguages
+			mockConfig := &mocks.MockLSPServerConfig{}
+
+			b := NewMCPLSPBridge(mockConfig, tt.allowedDirectories)
+
+			if tt.mockDetectError != nil {
+				mockConfig.On("DetectProjectLanguages", tt.workspaceUri).Return(tt.mockDetectedLanguages, nil)
+			} else {
+				mockConfig.On("DetectProjectLanguages", tt.workspaceUri).Return(tt.mockDetectedLanguages, tt.mockDetectError)
+			}
+
+			// Set up mock clients if needed
+			if tt.setupClients {
+				for language, mockClient := range tt.mockClientsSetup {
+					b.clients[language] = mockClient
+
+					// Set up mock expectations
+					mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+					ctx := context.Background()
+					mockClient.On("Context").Return(ctx)
+
+					// Set up WorkspaceDiagnostic mock
+					if report, exists := tt.mockReports[language]; exists {
+						if err, hasErr := tt.mockReportErrors[language]; hasErr {
+							mockClient.On("WorkspaceDiagnostic", tt.identifier).Return(report, err)
+						} else {
+							mockClient.On("WorkspaceDiagnostic", tt.identifier).Return(report, nil)
+						}
+					}
+
+					// Ensure mock expectations are checked at the end
+					defer mockClient.AssertExpectations(t)
+				}
+			}
+
+			if tt.serverConfig != nil {
+				mockConfig.On("FindServerConfig", "go").Return(tt.serverConfig, tt.serverConfigError)
+			}
+
+			// NOTE: You'll need to modify GetWorkspaceDiagnostics to use the mockConfig
+			// or make DetectProjectLanguages injectable for this test to work properly
+			got, gotErr := b.GetWorkspaceDiagnostics(tt.workspaceUri, tt.identifier)
+
+			if tt.wantErr {
+				if gotErr == nil {
+					t.Fatal("GetWorkspaceDiagnostics() succeeded unexpectedly, wanted error")
+				}
+				return
+			}
+
+			if gotErr != nil {
+				t.Errorf("GetWorkspaceDiagnostics() failed: %v", gotErr)
+				return
+			}
+
+			// Compare the results
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetWorkspaceDiagnostics() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

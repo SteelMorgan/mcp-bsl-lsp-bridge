@@ -17,7 +17,7 @@ import (
 )
 
 // NewMCPLSPBridge creates a new bridge instance with provided configuration and client factory
-func NewMCPLSPBridge(config *lsp.LSPServerConfig, allowedDirectories []string) *MCPLSPBridge {
+func NewMCPLSPBridge(config lsp.LSPServerConfigProvider, allowedDirectories []string) *MCPLSPBridge {
 	bridge := &MCPLSPBridge{
 		clients:            make(map[lsp.Language]lsp.LanguageClientInterface),
 		config:             config,
@@ -65,7 +65,7 @@ func (b *MCPLSPBridge) IsAllowedDirectory(path string) (string, error) {
 }
 
 // validateAndConnectClient attempts to validate and establish a language server connection using the injected factory
-func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig lsp.LanguageServerConfig, config ConnectionAttemptConfig) (lsp.LanguageClientInterface, error) {
+func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *lsp.LanguageServerConfig, config ConnectionAttemptConfig) (lsp.LanguageClientInterface, error) {
 	// Attempt connection with retry mechanism
 	var lastErr error
 
@@ -288,8 +288,8 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClient
 	}
 
 	// Find the server configuration
-	serverConfig, exists := b.config.LanguageServers[lsp.Language(language)]
-	if !exists {
+	serverConfig, err := b.GetConfig().FindServerConfig(language)
+	if err != nil {
 		return nil, fmt.Errorf("no server configuration found for language %s", language)
 	}
 
@@ -318,19 +318,19 @@ func (b *MCPLSPBridge) CloseAllClients() {
 }
 
 // InferLanguage infers the programming language from a file path
-func (b *MCPLSPBridge) InferLanguage(filePath string) (lsp.Language, error) {
+func (b *MCPLSPBridge) InferLanguage(filePath string) (*lsp.Language, error) {
 	ext := filepath.Ext(filePath)
-	language, exists := b.config.ExtensionLanguageMap[ext]
+	language, err := b.GetConfig().FindExtLanguage(ext)
 
-	if !exists {
-		return "", fmt.Errorf("no language found for extension %s", ext)
+	if err != nil {
+		return nil, err
 	}
 
 	return language, nil
 }
 
 // GetConfig returns the bridge's configuration
-func (b *MCPLSPBridge) GetConfig() *lsp.LSPServerConfig {
+func (b *MCPLSPBridge) GetConfig() lsp.LSPServerConfigProvider {
 	return b.config
 }
 
@@ -344,27 +344,22 @@ func (b *MCPLSPBridge) SetServer(mcpServer *server.MCPServer) {
 	b.server = mcpServer
 }
 
-// GetClientForLanguageInterface returns a client as interface{} for tool compatibility
-func (b *MCPLSPBridge) GetClientForLanguageInterface(language string) (lsp.LanguageClientInterface, error) {
-	return b.GetClientForLanguage(language)
-}
-
 // DetectProjectLanguages detects all languages used in a project directory
-func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]string, error) {
+func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]lsp.Language, error) {
 	if b.config == nil {
 		return nil, errors.New("no LSP configuration available")
 	}
 
-	return b.config.DetectProjectLanguages(projectPath)
+	return b.GetConfig().DetectProjectLanguages(projectPath)
 }
 
 // DetectPrimaryProjectLanguage detects the primary language of a project
-func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (string, error) {
+func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (*lsp.Language, error) {
 	if b.config == nil {
-		return "", errors.New("no LSP configuration available")
+		return nil, errors.New("no LSP configuration available")
 	}
 
-	return b.config.DetectPrimaryProjectLanguage(projectPath)
+	return b.GetConfig().DetectPrimaryProjectLanguage(projectPath)
 }
 
 // FindSymbolReferences finds all references to a symbol at a given position
@@ -415,8 +410,8 @@ func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]protocol
 }
 
 // GetMultiLanguageClients gets language clients for multiple languages with fallback
-func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
-	clients := make(map[string]lsp.LanguageClientInterface)
+func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[lsp.Language]lsp.LanguageClientInterface, error) {
+	clients := make(map[lsp.Language]lsp.LanguageClientInterface)
 
 	var mu sync.Mutex
 
@@ -443,7 +438,7 @@ func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[string]l
 			}
 
 			mu.Lock()
-			clients[lang] = client
+			clients[lsp.Language(lang)] = client
 			mu.Unlock()
 		}(language)
 	}
@@ -499,14 +494,14 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (
 	}
 
 	// Get language client
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
-		logger.Error("GetHoverInformation: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", language, err))
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		logger.Error("GetHoverInformation: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
 	}
 
 	// Ensure the document is opened in the language server
-	err = b.ensureDocumentOpen(client, normalizedURI, string(language))
+	err = b.ensureDocumentOpen(client, normalizedURI, string(*language))
 	if err != nil {
 		// Continue anyway, as some servers might still work without explicit didOpen
 		logger.Error("GetHoverInformation: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
@@ -515,7 +510,7 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (
 	result, err := client.Hover(normalizedURI, line, character)
 
 	if err != nil {
-		logger.Error("GetHoverInformation: Request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
+		logger.Error("GetHoverInformation: Request failed", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
 		return nil, fmt.Errorf("hover request failed: %w", err)
 	}
 
@@ -585,13 +580,13 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 		return nil, fmt.Errorf("failed to infer language: %w", err)
 	}
 
-	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Inferred language: %s", language))
+	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Inferred language: %s", *language))
 
 	// Get language client
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
-		logger.Error("GetDocumentSymbols: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", language, err))
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		logger.Error("GetDocumentSymbols: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
 	}
 
 	// Additional debugging: check client status
@@ -599,7 +594,7 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Client metrics: %+v", metrics))
 
 	// Ensure the document is opened in the language server
-	err = b.ensureDocumentOpen(client, normalizedURI, string(language))
+	err = b.ensureDocumentOpen(client, normalizedURI, string(*language))
 	if err != nil {
 		// Continue anyway, as some servers might still work without explicit didOpen
 		logger.Error("GetDocumentSymbols: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
@@ -608,7 +603,7 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 	// Get document symbols
 	symbols, err := client.DocumentSymbols(normalizedURI)
 	if err != nil {
-		logger.Error("GetDocumentSymbols: Request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
+		logger.Error("GetDocumentSymbols: Request failed", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
 		return nil, fmt.Errorf("document symbols request failed: %w", err)
 	}
 
@@ -617,12 +612,13 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 	return symbols, nil
 }
 
-// GetDiagnostics gets diagnostics for a document
-func (b *MCPLSPBridge) GetDiagnostics(uri string) ([]any, error) {
-	// For now, return empty diagnostics since LSP diagnostics are typically pushed
-	// and we haven't implemented a storage mechanism yet
-	// TODO: Implement diagnostic storage in the client handler
-	return []any{}, nil
+func (b *MCPLSPBridge) GetServerConfig(language string) (lsp.LanguageServerConfigProvider, error) {
+	languageServer, err := b.GetConfig().FindServerConfig(language)
+	if err != nil {
+		return nil, err
+	}
+
+	return languageServer, nil
 }
 
 // GetSignatureHelp gets signature help for a function at a specific position
@@ -638,14 +634,14 @@ func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character uint32) (*pr
 	}
 
 	// Get language client
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
-		logger.Error("GetSignatureHelp: Client creation failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		logger.Error("GetSignatureHelp: Client creation failed", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
 	}
 
 	// Ensure document is open in the language server
-	err = b.ensureDocumentOpen(client, normalizedURI, string(language))
+	err = b.ensureDocumentOpen(client, normalizedURI, string(*language))
 	if err != nil {
 		// Continue anyway, as some servers might still work without explicit didOpen
 		logger.Error("GetSignatureHelp: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
@@ -656,7 +652,7 @@ func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character uint32) (*pr
 
 	signatureHelp, err = client.SignatureHelp(normalizedURI, line, character)
 	if err != nil {
-		logger.Error("GetSignatureHelp: Request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
+		logger.Error("GetSignatureHelp: Request failed", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
 		return nil, fmt.Errorf("signature help request failed: %w", err)
 	}
 
@@ -681,9 +677,9 @@ func (b *MCPLSPBridge) GetCodeActions(uri string, line, character, endLine, endC
 	}
 
 	// Get language client
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
 	}
 
 	codeActions, err := client.CodeActions(uri, line, character, endLine, endCharacter)
@@ -703,9 +699,9 @@ func (b *MCPLSPBridge) FormatDocument(uri string, tabSize uint32, insertSpaces b
 	}
 
 	// Get language client
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
 	}
 
 	// Execute document formatting request
@@ -850,14 +846,14 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName 
 	}
 
 	// Get language client
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
-		logger.Error("RenameSymbol: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", language, err))
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		logger.Error("RenameSymbol: Failed to get language client", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
 	}
 
 	// Ensure the document is opened in the language server
-	err = b.ensureDocumentOpen(client, normalizedURI, string(language))
+	err = b.ensureDocumentOpen(client, normalizedURI, string(*language))
 	if err != nil {
 		// Continue anyway, as some servers might still work without explicit didOpen
 		logger.Error("RenameSymbol: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
@@ -987,14 +983,14 @@ func (b *MCPLSPBridge) FindImplementations(uri string, line, character uint32) (
 	}
 
 	// Get language client
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
-		logger.Error("FindImplementations: Client creation failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		logger.Error("FindImplementations: Client creation failed", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
 	}
 
 	// Ensure document is open in the language server
-	err = b.ensureDocumentOpen(client, normalizedURI, string(language))
+	err = b.ensureDocumentOpen(client, normalizedURI, string(*language))
 	if err != nil {
 		// Continue anyway, as some servers might still work without explicit didOpen
 		logger.Error("FindImplementations: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
@@ -1003,7 +999,7 @@ func (b *MCPLSPBridge) FindImplementations(uri string, line, character uint32) (
 	// Execute implementation request using the LSP client method
 	implementations, err := client.Implementation(normalizedURI, line, character)
 	if err != nil {
-		logger.Error("FindImplementations: Request failed", fmt.Sprintf("Language: %s, Error: %v", language, err))
+		logger.Error("FindImplementations: Request failed", fmt.Sprintf("Language: %s, Error: %v", string(*language), err))
 		return nil, fmt.Errorf("implementation request failed: %w", err)
 	}
 
@@ -1018,12 +1014,12 @@ func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLin
 		return nil, fmt.Errorf("failed to infer language: %w", err)
 	}
 
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+		return nil, fmt.Errorf("failed to get client for language %s: %w", *language, err)
 	}
 
-	err = b.ensureDocumentOpen(client, uri, string(language))
+	err = b.ensureDocumentOpen(client, uri, string(*language))
 	if err != nil {
 		// Continue anyway, as some servers might still work without explicit didOpen
 		logger.Error("SemanticTokens: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", uri, err))
@@ -1073,7 +1069,7 @@ func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character uint32) 
 	}
 
 	// Get language client
-	client, err := b.GetClientForLanguage(string(language))
+	client, err := b.GetClientForLanguage(string(*language))
 	if err != nil {
 		return nil, err
 	}
@@ -1101,25 +1097,30 @@ func (b *MCPLSPBridge) GetOutgoingCalls(item protocol.CallHierarchyItem) ([]prot
 }
 
 // GetWorkspaceDiagnostics gets diagnostics for entire workspace
-func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]*protocol.WorkspaceDiagnosticReport, error) {
+func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]protocol.WorkspaceDiagnosticReport, error) {
 	// 1. Detect project languages or use multi-language approach
 	languages, err := b.DetectProjectLanguages(workspaceUri)
 	if err != nil {
-		return nil, fmt.Errorf("failed to detect project languages: %w", err)
+		return []protocol.WorkspaceDiagnosticReport{}, err
 	}
 
 	if len(languages) == 0 {
-		return []*protocol.WorkspaceDiagnosticReport{}, nil // No languages detected, return empty result
+		return []protocol.WorkspaceDiagnosticReport{}, nil // No languages detected, return empty result
+	}
+
+	var languageStrings []string
+	for _, lang := range languages {
+		languageStrings = append(languageStrings, string(lang))
 	}
 
 	// 2. Get language clients for detected languages
-	clients, err := b.GetMultiLanguageClients(languages)
+	clients, err := b.GetMultiLanguageClients(languageStrings)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get language clients: %w", err)
 	}
 
 	// 3. Execute workspace diagnostic requests
-	var allReports []*protocol.WorkspaceDiagnosticReport
+	var allReports []protocol.WorkspaceDiagnosticReport
 
 	for language, clientInterface := range clients {
 		client := clientInterface
@@ -1130,7 +1131,7 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 			continue
 		}
 
-		allReports = append(allReports, report)
+		allReports = append(allReports, *report)
 	}
 
 	return allReports, nil

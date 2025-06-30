@@ -82,8 +82,8 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 		Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{Value: "func main()"},
 	}
 
-	// ADD THIS LINE: Expect InferLanguage to be called and return "go"
-	mockBridge.On("InferLanguage", "file:///test.go").Return(lsp.Language("go"), nil).Once()
+	language := lsp.Language("go")
+	mockBridge.On("InferLanguage", "file:///test.go").Return(&language, nil).Once()
 
 	mockBridge.On("GetHoverInformation", "file:///test.go", uint32(10), uint32(5)).Return(&hoverResult, nil).Once()
 
@@ -129,62 +129,10 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 	mockBridge.AssertExpectations(t)
 }
 
-func TestMCPToolIntegration_DiagnosticsTool(t *testing.T) {
-	mockBridge := new(mocks.MockBridge)
-	mockBridge.On("GetDiagnostics", "file:///test.go").Return([]any{
-		protocol.Diagnostic{
-			Message: "unused variable",
-			Range: protocol.Range{
-				Start: protocol.Position{Line: 10, Character: 0},
-				End:   protocol.Position{Line: 10, Character: 5},
-			},
-		},
-	}, nil).Once()
-	// mockBridge.On("InferLanguage", "file:///test.go").Return("go", nil).Once()
-
-	// Initialize tool and handler directly, similar to HoverTool
-	tool, handler := DiagnosticTool(mockBridge)
-	mcpServer, err := mcptest.NewServer(t, server.ServerTool{
-		Tool:    tool,
-		Handler: handler,
-	})
-	require.NoError(t, err, "Could not start server")
-
-	defer mcpServer.Close()
-
-	ctx := context.Background()
-	result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
-		Request: mcp.Request{Method: "tools/call"},
-		Params: mcp.CallToolParams{
-			Name: "diagnostics",
-			Arguments: map[string]any{
-				"uri": "file:///test.go",
-			},
-		},
-	})
-
-	require.NoError(t, err, "Unexpected error from CallTool")
-	assert.NotNil(t, result, "Expected result but got nil")
-	assert.False(t, result.IsError, "Expected successful result, got error")
-
-	assert.NotEmpty(t, result.Content, "Expected diagnostic content")
-
-	for _, content := range result.Content {
-		// Change this line to assert to value type
-		textContent, ok := content.(mcp.TextContent)
-		assert.True(t, ok, "Expected TextContent, got %T", content)
-		assert.NotEmpty(t, textContent.Text, "Expected diagnostic content")
-
-		expectedDiag := "=== DIAGNOSTICS ===\n\nWARNINGS (1):\n1. unused variable\n"
-		assert.Equal(t, expectedDiag, textContent.Text, "Unexpected diagnostic text")
-	}
-
-	mockBridge.AssertExpectations(t)
-	t.Logf("Integration test 'diagnostics tool integration' completed successfully")
-}
 func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
-	mockBridge.On("InferLanguage", "file:///path/to/main.go").Return(lsp.Language("go"), nil).Once() // Changed to file:/// URI
+	language := lsp.Language("go")
+	mockBridge.On("InferLanguage", "file:///path/to/main.go").Return(&language, nil).Once() // Changed to file:/// URI
 
 	// Initialize tool and handler directly
 	tool, handler := InferLanguageTool(mockBridge)
@@ -233,23 +181,23 @@ func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 }
 func TestMCPToolIntegration_LSPConnectTool(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
-	mockBridge.On("GetConfig").Return(&lsp.LSPServerConfig{
-		LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
-			"go": {
-				Command:   "gopls",
-				Args:      []string{},
-				Languages: []string{"go"},
-				Filetypes: []string{".go"},
-			},
-		},
-		ExtensionLanguageMap: map[string]lsp.Language{
-			".go": "go",
-		},
-		LanguageExtensionMap: map[lsp.Language][]string{
-			"go": {".go"},
-		},
-	}, nil).Once()
-	mockBridge.On("GetClientForLanguageInterface", "go").Return(&lsp.LanguageClient{}, nil).Once()
+	// mockBridge.On("GetConfig").Return(&lsp.LSPServerConfig{
+	// 	LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+	// 		"go": {
+	// 			Command:   "gopls",
+	// 			Args:      []string{},
+	// 			Languages: []string{"go"},
+	// 			Filetypes: []string{".go"},
+	// 		},
+	// 	},
+	// 	ExtensionLanguageMap: map[string]lsp.Language{
+	// 		".go": "go",
+	// 	},
+	// 	LanguageExtensionMap: map[lsp.Language][]string{
+	// 		"go": {".go"},
+	// 	},
+	// }, nil).Once()
+	mockBridge.On("GetClientForLanguage", "go").Return(&lsp.LanguageClient{}, nil).Once()
 
 	// Initialize tool and handler directly
 	tool, handler := LSPConnectTool(mockBridge) // Assuming LSPConnectTool exists in the tools package
@@ -312,7 +260,8 @@ func TestMCPToolIntegration_LSPDisconnectTool(t *testing.T) {
 }
 func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
-	mockBridge.On("InferLanguage", "file:///invalid.xyz").Return(lsp.Language(""), errors.New("unsupported file type")).Once()
+	language := lsp.Language("")
+	mockBridge.On("InferLanguage", "file:///invalid.xyz").Return(&language, errors.New("unsupported file type")).Once()
 
 	mockBridge.On("GetHoverInformation", "file:///invalid.xyz", uint32(10), uint32(5)).Return((*protocol.Hover)(nil), errors.New("unsupported file type")).Once()
 
@@ -641,7 +590,6 @@ func TestMCPToolRegistration(t *testing.T) {
 	RegisterLSPDisconnectTool(mcpServer, bridge)
 	RegisterHoverTool(mcpServer, bridge)
 	RegisterSignatureHelpTool(mcpServer, bridge)
-	RegisterDiagnosticsTool(mcpServer, bridge)
 	RegisterCodeActionsTool(mcpServer, bridge)
 	RegisterFormatDocumentTool(mcpServer, bridge)
 	RegisterRenameTool(mcpServer, bridge)

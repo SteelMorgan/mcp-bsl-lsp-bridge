@@ -40,21 +40,25 @@ func MCPLSPDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.
 				return mcp.NewToolResultText(sb.String()), nil
 			}
 
+			globalConfig := config.GetGlobalConfig()
+			languageServers := config.GetLanguageServers()
+		
+
 			if reportType == "summary" || reportType == "all" {
 				sb.WriteString("\n### Summary\n")
-				sb.WriteString(fmt.Sprintf("Global Log Level: %s\n", config.Global.LogLevel))
-				sb.WriteString(fmt.Sprintf("Global Log Path: %s\n", config.Global.LogPath))
-				sb.WriteString(fmt.Sprintf("Max Restart Attempts: %d\n", config.Global.MaxRestartAttempts))
-				sb.WriteString(fmt.Sprintf("Restart Delay: %dms\n", config.Global.RestartDelayMs))
-				sb.WriteString(fmt.Sprintf("Number of Registered Language Servers: %d\n", len(config.LanguageServers)))
+				sb.WriteString(fmt.Sprintf("Global Log Level: %s\n", globalConfig.LogLevel))
+				sb.WriteString(fmt.Sprintf("Global Log Path: %s\n", globalConfig.LogPath))
+				sb.WriteString(fmt.Sprintf("Max Restart Attempts: %d\n", globalConfig.MaxRestartAttempts))
+				sb.WriteString(fmt.Sprintf("Restart Delay: %dms\n", globalConfig.RestartDelayMs))
+				sb.WriteString(fmt.Sprintf("Number of Registered Language Servers: %d\n", len(languageServers)))
 			}
 
 			if reportType == "config" || reportType == "all" {
 				sb.WriteString("\n### Language Server Configuration\n")
-				if len(config.LanguageServers) == 0 {
+				if len(languageServers) == 0 {
 					sb.WriteString("No language servers configured.\n")
 				} else {
-					for lang, lsConfig := range config.LanguageServers {
+					for lang, lsConfig := range languageServers {
 						initializationOptions, err := json.MarshalIndent(lsConfig.InitializationOptions, "", "  ")
 						if err != nil {
 							sb.WriteString(fmt.Sprintf("Error unmarshaling initialization options for %s: %v\n", lang, err))
@@ -71,7 +75,7 @@ func MCPLSPDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.
 			if reportType == "connected_clients" || reportType == "all" {
 				sb.WriteString("\n### Connected Language Clients\n")
 				var configuredLanguages []string
-				for lang := range config.LanguageServers {
+				for lang := range languageServers {
 					configuredLanguages = append(configuredLanguages, string(lang))
 				}
 

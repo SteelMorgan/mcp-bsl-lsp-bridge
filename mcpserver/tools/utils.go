@@ -438,7 +438,7 @@ func formatImplementations(implementations []protocol.Location) string {
 }
 
 // formatWorkspaceDiagnostics formats workspace diagnostic results for display
-func formatWorkspaceDiagnostics(diagnostics []*protocol.WorkspaceDiagnosticReport) string {
+func formatWorkspaceDiagnostics(diagnostics []protocol.WorkspaceDiagnosticReport) string {
 	if diagnostics == nil {
 		return "No workspace diagnostics available"
 	}

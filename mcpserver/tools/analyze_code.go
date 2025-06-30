@@ -51,7 +51,7 @@ func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandle
 			}
 
 			// Get LSP client for the language
-			client, err := bridge.GetClientForLanguageInterface(string(language))
+			client, err := bridge.GetClientForLanguage(string(*language))
 			if err != nil {
 				logger.Error("analyze_code: Failed to get LSP client", err)
 				return mcp.NewToolResultError("Failed to get LSP client"), nil
@@ -74,7 +74,7 @@ func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandle
 				Uri:        uri,
 				Line:       int32(line),
 				Character:  int32(character),
-				LanguageId: string(language),
+				LanguageId: string(*language),
 			}
 
 			result, err := lsp.AnalyzeCode(lspClient, analyzeOpts)

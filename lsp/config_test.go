@@ -56,7 +56,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 	testCases := []struct {
 		name          string
 		projectFiles  map[string]string
-		expectedLangs []string
+		expectedLangs []Language
 	}{
 		{
 			name: "Go Project",
@@ -64,7 +64,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				"go.mod":  "module example.com/myproject\n",
 				"main.go": "package main\n\nfunc main() {}\n",
 			},
-			expectedLangs: []string{"go"},
+			expectedLangs: []Language{"go"},
 		},
 		{
 			name: "Python Project",
@@ -72,7 +72,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				"pyproject.toml": "[tool.poetry]\nname = \"myproject\"\n",
 				"main.py":        "def main():\n    pass\n",
 			},
-			expectedLangs: []string{"python"},
+			expectedLangs: []Language{"python"},
 		},
 		{
 			name: "Mixed Project",
@@ -82,7 +82,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				"index.ts":  "const x = 42;\n",
 				"script.py": "def hello():\n    print('world')\n",
 			},
-			expectedLangs: []string{"go", "typescript", "python"},
+			expectedLangs: []Language{"go", "typescript", "python"},
 		},
 		{
 			name: "No Recognized Languages",
@@ -90,7 +90,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				"README.md":   "# My Project\n",
 				"config.json": "{\"key\": \"value\"}\n",
 			},
-			expectedLangs: []string{},
+			expectedLangs: []Language{},
 		},
 	}
 
@@ -156,7 +156,7 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 	testCases := []struct {
 		name            string
 		projectFiles    map[string]string
-		expectedPrimary string
+		expectedPrimary Language
 	}{
 		{
 			name: "Go Project",
@@ -192,8 +192,8 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 				t.Fatalf("Unexpected error: %v", err)
 			}
 
-			if primaryLang != tc.expectedPrimary {
-				t.Errorf("Expected primary language %s, got %s", tc.expectedPrimary, primaryLang)
+			if *primaryLang != tc.expectedPrimary {
+				t.Errorf("Expected primary language %s, got %s", tc.expectedPrimary, string(*primaryLang))
 			}
 		})
 	}

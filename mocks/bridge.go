@@ -11,7 +11,7 @@ type MockBridge struct {
 	mock.Mock
 }
 
-func (m *MockBridge) GetClientForLanguageInterface(language string) (lsp.LanguageClientInterface, error) {
+func (m *MockBridge) GetClientForLanguage(language string) (lsp.LanguageClientInterface, error) {
 	args := m.Called(language)
 
 	// Safe type assertion with error checking
@@ -27,13 +27,13 @@ func (m *MockBridge) GetClientForLanguageInterface(language string) (lsp.Languag
 	return nil, args.Error(1)
 }
 
-func (m *MockBridge) InferLanguage(filePath string) (lsp.Language, error) {
+func (m *MockBridge) InferLanguage(filePath string) (*lsp.Language, error) {
 	args := m.Called(filePath)
 	if args.Get(0) == nil {
-		return lsp.Language(""), args.Error(1)
+		return nil, args.Error(1)
 	}
 
-	return args.Get(0).(lsp.Language), args.Error(1)
+	return args.Get(0).(*lsp.Language), args.Error(1)
 }
 
 func (m *MockBridge) ProjectRoots() ([]string, error) {
@@ -54,19 +54,24 @@ func (m *MockBridge) CloseAllClients() {
 	m.Called()
 }
 
-func (m *MockBridge) GetConfig() *lsp.LSPServerConfig {
+func (m *MockBridge) GetConfig() lsp.LSPServerConfigProvider {
 	args := m.Called()
-	return args.Get(0).(*lsp.LSPServerConfig)
+	return args.Get(0).(lsp.LSPServerConfigProvider)
 }
 
-func (m *MockBridge) DetectProjectLanguages(projectPath string) ([]string, error) {
-	args := m.Called(projectPath)
-	return args.Get(0).([]string), args.Error(1)
+func (m *MockBridge) GetServerConfig(language string) (lsp.LanguageServerConfigProvider, error) {
+	args := m.Called(language)
+	return args.Get(0).(lsp.LanguageServerConfigProvider), args.Error(1)
 }
 
-func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (string, error) {
+func (m *MockBridge) DetectProjectLanguages(projectPath string) ([]lsp.Language, error) {
 	args := m.Called(projectPath)
-	return args.String(0), args.Error(1)
+	return args.Get(0).([]lsp.Language), args.Error(1)
+}
+
+func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (*lsp.Language, error) {
+	args := m.Called(projectPath)
+	return args.Get(0).(*lsp.Language), args.Error(1)
 }
 
 func (m *MockBridge) FindSymbolReferences(language, uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
@@ -84,9 +89,9 @@ func (m *MockBridge) SearchTextInWorkspace(language, query string) ([]protocol.W
 	return args.Get(0).([]protocol.WorkspaceSymbol), args.Error(1)
 }
 
-func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[string]lsp.LanguageClientInterface, error) {
+func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[lsp.Language]lsp.LanguageClientInterface, error) {
 	args := m.Called(languages)
-	return args.Get(0).(map[string]lsp.LanguageClientInterface), args.Error(1)
+	return args.Get(0).(map[lsp.Language]lsp.LanguageClientInterface), args.Error(1)
 }
 
 func (m *MockBridge) GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error) {
@@ -99,9 +104,9 @@ func (m *MockBridge) GetDiagnostics(uri string) ([]any, error) {
 	return args.Get(0).([]any), args.Error(1)
 }
 
-func (m *MockBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]*protocol.WorkspaceDiagnosticReport, error) {
+func (m *MockBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier string) ([]protocol.WorkspaceDiagnosticReport, error) {
 	args := m.Called(workspaceUri, identifier)
-	return args.Get(0).([]*protocol.WorkspaceDiagnosticReport), args.Error(1)
+	return args.Get(0).([]protocol.WorkspaceDiagnosticReport), args.Error(1)
 }
 
 func (m *MockBridge) GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {

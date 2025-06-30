@@ -1,13 +1,16 @@
 package tools
 
 import (
+	"context"
 	"errors"
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
+	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
@@ -18,35 +21,40 @@ func TestAnalyzeCodeTool_Success(t *testing.T) {
 	mockClient := &mocks.MockLanguageClient{}
 
 	// Set up mock expectations
-	bridge.On("InferLanguage", uri).Return(mockLanguage, nil)
+	bridge.On("InferLanguage", uri).Return(&mockLanguage, nil)
 
-	bridge.On("GetClientForLanguageInterface", string(mockLanguage)).Return(
+	bridge.On("GetClientForLanguage", string(mockLanguage)).Return(
 		lsp.LanguageClientInterface(mockClient), nil)
 
+	tool, handler := AnalyzeCode(bridge)
 	// Create MCP server and register tool
-	mcpServer, err := mcptest.NewServer(t)
+	mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+		Tool:    tool,
+		Handler: handler,
+	})
 	if err != nil {
 		t.Fatalf("Could not start MCP server: %v", err)
 	}
 
-	RegisterAnalyzeCodeTool(mcpServer, bridge)
+	ctx := context.Background()
+	result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+		Request: mcp.Request{Method: "tools/call"},
+		Params: mcp.CallToolParams{
+			Name: "analyze_code",
+			Arguments: map[string]any{
+				"uri":       "file:///test.go",
+				"line":      10,
+				"character": 5,
+			},
+		},
+	})
 
-	// Test language inference
-	language, err := bridge.InferLanguage(uri)
 	if err != nil {
-		t.Errorf("Unexpected error in language inference: %v", err)
-		return
+		t.Errorf("Error: %v", err)
 	}
 
-	// Test client creation
-	client, err := bridge.GetClientForLanguageInterface(string(language))
-	if err != nil {
-		t.Errorf("Unexpected error in client creation: %v", err)
-		return
-	}
-
-	if client == nil {
-		t.Error("Expected client but got nil")
+	if result == nil {
+		t.Error("Expected result but got nil")
 	}
 
 	bridge.AssertExpectations(t)
@@ -57,20 +65,37 @@ func TestAnalyzeCodeTool_LanguageInferenceFailure(t *testing.T) {
 	uri := "file:///unknown.xyz"
 
 	// Set up mock to return error
-	bridge.On("InferLanguage", uri).Return(lsp.Language(""), errors.New("unsupported file type"))
+	bridge.On("InferLanguage", uri).Return((*lsp.Language)(nil), errors.New("unsupported file type"))
 
+	tool, handler := AnalyzeCode(bridge)
 	// Create MCP server and register tool
-	mcpServer, err := mcptest.NewServer(t)
+	mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+		Tool:    tool,
+		Handler: handler,
+	})
 	if err != nil {
 		t.Fatalf("Could not start MCP server: %v", err)
 	}
 
-	RegisterAnalyzeCodeTool(mcpServer, bridge)
+	ctx := context.Background()
+	result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+		Request: mcp.Request{Method: "tools/call"},
+		Params: mcp.CallToolParams{
+			Name: "analyze_code",
+			Arguments: map[string]any{
+				"uri":       uri,
+				"line":      10,
+				"character": 5,
+			},
+		},
+	})
 
-	// Test language inference - should fail
-	_, err = bridge.InferLanguage(uri)
-	if err == nil {
-		t.Error("Expected error in language inference but got none")
+	if err != nil {
+		t.Errorf("Error: %v", err)
+	}
+
+	if result == nil {
+		t.Error("Expected result but got nil")
 	}
 
 	bridge.AssertExpectations(t)
@@ -79,31 +104,41 @@ func TestAnalyzeCodeTool_LanguageInferenceFailure(t *testing.T) {
 func TestAnalyzeCodeTool_ClientCreationFailure(t *testing.T) {
 	bridge := &mocks.MockBridge{}
 	uri := "file:///test.go"
-	mockLanguage := "unsupported"
+	mockLanguage := lsp.Language("unsupported")
 
 	// Set up mocks - language inference succeeds, client creation fails
-	bridge.On("InferLanguage", uri).Return(lsp.Language(mockLanguage), nil)
-	bridge.On("GetClientForLanguageInterface", mockLanguage).Return((*lsp.LanguageClient)(nil), errors.New("unsupported language"))
+	bridge.On("InferLanguage", uri).Return(&mockLanguage, nil)
+	bridge.On("GetClientForLanguage", string(mockLanguage)).Return((lsp.LanguageClientInterface)(nil), errors.New("unsupported language"))
 
+	tool, handler := AnalyzeCode(bridge)
 	// Create MCP server and register tool
-	mcpServer, err := mcptest.NewServer(t)
+	mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+		Tool:    tool,
+		Handler: handler,
+	})
 	if err != nil {
 		t.Fatalf("Could not start MCP server: %v", err)
 	}
 
-	RegisterAnalyzeCodeTool(mcpServer, bridge)
+	ctx := context.Background()
+	result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+		Request: mcp.Request{Method: "tools/call"},
+		Params: mcp.CallToolParams{
+			Name: "analyze_code",
+			Arguments: map[string]any{
+				"uri":       "file:///test.go",
+				"line":      10,
+				"character": 5,
+			},
+		},
+	})
 
-	// Test language inference - should succeed
-	language, err := bridge.InferLanguage(uri)
 	if err != nil {
-		t.Errorf("Unexpected error in language inference: %v", err)
-		return
+		t.Errorf("Error: %v", err)
 	}
 
-	// Test client creation - should fail
-	_, err = bridge.GetClientForLanguageInterface(string(language))
-	if err == nil {
-		t.Error("Expected error in client creation but got none")
+	if result == nil {
+		t.Error("Expected result but got nil")
 	}
 
 	bridge.AssertExpectations(t)

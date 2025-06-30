@@ -144,7 +144,7 @@ func TestInferLanguageTool(t *testing.T) {
 				return
 			}
 
-			if tc.expectError && config == nil {
+			if tc.expectError && config != nil {
 				// Verify expectations and return for expected error case
 				bridge.AssertExpectations(t)
 				return
@@ -170,20 +170,24 @@ func TestInferLanguageTool(t *testing.T) {
 				return
 			}
 
-			language, found := config.ExtensionLanguageMap[ext]
-			if !found && !tc.expectError {
+			language, err := config.FindExtLanguage(ext)
+			if err != nil && !tc.expectError {
 				t.Errorf("Expected to find language for extension %s", ext)
 				return
 			}
 
-			if tc.expectError && !found {
+			if tc.expectError && err != nil {
 				// Verify expectations and return for expected error case
 				bridge.AssertExpectations(t)
 				return
 			}
 
-			if language != tc.expectedLang {
-				t.Errorf("Expected language %s, got %s", tc.expectedLang, language)
+			if language == nil {
+				t.Fatal("Did not get the language")
+			}
+
+			if *language != tc.expectedLang {
+				t.Errorf("Expected language %s, got %s", tc.expectedLang, string(*language))
 			}
 
 			// Verify all mock expectations were met
@@ -249,13 +253,13 @@ func TestInferLanguageEdgeCases(t *testing.T) {
 		}
 
 		// Check if language mapping works
-		language, found := config.ExtensionLanguageMap[ext]
-		if !found {
+		language, err := config.FindExtLanguage(ext)
+		if err != nil {
 			t.Error("Expected to find language for .js extension")
 		}
 
-		if language != "javascript" {
-			t.Errorf("Expected 'javascript', got '%s'", language)
+		if *language != "javascript" {
+			t.Errorf("Expected 'javascript', got '%s'", string(*language))
 		}
 	})
 }

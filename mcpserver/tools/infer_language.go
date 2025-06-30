@@ -36,9 +36,9 @@ func InferLanguageTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			}
 
 			logger.Info("infer_language: Successfully inferred language",
-				fmt.Sprintf("File: %s, Language: %s", filePath, language),
+				fmt.Sprintf("File: %s, Language: %s", filePath, string(*language)),
 			)
 
-			return mcp.NewToolResultText(string(language)), nil
+			return mcp.NewToolResultText(string(*language)), nil
 		}
 }

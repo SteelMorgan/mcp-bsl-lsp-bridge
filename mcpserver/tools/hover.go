@@ -42,7 +42,7 @@ func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerF
 			if langErr != nil {
 				logger.Error("hover: Language inference failed", langErr)
 			} else {
-				logger.Info(fmt.Sprintf("Hover Tool: Inferred language: %s", language))
+				logger.Info(fmt.Sprintf("Hover Tool: Inferred language: %s", *language))
 			}
 
 			// Execute bridge method with detailed error logging

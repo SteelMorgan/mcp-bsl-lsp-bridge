@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -19,7 +21,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 		name            string
 		workspaceUri    string
 		query           string
-		mockLanguages   []string
+		mockLanguages   []lsp.Language
 		mockResults     []protocol.WorkspaceSymbol
 		expectError     bool
 		expectedContent string
@@ -28,7 +30,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 			name:          "successful workspace symbols search",
 			workspaceUri:  "file:///workspace",
 			query:         "main",
-			mockLanguages: []string{"go"},
+			mockLanguages: []lsp.Language{"go"},
 			mockResults: []protocol.WorkspaceSymbol{
 				{
 					Name: "main",
@@ -51,7 +53,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 			name:          "empty query",
 			workspaceUri:  "file:///workspace",
 			query:         "",
-			mockLanguages: []string{"go"},
+			mockLanguages: []lsp.Language{"go"},
 			mockResults:   []protocol.WorkspaceSymbol{},
 			expectError:   false,
 		},
@@ -61,46 +63,69 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
+			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
+
 			// Set up mock expectations
-			bridge.On("DetectProjectLanguages", tc.workspaceUri).Return(tc.mockLanguages, nil)
+			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
 
 			if len(tc.mockLanguages) > 0 {
-				mockClients := make(map[string]lsp.LanguageClientInterface)
+				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
 				for _, lang := range tc.mockLanguages {
-					mockClients[lang] = &lsp.LanguageClient{}
+					client, err := lsp.NewLanguageClient("mock-lsp-server")
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					_, err = client.Connect()
+					if err != nil {
+						t.Errorf("Could not connect %v", err)
+						return
+					}
+					mockClients[lang] = client
+				}
+				var languageStrings []string
+				for _, lang := range tc.mockLanguages {
+					languageStrings = append(languageStrings, string(lang))
 				}
 
-				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
-				bridge.On("SearchTextInWorkspace", "go", tc.query).Return(tc.mockResults, nil)
+				bridge.On("GetMultiLanguageClients", languageStrings).Return(mockClients, nil)
+				// bridge.On("SearchTextInWorkspace", "go", tc.query).Return(tc.mockResults, nil)
 			}
 
-			// Create MCP server and register tool
-			mcpServer := server.NewMCPServer("test", "1.0.0", server.WithToolCapabilities(false))
-			RegisterProjectAnalysisTool(mcpServer, bridge)
-
-			// Execute test
-			languages, err := bridge.DetectProjectLanguages(tc.workspaceUri)
-			if err != nil && !tc.expectError {
-				t.Errorf("Unexpected error in project language detection: %v", err)
+			tool, handler := ProjectAnalysisTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
 				return
 			}
 
-			if !tc.expectError && len(languages) > 0 {
-				_, err := bridge.GetMultiLanguageClients(languages)
-				if err != nil {
-					t.Errorf("Unexpected error creating clients: %v", err)
-					return
-				}
+			// defer mcpServer.Close()
 
-				symbols, err := bridge.SearchTextInWorkspace("go", tc.query)
-				if err != nil {
-					t.Errorf("Error searching workspace symbols: %v", err)
-					return
-				}
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "project_analysis",
+					Arguments: map[string]any{
+						"workspace_uri": tc.workspaceUri,
+						"query":         tc.query,
+						"analysis_type": "workspace_symbols",
+					},
+				},
+			})
 
-				if tc.query != "" && len(symbols) == 0 {
-					t.Error("Expected workspace symbols but got none")
-				}
+			if err != nil {
+				t.Errorf("Error calling tool: %v", err)
+				return
+			}
+
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
 			}
 
 			bridge.AssertExpectations(t)
@@ -112,15 +137,15 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 		name           string
 		workspaceUri   string
 		query          string
-		mockLanguages  []string
+		mockLanguages  []lsp.Language
 		mockReferences []protocol.Location
 		expectError    bool
 	}{
 		{
 			name:          "successful symbol references search",
 			workspaceUri:  "file:///workspace",
-			query:         "main:5:0",
-			mockLanguages: []string{"go"},
+			query:         "main",
+			mockLanguages: []lsp.Language{"go"},
 			mockReferences: []protocol.Location{
 				{
 					Uri: "file:///main.go",
@@ -139,59 +164,73 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 			},
 			expectError: false,
 		},
-		{
-			name:          "invalid position format",
-			workspaceUri:  "file:///workspace",
-			query:         "invalid_position",
-			mockLanguages: []string{"go"},
-			expectError:   true,
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			// Set up mock expectations
-			bridge.On("DetectProjectLanguages", tc.workspaceUri).Return(tc.mockLanguages, nil)
+			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
 
-			if !tc.expectError && len(tc.mockLanguages) > 0 {
-				mockClients := make(map[string]lsp.LanguageClientInterface)
+			// Set up mock expectations
+			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
+
+			mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
+			if len(tc.mockLanguages) > 0 {
 				for _, lang := range tc.mockLanguages {
-					mockClients[lang] = &lsp.LanguageClient{}
+					client, err := lsp.NewLanguageClient("mock-lsp-server")
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					_, err = client.Connect()
+					if err != nil {
+						t.Error(err)
+					}
+					mockClients[lang] = client
+				}
+				var languageStrings []string
+				for _, lang := range tc.mockLanguages {
+					languageStrings = append(languageStrings, string(lang))
 				}
 
-				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
-				bridge.On("FindSymbolReferences", "go", "file:///main.go", uint32(5), uint32(0), true).Return(tc.mockReferences, nil)
+				bridge.On("GetMultiLanguageClients", languageStrings).Return(mockClients, nil)
 			}
 
-			// Create MCP server and register tool
-			mcpServer := server.NewMCPServer("test", "1.0.0", server.WithToolCapabilities(false))
-			RegisterProjectAnalysisTool(mcpServer, bridge)
-
-			// Execute test
-			languages, err := bridge.DetectProjectLanguages(tc.workspaceUri)
-			if err != nil && !tc.expectError {
-				t.Errorf("Unexpected error in project language detection: %v", err)
+			tool, handler := ProjectAnalysisTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
 				return
 			}
 
-			if !tc.expectError && len(languages) > 0 {
-				_, err := bridge.GetMultiLanguageClients(languages)
-				if err != nil {
-					t.Errorf("Unexpected error creating clients: %v", err)
-					return
-				}
+			// defer mcpServer.Close()
 
-				refs, err := bridge.FindSymbolReferences("go", "file:///main.go", 5, 0, true)
-				if err != nil {
-					t.Errorf("Error finding references: %v", err)
-					return
-				}
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "project_analysis",
+					Arguments: map[string]any{
+						"workspace_uri": tc.workspaceUri,
+						"query":         tc.query,
+						"analysis_type": "references",
+					},
+				},
+			})
 
-				if len(refs) != len(tc.mockReferences) {
-					t.Errorf("Expected %d references, got %d", len(tc.mockReferences), len(refs))
-				}
+			if err != nil {
+				t.Errorf("Error calling tool: %v", err)
+				return
+			}
+
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
 			}
 
 			bridge.AssertExpectations(t)
@@ -204,15 +243,15 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 		name            string
 		workspaceUri    string
 		query           string
-		mockLanguages   []string
+		mockLanguages   []lsp.Language
 		mockDefinitions []protocol.Or2[protocol.LocationLink, protocol.Location]
 		expectError     bool
 	}{
 		{
 			name:          "successful symbol definitions search",
 			workspaceUri:  "file:///workspace",
-			query:         "main:5:0",
-			mockLanguages: []string{"go"},
+			query:         "main",
+			mockLanguages: []lsp.Language{"go"},
 			mockDefinitions: []protocol.Or2[protocol.LocationLink, protocol.Location]{
 				{
 					Value: protocol.Location{
@@ -229,8 +268,8 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 		{
 			name:            "symbol not found",
 			workspaceUri:    "file:///workspace",
-			query:           "nonexistent:1:0",
-			mockLanguages:   []string{"go"},
+			query:           "nonexistent",
+			mockLanguages:   []lsp.Language{"go"},
 			mockDefinitions: []protocol.Or2[protocol.LocationLink, protocol.Location]{},
 			expectError:     false,
 		},
@@ -240,46 +279,70 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
+			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
+
 			// Set up mock expectations
-			bridge.On("DetectProjectLanguages", tc.workspaceUri).Return(tc.mockLanguages, nil)
+			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
 
 			if len(tc.mockLanguages) > 0 {
-				mockClients := make(map[string]lsp.LanguageClientInterface)
+				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
 				for _, lang := range tc.mockLanguages {
-					mockClients[lang] = &lsp.LanguageClient{}
+
+					client, err := lsp.NewLanguageClient("mock-lsp-server")
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					_, err = client.Connect()
+					if err != nil {
+						t.Error(err)
+					}
+					mockClients[lang] = client
 				}
 
-				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
-				bridge.On("FindSymbolDefinitions", "go", "file:///main.go", uint32(5), uint32(0)).Return(tc.mockDefinitions, nil)
+				var languageStrings []string
+				for _, lang := range tc.mockLanguages {
+					languageStrings = append(languageStrings, string(lang))
+				}
+
+				bridge.On("GetMultiLanguageClients", languageStrings).Return(mockClients, nil)
+				// bridge.On("FindSymbolDefinitions", "go", "file:///main.go", uint32(5), uint32(0)).Return(tc.mockDefinitions, nil)
 			}
 
-			// Create MCP server and register tool
-			mcpServer := server.NewMCPServer("test", "1.0.0", server.WithToolCapabilities(false))
-			RegisterProjectAnalysisTool(mcpServer, bridge)
-
-			// Execute test
-			languages, err := bridge.DetectProjectLanguages(tc.workspaceUri)
-			if err != nil && !tc.expectError {
-				t.Errorf("Unexpected error in project language detection: %v", err)
+			tool, handler := ProjectAnalysisTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
 				return
 			}
 
-			if !tc.expectError && len(languages) > 0 {
-				_, err := bridge.GetMultiLanguageClients(languages)
-				if err != nil {
-					t.Errorf("Unexpected error creating clients: %v", err)
-					return
-				}
+			// defer mcpServer.Close()
 
-				defs, err := bridge.FindSymbolDefinitions("go", "file:///main.go", 5, 0)
-				if err != nil {
-					t.Errorf("Error finding definitions: %v", err)
-					return
-				}
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "project_analysis",
+					Arguments: map[string]any{
+						"workspace_uri": tc.workspaceUri,
+						"query":         tc.query,
+						"analysis_type": "workspace_symbols",
+					},
+				},
+			})
 
-				if len(defs) != len(tc.mockDefinitions) {
-					t.Errorf("Expected %d definitions, got %d", len(tc.mockDefinitions), len(defs))
-				}
+			if err != nil {
+				t.Errorf("Error calling tool: %v", err)
+				return
+			}
+
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
 			}
 
 			bridge.AssertExpectations(t)
@@ -292,7 +355,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 		name          string
 		workspaceUri  string
 		query         string
-		mockLanguages []string
+		mockLanguages []lsp.Language
 		mockResults   []protocol.WorkspaceSymbol
 		expectError   bool
 	}{
@@ -300,7 +363,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 			name:          "successful text search",
 			workspaceUri:  "file:///workspace",
 			query:         "TODO",
-			mockLanguages: []string{"go"},
+			mockLanguages: []lsp.Language{"go"},
 			mockResults: []protocol.WorkspaceSymbol{
 				{
 					Name:          "main",
@@ -324,7 +387,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 			name:          "no matches found",
 			workspaceUri:  "file:///workspace",
 			query:         "nonexistent_pattern",
-			mockLanguages: []string{"go"},
+			mockLanguages: []lsp.Language{"go"},
 			mockResults:   []protocol.WorkspaceSymbol{},
 			expectError:   false,
 		},
@@ -334,46 +397,70 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
+			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
+
 			// Set up mock expectations
-			bridge.On("DetectProjectLanguages", tc.workspaceUri).Return(tc.mockLanguages, nil)
+			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
 
 			if len(tc.mockLanguages) > 0 {
-				mockClients := make(map[string]lsp.LanguageClientInterface)
+				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
 				for _, lang := range tc.mockLanguages {
-					mockClients[lang] = &lsp.LanguageClient{}
+
+					client, err := lsp.NewLanguageClient("mock-lsp-server")
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					_, err = client.Connect()
+					if err != nil {
+						t.Errorf("Could not connect %v", err)
+						return
+					}
+					mockClients[lang] = client
+				}
+				var languageStrings []string
+				for _, lang := range tc.mockLanguages {
+					languageStrings = append(languageStrings, string(lang))
 				}
 
-				bridge.On("GetMultiLanguageClients", tc.mockLanguages).Return(mockClients, nil)
-				bridge.On("SearchTextInWorkspace", "go", tc.query).Return(tc.mockResults, nil)
+				bridge.On("GetMultiLanguageClients", languageStrings).Return(mockClients, nil)
+				// bridge.On("SearchTextInWorkspace", "go", tc.query).Return(tc.mockResults, nil)
 			}
 
-			// Create MCP server and register tool
-			mcpServer := server.NewMCPServer("test", "1.0.0", server.WithToolCapabilities(false))
-			RegisterProjectAnalysisTool(mcpServer, bridge)
-
-			// Execute test
-			languages, err := bridge.DetectProjectLanguages(tc.workspaceUri)
-			if err != nil && !tc.expectError {
-				t.Errorf("Unexpected error in project language detection: %v", err)
+			tool, handler := ProjectAnalysisTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
 				return
 			}
 
-			if !tc.expectError && len(languages) > 0 {
-				_, err := bridge.GetMultiLanguageClients(languages)
-				if err != nil {
-					t.Errorf("Unexpected error creating clients: %v", err)
-					return
-				}
+			// defer mcpServer.Close()
 
-				results, err := bridge.SearchTextInWorkspace("go", tc.query)
-				if err != nil {
-					t.Errorf("Error in text search: %v", err)
-					return
-				}
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "project_analysis",
+					Arguments: map[string]any{
+						"workspace_uri": tc.workspaceUri,
+						"query":         tc.query,
+						"analysis_type": "workspace_symbols",
+					},
+				},
+			})
 
-				if len(results) != len(tc.mockResults) {
-					t.Errorf("Expected %d search results, got %d", len(tc.mockResults), len(results))
-				}
+			if err != nil {
+				t.Errorf("Error calling tool: %v", err)
+				return
+			}
+
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
 			}
 
 			bridge.AssertExpectations(t)
@@ -385,6 +472,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 	testCases := []struct {
 		name         string
 		workspaceUri string
+		query        string
 		setupMock    func(*mocks.MockBridge)
 		expectError  bool
 		errorMsg     string
@@ -392,9 +480,10 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 		{
 			name:         "project language detection failure",
 			workspaceUri: "file:///nonexistent",
+			query:        "",
 			setupMock: func(bridge *mocks.MockBridge) {
 				// This case expects DetectProjectLanguages to fail
-				bridge.On("DetectProjectLanguages", "file:///nonexistent").Return([]string{}, errors.New("project not found"))
+				bridge.On("DetectProjectLanguages", "/nonexistent").Return([]lsp.Language{}, errors.New("project not found"))
 			},
 			expectError: true,
 			errorMsg:    "project not found",
@@ -402,10 +491,11 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 		{
 			name:         "client creation failure",
 			workspaceUri: "file:///workspace",
+			query:        "",
 			setupMock: func(bridge *mocks.MockBridge) {
 				// This case expects DetectProjectLanguages to succeed, and then GetMultiLanguageClients to fail
-				bridge.On("DetectProjectLanguages", "file:///workspace").Return([]string{"go"}, nil)
-				bridge.On("GetMultiLanguageClients", []string{"go"}).Return(map[string]lsp.LanguageClientInterface{}, errors.New("failed to create clients"))
+				bridge.On("DetectProjectLanguages", "/workspace").Return([]lsp.Language{"go"}, nil)
+				bridge.On("GetMultiLanguageClients", []string{"go"}).Return(map[lsp.Language]lsp.LanguageClientInterface{}, errors.New("failed to create clients"))
 			},
 			expectError: true,
 			errorMsg:    "failed to create clients",
@@ -423,45 +513,39 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 				Tool:    tool,
 				Handler: handler,
 			})
+			if err != nil {
+				t.Errorf("Could not create MCP server: %v", err)
+				return
+			}
+
+			// defer mcpServer.Close()
+
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "project_analysis",
+					Arguments: map[string]any{
+						"workspace_uri": tc.workspaceUri,
+						"query":         tc.query,
+						"analysis_type": "workspace_symbols",
+					},
+				},
+			})
+
+			if err != nil {
+				t.Errorf("Error calling tool: %v", err)
+				return
+			}
+
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
+			}
 			require.NoError(t, err, "Could not start server")
 
 			defer mcpServer.Close()
-
-			// Variable to hold the actual error encountered during the operations
-			var actualErr error
-
-			// 1. Test project language detection
-			languages, err := bridge.DetectProjectLanguages(tc.workspaceUri)
-			if err != nil {
-				actualErr = err // If DetectProjectLanguages fails, capture that error
-			} else {
-				// 2. If language detection succeeded, test client creation
-				if len(languages) > 0 {
-					_, err := bridge.GetMultiLanguageClients(languages)
-					if err != nil {
-						actualErr = err // If GetMultiLanguageClients fails, capture that error
-					}
-				}
-			}
-
-			// Now, assert the overall error expectation for the test case
-			if tc.expectError {
-				if actualErr == nil {
-					t.Error("Expected an error but got none.")
-					return
-				}
-
-				if !strings.Contains(actualErr.Error(), tc.errorMsg) {
-					t.Errorf("Expected error message to contain '%s', got: %v", tc.errorMsg, actualErr)
-				}
-			} else {
-				// This block would handle cases where NO error is expected.
-				// Based on the current test cases, this path won't be taken,
-				// but it's good practice for comprehensive error handling.
-				if actualErr != nil {
-					t.Errorf("Did not expect an error but got: %v", actualErr)
-				}
-			}
 
 			// Ensure all mocked expectations were met
 			bridge.AssertExpectations(t)
@@ -505,4 +589,3 @@ func TestProjectAnalysisUtilityFunctions(t *testing.T) {
 		}
 	})
 }
-

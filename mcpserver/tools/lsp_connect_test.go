@@ -1,108 +1,63 @@
 package tools
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
 
+	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 func TestLSPConnectTool(t *testing.T) {
 	testCases := []struct {
 		name        string
 		language    string
-		mockConfig  *lsp.LSPServerConfig
-		mockClient  any
+		mockConfig  lsp.LSPServerConfigProvider
+		mockClient  lsp.LanguageClientInterface
 		expectError bool
 		description string
 	}{
 		{
-			name:     "successful Go connection",
-			language: "go",
-			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
-					"go": {
-						Command:   "gopls",
-						Args:      []string{"serve"},
-						Filetypes: []string{".go"},
-					},
-					"python": {
-						Command:   "pyright-langserver",
-						Args:      []string{"--stdio"},
-						Filetypes: []string{".py"},
-					},
-				},
-			},
-			mockClient:  &lsp.LanguageClient{},
+			name:        "successful Go connection",
+			language:    "go",
+			mockConfig:  &mocks.MockLSPServerConfig{},
+			mockClient:  &mocks.MockLanguageClient{},
 			expectError: false,
 			description: "Should successfully connect to Go language server",
 		},
 		{
-			name:     "successful Python connection",
-			language: "python",
-			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
-					"go": {
-						Command:   "gopls",
-						Filetypes: []string{".go"},
-					},
-					"python": {
-						Command:   "pyright-langserver",
-						Args:      []string{"--stdio"},
-						Filetypes: []string{".py"},
-					},
-				},
-			},
-			mockClient:  &lsp.LanguageClient{},
+			name:        "successful Python connection",
+			language:    "python",
+			mockConfig:  &mocks.MockLSPServerConfig{},
+			mockClient:  &mocks.MockLanguageClient{},
 			expectError: false,
 			description: "Should successfully connect to Python language server",
 		},
 		{
-			name:     "successful TypeScript connection",
-			language: "typescript",
-			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
-					"typescript": {
-						Command:   "typescript-language-server",
-						Args:      []string{"--stdio"},
-						Filetypes: []string{".ts", ".tsx"},
-					},
-				},
-			},
-			mockClient:  &lsp.LanguageClient{},
+			name:        "successful TypeScript connection",
+			language:    "typescript",
+			mockConfig:  &mocks.MockLSPServerConfig{},
+			mockClient:  &mocks.MockLanguageClient{},
 			expectError: false,
 			description: "Should successfully connect to TypeScript language server",
 		},
 		{
-			name:     "successful Rust connection",
-			language: "rust",
-			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
-					"rust": {
-						Command:   "rust-analyzer",
-						Filetypes: []string{".rs"},
-					},
-				},
-			},
-			mockClient:  &lsp.LanguageClient{},
+			name:        "successful Rust connection",
+			language:    "rust",
+			mockConfig:  &mocks.MockLSPServerConfig{},
+			mockClient:  &mocks.MockLanguageClient{},
 			expectError: false,
 			description: "Should successfully connect to Rust language server",
 		},
 		{
-			name:     "language not configured",
-			language: "unsupported",
-			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
-					"go": {
-						Command:   "gopls",
-						Filetypes: []string{".go"},
-					},
-				},
-			},
+			name:        "language not configured",
+			language:    "unsupported",
+			mockConfig:  &mocks.MockLSPServerConfig{},
 			expectError: true,
 			description: "Should fail when language server is not configured",
 		},
@@ -114,27 +69,16 @@ func TestLSPConnectTool(t *testing.T) {
 			description: "Should fail when no configuration is available",
 		},
 		{
-			name:     "client creation failure",
-			language: "go",
-			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
-					"go": {
-						Command:   "gopls",
-						Filetypes: []string{".go"},
-					},
-				},
-			},
+			name:        "client creation failure",
+			language:    "go",
+			mockConfig:  &mocks.MockLSPServerConfig{},
 			expectError: true,
 			description: "Should handle client creation failures gracefully",
 		},
 		{
-			name:     "empty language string",
-			language: "",
-			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
-					"go": {Command: "gopls"},
-				},
-			},
+			name:        "empty language string",
+			language:    "",
+			mockConfig:  &mocks.MockLSPServerConfig{},
 			expectError: true,
 			description: "Should fail with empty language string",
 		},
@@ -144,71 +88,51 @@ func TestLSPConnectTool(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			// Set up mock expectations for GetConfig
-			bridge.On("GetConfig").Return(tc.mockConfig)
-
-			// Set up mock expectations for GetClientForLanguageInterface
-			if tc.mockClient != nil {
-				bridge.On("GetClientForLanguageInterface", tc.language).Return(tc.mockClient, nil)
-			} else if tc.expectError && tc.name == "client creation failure" {
-				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), fmt.Errorf("failed to create client for language: %s", tc.language))
-			} else if tc.expectError {
-				bridge.On("GetClientForLanguageInterface", tc.language).Return((*lsp.LanguageClientInterface)(nil), errors.New("client creation failed")).Maybe()
+			if tc.expectError {
+				bridge.On("GetClientForLanguage", tc.language).Return((lsp.LanguageClientInterface)(nil), fmt.Errorf("failed to create client for language: %s", tc.language))
+			} else {
+				bridge.On("GetClientForLanguage", tc.language).Return(tc.mockClient, nil)
 			}
 
 			// Create MCP server and register tool
-			mcpServer, err := mcptest.NewServer(t)
+			tool, handler := LSPConnectTool(bridge)
+			mcpServer, err := mcptest.NewServer(t, server.ServerTool{
+				Tool:    tool,
+				Handler: handler,
+			})
 			if err != nil {
 				t.Errorf("Could not create MCP server: %v", err)
-			}
-
-			RegisterLSPConnectTool(mcpServer, bridge)
-
-			// Test configuration retrieval
-			config := bridge.GetConfig()
-			if config == nil {
-				if !tc.expectError {
-					t.Error("Expected config but got nil")
-				}
-
 				return
 			}
 
-			// Test language server configuration existence
-			_, exists := config.LanguageServers[lsp.Language(tc.language)]
-			if !exists {
-				if !tc.expectError {
-					t.Errorf("Expected language server config for %s", tc.language)
-				}
+			// defer mcpServer.Close()
 
+			ctx := context.Background()
+			toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+				Request: mcp.Request{Method: "tools/call"},
+				Params: mcp.CallToolParams{
+					Name: "lsp_connect",
+					Arguments: map[string]any{
+						"language": tc.language,
+					},
+				},
+			})
+
+			if err != nil {
+				t.Errorf("Could not make request %v", err)
 				return
 			}
 
-			// Test client creation
-			client, err := bridge.GetClientForLanguageInterface(string(tc.language))
-			if tc.expectError {
-				if err == nil {
-					t.Error("Expected error but got none")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Unexpected error: %v", err)
-					return
-				}
-
-				if client == nil {
-					t.Error("Expected client but got nil")
-				}
+			if !toolResult.IsError && tc.expectError {
+				t.Error("Expected error but got none")
+			} else if toolResult.IsError && !tc.expectError {
+				t.Errorf("Unexpected error: %v", toolResult.Content)
 			}
 
-			t.Logf("Test completed: %s", tc.description)
-
-			// Verify all expectations were met
 			bridge.AssertExpectations(t)
 		})
 	}
 }
-
 func TestLSPConnectValidation(t *testing.T) {
 	t.Run("validate language server configuration", func(t *testing.T) {
 		config := &lsp.LSPServerConfig{

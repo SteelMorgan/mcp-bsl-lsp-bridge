@@ -66,6 +66,10 @@ type LanguageServerConfig struct {
 	InitializationOptions map[string]any `json:"initialization_options"`
 }
 
+type LanguageServerConfigProvider interface {
+
+}
+
 // LanguageClientInterface defines the methods required for a language client.
 // This interface abstracts the concrete LanguageClient type for better testability.
 type LanguageClientInterface interface {
@@ -148,14 +152,30 @@ type ClientMetrics struct {
 
 // LSPServerConfig represents the complete configuration for language servers
 type LSPServerConfig struct {
-	LanguageServers map[Language]LanguageServerConfig `json:"language_servers"`
-	Global          struct {
-		LogPath            string `json:"log_file_path"`
-		LogLevel           string `json:"log_level"`
-		MaxLogFiles        int    `json:"max_log_files"`
-		MaxRestartAttempts int    `json:"max_restart_attempts"`
-		RestartDelayMs     int    `json:"restart_delay_ms"`
-	} `json:"global"`
-	LanguageExtensionMap map[Language][]string `json:"language_extension_map"`
-	ExtensionLanguageMap map[string]Language   `json:"extension_language_map"`
+	LanguageServers      map[Language]LanguageServerConfig `json:"language_servers"`
+	Global               GlobalConfig                      `json:"global"`
+	LanguageExtensionMap map[Language][]string             `json:"language_extension_map"`
+	ExtensionLanguageMap map[string]Language               `json:"extension_language_map"`
+}
+
+type GlobalConfig struct {
+	LogPath            string `json:"log_file_path"`
+	LogLevel           string `json:"log_level"`
+	MaxLogFiles        int    `json:"max_log_files"`
+	MaxRestartAttempts int    `json:"max_restart_attempts"`
+	RestartDelayMs     int    `json:"restart_delay_ms"`
+}
+
+type LSPServerConfigProvider interface {
+	FindServerConfig(language string) (*LanguageServerConfig, error)
+	GetGlobalConfig() GlobalConfig
+	GetLanguageServers() map[Language]LanguageServerConfig
+
+	LanguageDetector
+}
+
+type LanguageDetector interface {
+	FindExtLanguage(ext string) (*Language, error)
+	DetectProjectLanguages(projectPath string) ([]Language, error)
+	DetectPrimaryProjectLanguage(projectPath string) (*Language, error)
 }

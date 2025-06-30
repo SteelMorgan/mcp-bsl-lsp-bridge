@@ -44,7 +44,7 @@ func TestNewMCPLSPBridge(t *testing.T) {
 		t.Fatal("Bridge configuration not loaded")
 	}
 
-	if len(config.LanguageServers) == 0 {
+	if len(config.GetLanguageServers()) == 0 {
 		t.Fatal("No language servers configured")
 	}
 }
@@ -81,8 +81,8 @@ func TestInferLanguage(t *testing.T) {
 				return
 			}
 
-			if language != tc.expected {
-				t.Errorf("Expected language %s, got %s", tc.expected, language)
+			if *language != tc.expected {
+				t.Errorf("Expected language %s, got %s", tc.expected, *language)
 			}
 		})
 	}

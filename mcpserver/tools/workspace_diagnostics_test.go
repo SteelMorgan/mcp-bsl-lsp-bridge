@@ -86,7 +86,7 @@ func TestWorkspaceDiagnosticsTool(t *testing.T) {
 func TestFormatWorkspaceDiagnostics(t *testing.T) {
 	testCases := []struct {
 		name     string
-		input    []*protocol.WorkspaceDiagnosticReport
+		input    []protocol.WorkspaceDiagnosticReport
 		expected []string // Expected strings to be present in output
 	}{
 		{
@@ -96,12 +96,12 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 		},
 		{
 			name:     "empty diagnostics",
-			input:    []*protocol.WorkspaceDiagnosticReport{},
+			input:    []protocol.WorkspaceDiagnosticReport{},
 			expected: []string{"No workspace diagnostics found"},
 		},
 		{
 			name: "workspace report with diagnostics",
-			input: []*protocol.WorkspaceDiagnosticReport{
+			input: []protocol.WorkspaceDiagnosticReport{
 				{
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						// Simplified test case - union type handling will be implemented later
@@ -116,7 +116,7 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 		},
 		{
 			name: "workspace report with no issues",
-			input: []*protocol.WorkspaceDiagnosticReport{
+			input: []protocol.WorkspaceDiagnosticReport{
 				{
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{},
 				},

@@ -10,6 +10,6 @@ import (
 type MCPLSPBridge struct {
 	server  *server.MCPServer
 	clients map[lsp.Language]lsp.LanguageClientInterface
-	config  *lsp.LSPServerConfig
+	config  lsp.LSPServerConfigProvider
 	allowedDirectories []string
 }
