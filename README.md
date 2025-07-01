@@ -6,29 +6,39 @@ A Go-based bridge that combines MCP (Model Context Protocol) server capabilities
 
 **NOTE**: Currently working to build up functionality and laying down the groundwork for the interface. Consider that many things may change as we work into making it more streamlined.
 
-## Features
+## What the MCP LSP Bridge Unlocks for You
 
-### Core Capabilities
+The MCP LSP Bridge empowers MCP-compatible agents (like LLMs) with powerful Language Server Protocol (LSP) capabilities, transforming how they interact with and understand code. It acts as an intelligent intermediary, providing a wide range of code analysis, navigation, and modification tools across many programming languages.
 
-- **Cross-platform directory management** following system conventions
-- **Smart configuration loading** with multiple fallback locations
-- **XDG Base Directory Specification** compliance on Unix systems
-- **Root user support** with appropriate system directories
-- **Comprehensive LSP server support** for 20+ programming languages
+### Key Functionality
 
-### Advanced LSP Tools ✨ **ACTIONABLE FUNCTIONALITY** (Latest!)
+1.  **Intelligent Code Understanding & Navigation**:
+    *   **Get Contextual Information**: Easily retrieve documentation, type definitions, and function signatures for any code element.
+    *   **Identify Issues**: Receive real-time diagnostics (errors, warnings, hints) to understand code health.
+    *   **Explore Code Structure**: Outline symbols within a file or search for symbols across your entire project.
+    *   **Trace Code Flow**: Discover where symbols are defined, where they are used, and analyze function call hierarchies.
 
-- **Code Intelligence**: Hover documentation, signature help, diagnostics
-- **Code Actions**: Quick fixes, refactoring suggestions, and code improvements
-- **🎯 ACTIONABLE Code Formatting**: Document formatting with preview/apply modes - actually modifies files!
-- **🎯 ACTIONABLE Symbol Renaming**: Cross-file symbol renaming with preview/apply modes - safely renames across entire codebase!
-- **Advanced Navigation**: Implementation finding, call hierarchy analysis
-- **Multi-Language Support**: Works across Go, Python, TypeScript, Rust, and more
+2.  **Automated Code Improvement & Refactoring**:
+    *   **Apply Quick Fixes & Suggestions**: Get context-aware code actions, including automatic fixes for errors, import organization, and refactoring suggestions.
+    *   **Format Code**: Standardize code style across files based on language conventions.
+    *   **Safely Rename Symbols**: Rename variables, functions, classes, and other symbols consistently across your entire codebase.
 
-**New Dual-Mode Operations:**
-- **Preview Mode** (`apply='false'`): Shows what changes would be made without modifying files
-- **Apply Mode** (`apply='true'`): Actually applies changes to your codebase
-- **Safety First**: Always preview before applying for safe code modifications
+3.  **Project-Wide Analysis**:
+    *   **Language Detection**: Automatically identify the programming languages used in your project.
+    *   **Content Search**: Search for specific text patterns across your entire workspace.
+
+### Crucial Safety Features for Code Modifications (Preview & Apply)
+
+For tools that modify your code (like formatting or renaming), the bridge provides a critical safety mechanism:
+
+*   **Preview Mode**: Always run actions in preview mode first. This shows you exactly *what changes will be made* across all affected files without actually modifying them.
+*   **Apply Mode**: Once you've reviewed and approved the preview, you can then command the bridge to *apply* the changes to your codebase.
+
+This dual-mode operation ensures you have full control and visibility over automated code modifications, preventing unintended changes.
+
+### Multi-Language Support
+
+The bridge is designed to work with over 20 programming languages (e.g., Go, Python, TypeScript, Rust, Java, C#, C++, etc.), automatically detecting file types and connecting to the appropriate language servers.
 
 ## Usage
 
@@ -114,25 +124,25 @@ The bridge exposes the following MCP tools for Claude Code integration:
 - **`mcp__lsp__analyze_code`**: Analyze code for completion suggestions and insights
 - **`mcp__lsp__infer_language`**: Detect programming language from file path
 - **`mcp__lsp__detect_project_languages`**: Detect all languages in a project
+- **`mcp__lsp__get_range_content`**: Get text content from a specified file range.
 
 ### LSP Connection Management
 
 - **`mcp__lsp__lsp_connect`**: Connect to appropriate language server for a file
 - **`mcp__lsp__lsp_disconnect`**: Disconnect all active language servers
 
-### Code Intelligence Tools ✨ New!
+### Code Intelligence Tools
 
 - **`mcp__lsp__hover`**: Get symbol documentation and type information
 - **`mcp__lsp__signature_help`**: Get function parameter assistance
-- **`mcp__lsp__diagnostics`**: Get error and warning diagnostics
+- **`mcp__lsp__workspace_diagnostics`**: Get comprehensive diagnostics (errors, warnings) for the entire workspace.
+- **`mcp__lsp__semantic_tokens`**: Get semantic tokens (e.g., function, variable types) for a specific range of a file.
 
-### Code Improvement Tools ✨ New!
-
+### Code Improvement Tools 
 - **`mcp__lsp__code_actions`**: Get quick fixes and refactoring suggestions
 - **`mcp__lsp__format_document`**: Format code with customizable options
 
-### Advanced Navigation Tools ✨ New!
-
+### Advanced Navigation Tools 
 - **`mcp__lsp__rename`**: Rename symbols with optional preview
 - **`mcp__lsp__implementation`**: Find symbol implementations
 - **`mcp__lsp__call_hierarchy`**: Prepare call hierarchy analysis
@@ -144,6 +154,8 @@ The bridge exposes the following MCP tools for Claude Code integration:
   - Reference finding
   - Definition location
   - Text-based search
+- **`mcp__lsp__workspace_diagnostics`**: Get comprehensive diagnostics for the entire workspace.
+
 
 ## Configuration
 
@@ -224,21 +236,3 @@ USER user
 CMD ["mcp-lsp-bridge"]
 ```
 
-### Programmatic Configuration
-
-You can also configure logging programmatically:
-
-```go
-logConfig := logger.LoggerConfig{
-    LogPath:     "/path/to/logfile.log",
-    LogLevel:    "debug",
-    MaxLogFiles: 3,
-}
-logger.InitLogger(logConfig)
-```
-
-### Logging Methods
-
-- `logger.Info()`: Log informational messages
-- `logger.Debug()`: Log debug messages (only when log level is "debug")
-- `logger.Error()`: Log error messages
