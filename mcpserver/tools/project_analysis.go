@@ -25,10 +25,10 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			"project_analysis",
 			mcp.WithDescription("Multi-purpose code analysis. 'definitions': Precise symbol location (URI, line, char); use this output for 'hover', 'signature_help', 'rename', or 'get_range_content'. 'references': All symbol usages. 'workspace_symbols': Project-wide symbol search. 'document_symbols': File symbol outline. 'text_search': Workspace content search."),
 			mcp.WithString("workspace_uri", mcp.Description("URI to project root (e.g., 'file:///home/user/my_project').")),
-			mcp.WithString("query", mcp.Description("Symbol name (definitions/references/workspace_symbols), file URI (document_symbols), or text pattern (text_search).")),
-			mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search).")),
-			mcp.WithNumber("offset", mcp.Description("Result offset (default: 0).")),
-			mcp.WithNumber("limit", mcp.Description("Max results (default: 20, max: 100).")),
+			mcp.WithString("query", mcp.Description("Symbol name (definitions/references/workspace_symbols), file URI (document_symbols), or text pattern (text_search)."), mcp.Required()),
+			mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search)."), mcp.Required()),
+			mcp.WithNumber("offset", mcp.Description("Result offset (default: 0)."), mcp.DefaultNumber(0), mcp.Min(0)),
+			mcp.WithNumber("limit", mcp.Description("Max results (default: 20, max: 100)."), mcp.Min(0), mcp.Max(100), mcp.DefaultNumber(20)),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			workspaceUri := request.GetString("workspace_uri", "")
 
@@ -42,19 +42,8 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			// Parse pagination parameters with defaults
-			offset := 0
-			if offsetVal, err := request.RequireInt("offset"); err == nil {
-				offset = offsetVal
-			}
-
-			limit := 20
-
-			if limitVal, err := request.RequireInt("limit"); err == nil {
-				if limitVal > 0 && limitVal <= 100 {
-					limit = limitVal
-				}
-			}
+			offset := request.GetInt("offset", 0)
+			limit := request.GetInt("limit", 20)
 
 			if workspaceUri == "" {
 				dirs := bridge.AllowedDirectories()

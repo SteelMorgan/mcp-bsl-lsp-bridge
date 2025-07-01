@@ -14,9 +14,9 @@ import (
 func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("hover",
 			mcp.WithDescription("Get detailed symbol information (signatures, documentation, types)."),
-			mcp.WithString("uri", mcp.Description("URI to the file")),
-			mcp.WithNumber("line", mcp.Description("Line number (0-based)")),
-			mcp.WithNumber("character", mcp.Description("Character position (0-based)")),
+			mcp.WithString("uri", mcp.Description("URI to the file"), mcp.Required()),
+			mcp.WithNumber("line", mcp.Description("Line number (0-based)"), mcp.Required(), mcp.Min(0)),
+			mcp.WithNumber("character", mcp.Description("Character position (0-based)"), mcp.Required(), mcp.Min(0)),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			// Parse and validate parameters
 			uri, err := request.RequireString("uri")
