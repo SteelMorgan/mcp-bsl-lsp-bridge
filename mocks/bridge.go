@@ -50,6 +50,11 @@ func (m *MockBridge) IsAllowedDirectory(path string) (string, error) {
 	return args.Get(0).(string), args.Error(1)
 }
 
+func (m *MockBridge) AllowedDirectories() []string {
+	args := m.Called()
+	return args.Get(0).([]string)
+}
+
 func (m *MockBridge) CloseAllClients() {
 	m.Called()
 }

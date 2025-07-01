@@ -64,6 +64,10 @@ func (b *MCPLSPBridge) IsAllowedDirectory(path string) (string, error) {
 	return absPath, nil
 }
 
+func (b *MCPLSPBridge) AllowedDirectories() []string {
+	return b.allowedDirectories
+}
+
 // validateAndConnectClient attempts to validate and establish a language server connection using the injected factory
 func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *lsp.LanguageServerConfig, config ConnectionAttemptConfig) (lsp.LanguageClientInterface, error) {
 	// Attempt connection with retry mechanism
@@ -72,10 +76,12 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 	startTime := time.Now()
 
 	// Get current working directory
-	dir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current directory: %w", err)
-	}
+	// dir, err := os.Getwd()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get current directory: %w", err)
+	// }
+	dirs := b.AllowedDirectories()
+	dir := dirs[0] // Get first directory (for now)
 
 	absPath, err := b.IsAllowedDirectory(dir)
 	if err != nil {

@@ -91,7 +91,7 @@ class MCPToolRunner:
         if params_str:
             # Updated regex to handle URLs and complex values
             # This pattern matches quoted strings (single or double) OR unquoted values up to comma/end
-            param_regex = r'(\w+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\s)]+))'
+            param_regex = r'(\w+)\s*[=|:]\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\s)]+))'
             param_matches = re.findall(param_regex, params_str)
             if not param_matches and params_str.strip():
                  logger.warning(f"Could not parse any parameters from: '{params_str}' for command: {command_str}")

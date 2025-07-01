@@ -23,17 +23,14 @@ func RegisterProjectAnalysisTool(mcpServer ToolServer, bridge interfaces.BridgeI
 func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool(
 			"project_analysis",
-			mcp.WithDescription("Multi-purpose code analysis tool. Use 'definitions' for precise symbol targeting, 'references' for usage locations, 'workspace_symbols' for symbol discovery, 'document_symbols' for file exploration, 'text_search' for content search."),
-			mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
-			mcp.WithString("query", mcp.Description("Symbol name (for definitions/references/workspace_symbols) or file path (for document_symbols) or text pattern (for text_search)")),
-			mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search)")),
-			mcp.WithNumber("offset", mcp.Description("Result offset for pagination (default: 0)")),
-			mcp.WithNumber("limit", mcp.Description("Maximum number of results to return (default: 20, max: 100)")),
+			mcp.WithDescription("Multi-purpose code analysis. 'definitions': Precise symbol location (URI, line, char); use this output for 'hover', 'signature_help', 'rename', or 'get_range_content'. 'references': All symbol usages. 'workspace_symbols': Project-wide symbol search. 'document_symbols': File symbol outline. 'text_search': Workspace content search."),
+			mcp.WithString("workspace_uri", mcp.Description("URI to project root (e.g., 'file:///home/user/my_project').")),
+			mcp.WithString("query", mcp.Description("Symbol name (definitions/references/workspace_symbols), file URI (document_symbols), or text pattern (text_search).")),
+			mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search).")),
+			mcp.WithNumber("offset", mcp.Description("Result offset (default: 0).")),
+			mcp.WithNumber("limit", mcp.Description("Max results (default: 20, max: 100).")),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			workspaceUri, err := request.RequireString("workspace_uri")
-			if err != nil {
-				return mcp.NewToolResultError(err.Error()), nil
-			}
+			workspaceUri := request.GetString("workspace_uri", "")
 
 			query, err := request.RequireString("query")
 			if err != nil {
@@ -57,6 +54,11 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 				if limitVal > 0 && limitVal <= 100 {
 					limit = limitVal
 				}
+			}
+
+			if workspaceUri == "" {
+				dirs := bridge.AllowedDirectories()
+				workspaceUri = dirs[0] // Get the first allow dir
 			}
 
 			// Convert URI to local file path

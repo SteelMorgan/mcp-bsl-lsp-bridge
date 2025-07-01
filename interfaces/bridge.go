@@ -57,6 +57,7 @@ type SymbolNavigator interface {
 
 type DirectoryManager interface {
 	IsAllowedDirectory(path string) (string, error)
+	AllowedDirectories() []string
 }
 
 type ClientManager interface {

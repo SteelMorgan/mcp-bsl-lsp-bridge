@@ -14,14 +14,15 @@ import (
 )
 
 // GetRangeContentTool defines the lsp__get_range_content tool.
-func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
+func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("get_range_content",
-			mcp.WithDescription("Get the text content within a specified file range."),
-			mcp.WithString("uri", mcp.Description("URI to the file (file:// scheme required).")),
-			mcp.WithNumber("start_line", mcp.Description("Start line number (0-based).")),
-			mcp.WithNumber("start_character", mcp.Description("Start character position (0-based).")),
-			mcp.WithNumber("end_line", mcp.Description("End line number (0-based).")),
-			mcp.WithNumber("end_character", mcp.Description("End character position (0-based).")),
+			mcp.WithDescription("Get text content from file range. Efficient for specific code blocks. Range parameters (uri, start/end line/char) should be precise, typically from 'lsp__project_analysis' ('definitions' or 'document_symbols' modes). Use 'strict' parameter to control bounds checking behavior."),
+			mcp.WithString("uri", mcp.Description("URI to file (file:// scheme required).")),
+			mcp.WithNumber("start_line", mcp.Description("Start line (0-based).")),
+			mcp.WithNumber("start_character", mcp.Description("Start character (0-based).")),
+			mcp.WithNumber("end_line", mcp.Description("End line (0-based).")),
+			mcp.WithNumber("end_character", mcp.Description("End character (0-based).")),
+			mcp.WithBoolean("strict", mcp.Description("Strict bounds checking. If true, fails on any out-of-bounds characters. If false (default), clamps character positions to line boundaries.")),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			logger.Info("GetRangeContent Tool: Received request")
 
@@ -64,7 +65,10 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 
 			endCharacter := uint32(endCharInt)
 
-			logger.Info(fmt.Sprintf("GetRangeContent Tool: Parsed URI: %s, Range: %d:%d - %d:%d", uri, startLine, startCharacter, endLine, endCharacter))
+			// Parse strict parameter (defaults to false)
+			strict := request.GetBool("strict", false)
+
+			logger.Info(fmt.Sprintf("GetRangeContent Tool: Parsed URI: %s, Range: %d:%d - %d:%d, Strict: %t", uri, startLine, startCharacter, endLine, endCharacter, strict))
 
 			filePath := normalizeURI(uri)
 			filePath = strings.TrimPrefix(filePath, "file://")
@@ -84,11 +88,30 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			// Split content into lines. Use "\n" directly in the string
 			lines := strings.Split(string(content), "\n")
 
-			// Validate line and character ranges
-			if startLine > endLine || (startLine == endLine && startCharacter > endCharacter) ||
-				startLine >= uint32(len(lines)) || endLine >= uint32(len(lines)) {
-				logger.Error("get_range_content: Range out of file bounds or invalid", fmt.Errorf("invalid range %d:%d - %d:%d", startLine, startCharacter, endLine, endCharacter))
-				return mcp.NewToolResultError(fmt.Sprintf("Range out of file bounds or invalid: %d:%d - %d:%d", startLine, startCharacter, endLine, endCharacter)), nil
+			// Validate basic line range - these should be hard errors
+			if startLine >= uint32(len(lines)) || endLine >= uint32(len(lines)) {
+				logger.Error("get_range_content: Line range out of file bounds", fmt.Errorf("line range %d-%d out of bounds (file has %d lines)", startLine, endLine, len(lines)))
+				return mcp.NewToolResultError(fmt.Sprintf("Line range %d-%d out of bounds (file has %d lines)", startLine, endLine, len(lines))), nil
+			}
+
+			// Validate logical range order
+			if startLine > endLine || (startLine == endLine && startCharacter > endCharacter) {
+				logger.Error("get_range_content: Invalid range order", fmt.Errorf("invalid range order %d:%d - %d:%d", startLine, startCharacter, endLine, endCharacter))
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid range order: %d:%d - %d:%d", startLine, startCharacter, endLine, endCharacter)), nil
+			}
+
+			// Helper function to handle character bounds based on strictness
+			handleCharacterBounds := func(line string, pos uint32, lineNum uint32, posType string) (uint32, error) {
+				lineLen := uint32(len(line))
+				if pos > lineLen {
+					if strict {
+						return 0, fmt.Errorf("invalid %s character on line %d: %d (line length: %d)", posType, lineNum, pos, lineLen)
+					}
+					logger.Info(fmt.Sprintf("get_range_content: Adjusted %s character on line %d from %d to %d (line end)",
+						posType, lineNum, pos, lineLen))
+					return lineLen, nil
+				}
+				return pos, nil
 			}
 
 			// Extract content based on line and character indices
@@ -97,25 +120,48 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 			if startLine == endLine {
 				// Single line range
 				line := lines[startLine]
-				// Added startCharacter > endCharacter check for completeness
-				if startCharacter > uint32(len(line)) || endCharacter > uint32(len(line)) || startCharacter > endCharacter {
-					// Corrected logger.Error format string and arguments
-					logger.Error("get_range_content: Invalid character range on single line", fmt.Errorf("invalid character range on line %d: %d to %d", startLine, startCharacter, endCharacter))
-					// Corrected mcp.NewToolResultError format string and arguments
-					return mcp.NewToolResultError(fmt.Sprintf("Invalid character range on line %d: %d to %d", startLine, startCharacter, endCharacter)), nil
+
+				// Handle character bounds based on strictness
+				adjustedStartChar, err := handleCharacterBounds(line, startCharacter, startLine, "start")
+				if err != nil {
+					logger.Error("get_range_content: Invalid start character on single line", err)
+					return mcp.NewToolResultError(err.Error()), nil
 				}
 
-				resultLines = append(resultLines, line[startCharacter:endCharacter])
+				adjustedEndChar, err := handleCharacterBounds(line, endCharacter, startLine, "end")
+				if err != nil {
+					logger.Error("get_range_content: Invalid end character on single line", err)
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+
+				// Additional check for character order on same line
+				if adjustedStartChar > adjustedEndChar {
+					err := fmt.Errorf("invalid character range on line %d: start %d > end %d", startLine, adjustedStartChar, adjustedEndChar)
+					logger.Error("get_range_content: Invalid character order on single line", err)
+					return mcp.NewToolResultError(err.Error()), nil
+				}
+
+				// Handle edge case where start character is at end of line
+				if adjustedStartChar >= uint32(len(line)) {
+					resultLines = append(resultLines, "")
+				} else {
+					resultLines = append(resultLines, line[adjustedStartChar:adjustedEndChar])
+				}
 			} else {
 				// Multi-line range
 				// First line (from start_character to end of line)
 				firstLine := lines[startLine]
-				if startCharacter > uint32(len(firstLine)) {
-					logger.Error("get_range_content: Invalid start character on first line", fmt.Errorf("invalid start character on line %d: %d", startLine, startCharacter))
-					return mcp.NewToolResultError(fmt.Sprintf("Invalid start character on line %d: %d", startLine, startCharacter)), nil
+				adjustedStartChar, err := handleCharacterBounds(firstLine, startCharacter, startLine, "start")
+				if err != nil {
+					logger.Error("get_range_content: Invalid start character on first line", err)
+					return mcp.NewToolResultError(err.Error()), nil
 				}
 
-				resultLines = append(resultLines, firstLine[startCharacter:])
+				if adjustedStartChar >= uint32(len(firstLine)) {
+					resultLines = append(resultLines, "")
+				} else {
+					resultLines = append(resultLines, firstLine[adjustedStartChar:])
+				}
 
 				// Middle lines (full lines)
 				for i := startLine + 1; i < endLine; i++ {
@@ -130,12 +176,13 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 
 				// Last line (from start of line to end_character)
 				lastLine := lines[endLine]
-				if endCharacter > uint32(len(lastLine)) {
-					logger.Error("get_range_content: Invalid end character on last line", fmt.Errorf("invalid end character on line %d: %d", endLine, endCharacter))
-					return mcp.NewToolResultError(fmt.Sprintf("Invalid end character on line %d: %d", endLine, endCharacter)), nil
+				adjustedEndChar, err := handleCharacterBounds(lastLine, endCharacter-1, endLine, "end")
+				if err != nil {
+					logger.Error("get_range_content: Invalid end character on last line", err)
+					return mcp.NewToolResultError(err.Error()), nil
 				}
 
-				resultLines = append(resultLines, lastLine[:endCharacter])
+				resultLines = append(resultLines, lastLine[:adjustedEndChar])
 			}
 
 			// Join the extracted lines back into a single string
@@ -147,5 +194,5 @@ func GetRangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 
 // RegisterRangeTools registers the range-based tools with the MCP server.
 func RegisterRangeTools(mcpServer ToolServer, bridge interfaces.BridgeInterface) {
-	mcpServer.AddTool(GetRangeContentTool(bridge))
+	mcpServer.AddTool(RangeContentTool(bridge))
 }
