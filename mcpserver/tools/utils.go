@@ -78,13 +78,11 @@ func symbolKindToString(kind protocol.SymbolKind) string {
 func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]) string {
 	switch v := contents.Value.(type) {
 	case protocol.MarkupContent:
-		return "=== HOVER INFORMATION ===\n" + v.Value
+		return v.Value
 	case string:
-		return "=== HOVER INFORMATION ===\n" + v
+		return v
 	case []any:
 		var result strings.Builder
-
-		result.WriteString("=== HOVER INFORMATION ===\n")
 
 		for i, item := range v {
 			if i > 0 {
@@ -102,27 +100,13 @@ func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.M
 
 		return result.String()
 	default:
-		return fmt.Sprintf("=== HOVER INFORMATION ===\nContent: %v", contents)
+		return fmt.Sprintf("%v", contents)
 	}
-}
-
-// Helper function to format signature help
-func formatSignatureHelp(sigHelp protocol.SignatureHelpResponse) string {
-	var result strings.Builder
-
-	result.WriteString("=== SIGNATURE HELP ===\n")
-
-	// For now, just return a basic representation until we can inspect the actual structure
-	result.WriteString(fmt.Sprintf("Signature help data: %+v", sigHelp))
-
-	return result.String()
 }
 
 // Helper function to format diagnostics
 func formatDiagnostics(diagnostics []any) string {
 	var result strings.Builder
-
-	result.WriteString("=== DIAGNOSTICS ===\n")
 
 	if len(diagnostics) == 0 {
 		result.WriteString("No diagnostics found")
@@ -171,8 +155,6 @@ func formatDiagnostics(diagnostics []any) string {
 // Helper function to format code actions
 func formatCodeActions(actions []protocol.CodeAction) string {
 	var result strings.Builder
-
-	result.WriteString("=== CODE ACTIONS ===\n")
 
 	if len(actions) == 0 {
 		result.WriteString("No code actions available")
@@ -262,7 +244,6 @@ func formatTextEdits(edits []protocol.TextEdit) string {
 	}
 
 	// Summary for agents
-	result.WriteString("\n=== FORMATTING SUMMARY ===\n")
 	result.WriteString(fmt.Sprintf("Total edits: %d\n", len(edits)))
 	result.WriteString(fmt.Sprintf("Whitespace/formatting edits: %d\n", whitespaceEdits))
 	result.WriteString(fmt.Sprintf("Content edits: %d\n", contentEdits))
@@ -282,8 +263,6 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 	}
 
 	var result strings.Builder
-
-	result.WriteString("=== RENAME PREVIEW ===\n")
 
 	totalFiles := 0
 	totalEdits := 0
@@ -405,7 +384,6 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 	if totalFiles == 0 {
 		result.WriteString("No rename changes found")
 	} else {
-		result.WriteString("\n=== RENAME SUMMARY ===\n")
 		result.WriteString(fmt.Sprintf("Files to be modified: %d\n", totalFiles))
 		result.WriteString(fmt.Sprintf("Total edits: %d\n", totalEdits))
 	}
@@ -416,8 +394,6 @@ func formatWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit) string {
 // Helper function to format implementations
 func formatImplementations(implementations []protocol.Location) string {
 	var result strings.Builder
-
-	result.WriteString("=== IMPLEMENTATIONS ===\n")
 
 	if len(implementations) == 0 {
 		result.WriteString("No implementations found")
@@ -448,8 +424,6 @@ func formatWorkspaceDiagnostics(diagnostics []protocol.WorkspaceDiagnosticReport
 	}
 
 	var result strings.Builder
-
-	result.WriteString("=== Workspace Diagnostics ===\n\n")
 
 	totalIssues := 0
 	errorCount := 0

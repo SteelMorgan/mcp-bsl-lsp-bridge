@@ -109,7 +109,6 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 				},
 			},
 			expected: []string{
-				"=== Workspace Diagnostics ===",
 				"Language Server 1 Results:",
 				"✅ No issues found in workspace",
 			},
@@ -122,7 +121,6 @@ func TestFormatWorkspaceDiagnostics(t *testing.T) {
 				},
 			},
 			expected: []string{
-				"=== Workspace Diagnostics ===",
 				"✅ No issues found in workspace",
 			},
 		},

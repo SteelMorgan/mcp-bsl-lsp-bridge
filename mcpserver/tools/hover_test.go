@@ -153,15 +153,15 @@ func TestFormatHoverContent(t *testing.T) {
 		{
 			name:     "string content",
 			input:    protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{Value: protocol.MarkedString{Value: "Simple hover text"}},
-			expected: "=== HOVER INFORMATION ===\nSimple hover text",
+			expected: "Simple hover text",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := formatHoverContent(tc.input)
-			if !strings.Contains(result, "HOVER INFORMATION") {
-				t.Errorf("Expected result to contain 'HOVER INFORMATION', got: %s", result)
+			if !strings.Contains(result, "Simple hover text") {
+				t.Errorf("Expected result to contain 'Simple hover text', got: %s", result)
 			}
 		})
 	}

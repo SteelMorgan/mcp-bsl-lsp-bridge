@@ -34,10 +34,6 @@ func TestFormatDocumentActionable(t *testing.T) {
 	if !strings.Contains(result, "Remove whitespace/formatting") {
 		t.Errorf("Expected action description, got: %s", result)
 	}
-
-	if !strings.Contains(result, "FORMATTING SUMMARY") {
-		t.Errorf("Expected summary section, got: %s", result)
-	}
 }
 
 func TestRenameSymbolActionable(t *testing.T) {
@@ -69,10 +65,6 @@ func TestRenameSymbolActionable(t *testing.T) {
 
 	result := formatWorkspaceEdit(&mockWorkspaceEdit)
 	
-	if !strings.Contains(result, "RENAME PREVIEW") {
-		t.Errorf("Expected rename preview header, got: %s", result)
-	}
-
 	if !strings.Contains(result, "Files to be modified: 2") {
 		t.Errorf("Expected file count in output, got: %s", result)
 	}
@@ -119,10 +111,6 @@ func TestFormatWorkspaceEditOutput(t *testing.T) {
 	result = formatWorkspaceEdit(&mockWorkspaceEdit)
 	
 	// Check for expected content
-	if !strings.Contains(result, "RENAME PREVIEW") {
-		t.Errorf("Expected 'RENAME PREVIEW' in output, got: %s", result)
-	}
-
 	if !strings.Contains(result, "File: test.go") {
 		t.Errorf("Expected filename in output, got: %s", result)
 	}

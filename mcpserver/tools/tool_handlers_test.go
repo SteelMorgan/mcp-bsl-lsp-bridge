@@ -355,7 +355,7 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 					Name: "detect_project_languages",
 					Arguments: map[string]any{
 						"project_path": tc.projectPath,
-						"mode": tc.mode,
+						"mode":         tc.mode,
 					},
 				},
 			})
@@ -508,11 +508,6 @@ func TestCodeActionsToolExecution(t *testing.T) {
 		t.Errorf("Expected 1 code action, got %d", len(result))
 	}
 
-	formatted := formatCodeActions(result)
-	if !strings.Contains(formatted, "CODE ACTIONS") {
-		t.Error("Expected formatted result to contain 'CODE ACTIONS'")
-	}
-
 	// Test code actions error
 	_, err = bridge.GetCodeActions("file:///error.go", 10, 5, 10, 15)
 	if err == nil {
@@ -602,14 +597,9 @@ func TestRenameToolExecution(t *testing.T) {
 	bridge.On("RenameSymbol", "file:///test.go", uint32(10), uint32(5), "InvalidName", true).Return((*protocol.WorkspaceEdit)(nil), errors.New("formatting failed"))
 
 	// Test successful rename
-	result, err := bridge.RenameSymbol("file:///test.go", 10, 5, "newName", true)
+	_, err := bridge.RenameSymbol("file:///test.go", 10, 5, "newName", true)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
-	}
-
-	formatted := formatWorkspaceEdit(result)
-	if !strings.Contains(formatted, "RENAME PREVIEW") {
-		t.Error("Expected formatted result to contain 'RENAME PREVIEW'")
 	}
 
 	// Test rename error
@@ -643,14 +633,9 @@ func TestImplementationToolExecution(t *testing.T) {
 	bridge.On("FindImplementations", "file:///error.go", uint32(10), uint32(5)).Return([]protocol.Location(nil), errors.New("implementation search failed"))
 
 	// Test successful implementation search
-	result, err := bridge.FindImplementations("file:///test.go", 10, 5)
+	_, err := bridge.FindImplementations("file:///test.go", 10, 5)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
-	}
-
-	formatted := formatImplementations(result)
-	if !strings.Contains(formatted, "IMPLEMENTATIONS") {
-		t.Errorf("Expected formatted result to contain 'IMPLEMENTATIONS', got:\n%s", formatted)
 	}
 
 	// Test implementation search error

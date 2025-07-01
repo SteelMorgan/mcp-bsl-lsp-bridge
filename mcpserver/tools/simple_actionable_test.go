@@ -30,11 +30,6 @@ func TestFormatTextEdits(t *testing.T) {
 
 	result := formatTextEdits(edits)
 
-	// Check for expected headers
-	if !strings.Contains(result, "=== DOCUMENT FORMATTING ===") {
-		t.Errorf("Expected formatting header, got: %s", result)
-	}
-
 	// Check for line numbers (should be 1-based)
 	if !strings.Contains(result, "Line 3") { // 2+1=3
 		t.Errorf("Expected line 3 in output, got: %s", result)
@@ -51,11 +46,6 @@ func TestFormatTextEdits(t *testing.T) {
 
 	if !strings.Contains(result, "Replace with: \"formatted\"") {
 		t.Errorf("Expected replace action description, got: %s", result)
-	}
-
-	// Check for summary
-	if !strings.Contains(result, "=== FORMATTING SUMMARY ===") {
-		t.Errorf("Expected summary section, got: %s", result)
 	}
 
 	if !strings.Contains(result, "Total edits: 2") {
@@ -96,11 +86,6 @@ func TestFormatWorkspaceEditSimple(t *testing.T) {
 	}
 
 	result = formatWorkspaceEdit(&mockWorkspaceEdit)
-
-	// Check for expected content
-	if !strings.Contains(result, "=== RENAME PREVIEW ===") {
-		t.Errorf("Expected rename preview header, got: %s", result)
-	}
 
 	if !strings.Contains(result, "File: test.go") {
 		t.Errorf("Expected filename in output, got: %s", result)

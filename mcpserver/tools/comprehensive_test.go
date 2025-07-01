@@ -96,7 +96,7 @@ func TestHoverToolHandler(t *testing.T) {
 				},
 			},
 			expectError:      false,
-			expectedInResult: "HOVER INFORMATION",
+			expectedInResult: "Function documentation",
 		},
 		{
 			name:         "hover error",
@@ -169,8 +169,8 @@ func TestDiagnosticsToolHandler(t *testing.T) {
 		}
 
 		formatted := formatDiagnostics(result)
-		if !strings.Contains(formatted, "DIAGNOSTICS") {
-			t.Errorf("Expected formatted result to contain 'DIAGNOSTICS'")
+		if !strings.Contains(formatted, "WARNING") {
+			t.Errorf("Expected formatted result to contain 'WARNING'")
 		}
 	})
 
@@ -220,15 +220,6 @@ func TestUtilityFunctions(t *testing.T) {
 		}
 	})
 
-	t.Run("formatSignatureHelp", func(t *testing.T) {
-		sigHelp := protocol.SignatureHelpResponse{}
-
-		result := formatSignatureHelp(sigHelp)
-		if !strings.Contains(result, "SIGNATURE HELP") {
-			t.Error("Expected result to contain 'SIGNATURE HELP'")
-		}
-	})
-
 	t.Run("formatTextEdits", func(t *testing.T) {
 		edits := []protocol.TextEdit{
 			{
@@ -250,8 +241,8 @@ func TestUtilityFunctions(t *testing.T) {
 		edit := protocol.WorkspaceEdit{Changes: map[protocol.DocumentUri][]protocol.TextEdit{}}
 
 		result := formatWorkspaceEdit(&edit)
-		if !strings.Contains(result, "RENAME PREVIEW") {
-			t.Error("Expected result to contain 'RENAME PREVIEW'")
+		if !strings.Contains(result, "No rename changes found") {
+			t.Error("Expected result to contain 'No rename changes found'")
 		}
 	})
 
@@ -266,8 +257,8 @@ func TestUtilityFunctions(t *testing.T) {
 		}
 
 		result := formatImplementations(impls)
-		if !strings.Contains(result, "IMPLEMENTATIONS") {
-			t.Error("Expected result to contain 'IMPLEMENTATIONS'")
+		if !strings.Contains(result, "implementations") {
+			t.Error("Expected result to contain 'implementations'")
 		}
 	})
 }

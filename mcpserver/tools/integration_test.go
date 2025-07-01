@@ -122,7 +122,7 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 		textContent, ok := content.(mcp.TextContent) // Assert to value type, not pointer type
 		assert.True(t, ok, "Expected TextContent, got %T", content)
 		assert.NotEmpty(t, textContent.Text, "Expected non-empty text content")
-		assert.Equal(t, "=== HOVER INFORMATION ===\nfunc main()", textContent.Text, "Unexpected hover content")
+		assert.Equal(t, "func main()", textContent.Text, "Unexpected hover content")
 	}
 
 	// Assert that all expectations on the mock were met

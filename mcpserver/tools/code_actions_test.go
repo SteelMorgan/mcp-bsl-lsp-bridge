@@ -104,14 +104,14 @@ func TestFormatCodeActions(t *testing.T) {
 					Kind:  &quickfix,
 				},
 			},
-			expected: "CODE ACTIONS",
+			expected: "quickfix",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := formatCodeActions(tc.input)
-			if !strings.Contains(result, "CODE ACTIONS") {
+			if !strings.Contains(result, tc.expected) {
 				t.Errorf("Expected result to contain 'CODE ACTIONS', got: %s", result)
 			}
 		})
