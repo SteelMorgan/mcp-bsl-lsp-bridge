@@ -1716,3 +1716,188 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		})
 	}
 }
+
+// Tests for bridge utility functions with 0% coverage
+
+func TestIsAllowedDirectory(t *testing.T) {
+	tests := []struct {
+		name          string
+		allowedDirs   []string
+		testPath      string
+		expectAllowed bool
+		expectError   string
+	}{
+		{
+			name:          "allowed directory exact match",
+			allowedDirs:   []string{"/home/user/project"},
+			testPath:      "/home/user/project",
+			expectAllowed: true,
+		},
+		{
+			name:          "allowed subdirectory",
+			allowedDirs:   []string{"/home/user/project"},
+			testPath:      "/home/user/project/src",
+			expectAllowed: true,
+		},
+		{
+			name:          "disallowed directory",
+			allowedDirs:   []string{"/home/user/project"},
+			testPath:      "/home/user/other",
+			expectAllowed: false,
+			expectError:   "file path is not allowed",
+		},
+		{
+			name:          "path traversal attempt",
+			allowedDirs:   []string{"/home/user/project"},
+			testPath:      "/home/user/project/../other",
+			expectAllowed: false,
+			expectError:   "file path is not allowed",
+		},
+		{
+			name:          "multiple allowed directories - first match",
+			allowedDirs:   []string{"/home/user/project1", "/home/user/project2"},
+			testPath:      "/home/user/project1/file.go",
+			expectAllowed: true,
+		},
+		{
+			name:          "multiple allowed directories - second match",
+			allowedDirs:   []string{"/home/user/project1", "/home/user/project2"},
+			testPath:      "/home/user/project2/file.go",
+			expectAllowed: true,
+		},
+		{
+			name:          "relative path resolution",
+			allowedDirs:   []string{"/home/user/project"},
+			testPath:      "project/../project/file.go",
+			expectAllowed: false, // Will depend on current working directory
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bridge := createTestBridge(tt.allowedDirs)
+			
+			result, err := bridge.IsAllowedDirectory(tt.testPath)
+			
+			if tt.expectAllowed {
+				assert.NoError(t, err, "Expected path to be allowed")
+				assert.NotEmpty(t, result, "Expected non-empty absolute path")
+				// Result should be an absolute path
+				assert.True(t, filepath.IsAbs(result), "Result should be absolute path")
+			} else {
+				assert.Error(t, err, "Expected path to be disallowed")
+				if tt.expectError != "" {
+					assert.Contains(t, err.Error(), tt.expectError)
+				}
+				assert.Empty(t, result, "Result should be empty on error")
+			}
+		})
+	}
+}
+
+func TestAllowedDirectories(t *testing.T) {
+	tests := []struct {
+		name        string
+		allowedDirs []string
+	}{
+		{
+			name:        "single directory",
+			allowedDirs: []string{"/home/user/project"},
+		},
+		{
+			name:        "multiple directories",
+			allowedDirs: []string{"/home/user/project1", "/home/user/project2", "/var/log"},
+		},
+		{
+			name:        "empty directories",
+			allowedDirs: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bridge := createTestBridge(tt.allowedDirs)
+			
+			result := bridge.AllowedDirectories()
+			
+			assert.Equal(t, tt.allowedDirs, result)
+			// Note: Currently returns reference to original slice (not a copy)
+			// This test verifies the current behavior
+			if len(result) > 0 {
+				originalFirst := result[0]
+				result[0] = "modified"
+				// Verify it's the same reference (current behavior)
+				assert.Equal(t, result, bridge.AllowedDirectories(), "Currently returns reference to original slice")
+				// Restore original value
+				result[0] = originalFirst
+			}
+		})
+	}
+}
+
+func TestDetectPrimaryProjectLanguage(t *testing.T) {
+	// Create temporary test directory structure
+	tempDir := t.TempDir()
+	
+	tests := []struct {
+		name         string
+		files        []string
+		expectedLang *lsp.Language
+		expectError  bool
+	}{
+		{
+			name:         "go project with go.mod",
+			files:        []string{"go.mod", "main.go"},
+			expectedLang: func() *lsp.Language { l := lsp.Language("go"); return &l }(),
+		},
+		{
+			name:         "python project with requirements.txt",
+			files:        []string{"requirements.txt", "main.py"},
+			expectedLang: func() *lsp.Language { l := lsp.Language("python"); return &l }(),
+		},
+		{
+			name:         "mixed project - should detect primary",
+			files:        []string{"go.mod", "main.go", "script.py"},
+			expectedLang: func() *lsp.Language { l := lsp.Language("go"); return &l }(),
+		},
+		{
+			name:        "empty directory",
+			files:       []string{},
+			expectedLang: nil,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create subdirectory for this test
+			testDir := filepath.Join(tempDir, tt.name)
+			err := os.MkdirAll(testDir, 0755)
+			require.NoError(t, err)
+
+			// Create test files
+			for _, file := range tt.files {
+				filePath := filepath.Join(testDir, file)
+				err := os.WriteFile(filePath, []byte("test content"), 0644)
+				require.NoError(t, err)
+			}
+
+			bridge := createTestBridge([]string{testDir})
+			
+			result, err := bridge.DetectPrimaryProjectLanguage(testDir)
+			
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				assert.NoError(t, err)
+				if tt.expectedLang != nil {
+					require.NotNil(t, result)
+					assert.Equal(t, *tt.expectedLang, *result)
+				} else {
+					assert.Nil(t, result)
+				}
+			}
+		})
+	}
+}

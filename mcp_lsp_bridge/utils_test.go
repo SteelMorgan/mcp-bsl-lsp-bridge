@@ -2,6 +2,7 @@ package mcp_lsp_bridge_test
 
 import (
 	"rockerboo/mcp-lsp-bridge/mcp_lsp_bridge"
+	"strings"
 	"testing"
 )
 
@@ -45,4 +46,114 @@ func TestPrettyPrint(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSafePrettyPrint(t *testing.T) {
+	tests := []struct {
+		name string
+		v    any
+		want string
+	}{
+		{"nil", nil, "null"},
+		{"simple string", "hello", "\"hello\""},
+		{"simple int", 42, "42"},
+		{"simple struct", struct {
+			Name string
+			Age  int
+		}{"John", 30}, "{\n   \"Age\": 30,\n   \"Name\": \"John\"\n}"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := mcp_lsp_bridge.SafePrettyPrint(tt.v)
+			if got != tt.want {
+				t.Errorf("SafePrettyPrint() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSafePrettyPrint_CircularReference(t *testing.T) {
+	// Create a struct with a circular reference
+	type Node struct {
+		Name string
+		Next *Node
+	}
+
+	node1 := &Node{Name: "Node1"}
+	node2 := &Node{Name: "Node2"}
+	node1.Next = node2
+	node2.Next = node1 // Creates circular reference
+
+	result := mcp_lsp_bridge.SafePrettyPrint(node1)
+	
+	// Should not panic and should contain circular reference indication
+	if result == "" {
+		t.Error("SafePrettyPrint should not return empty string for circular reference")
+	}
+	
+	// Should contain both nodes and handle the circular reference
+	// The exact format may vary but it should not crash
+	t.Logf("Circular reference result: %s", result)
+}
+
+func TestSafePrettyPrint_ComplexStructures(t *testing.T) {
+	// Test that SafePrettyPrint handles complex structures correctly
+	// This indirectly tests the simplifyForJSON function
+	
+	tests := []struct {
+		name        string
+		input       any
+		shouldMatch string // exact match
+		shouldContain []string // strings that should be in output
+	}{
+		{
+			name: "struct with unexported field",
+			input: struct {
+				Name string
+				age  int // unexported, should not appear
+			}{"John", 30},
+			shouldContain: []string{"Name", "John"},
+		},
+		{
+			name: "nil pointer",
+			input: (*string)(nil),
+			shouldMatch: "null",
+		},
+		{
+			name: "valid pointer",
+			input: func() *string { s := "hello"; return &s }(),
+			shouldMatch: "\"hello\"",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mcp_lsp_bridge.SafePrettyPrint(tt.input)
+			
+			if tt.shouldMatch != "" {
+				if result != tt.shouldMatch {
+					t.Errorf("Expected exact match %q, got %q", tt.shouldMatch, result)
+				}
+			}
+			
+			for _, contain := range tt.shouldContain {
+				if !contains(result, contain) {
+					t.Errorf("Expected result to contain %q, got %q", contain, result)
+				}
+			}
+			
+			// For struct with unexported field test, ensure 'age' is not present
+			if tt.name == "struct with unexported field" {
+				if contains(result, "age") {
+					t.Error("Unexported field 'age' should not appear in output")
+				}
+			}
+		})
+	}
+}
+
+// Helper function to check if a string contains a substring
+func contains(s, substr string) bool {
+	return strings.Contains(s, substr)
 }

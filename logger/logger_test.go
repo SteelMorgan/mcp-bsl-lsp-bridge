@@ -76,6 +76,27 @@ func TestLogLevels(t *testing.T) {
 			logMessage: "Test error message",
 			shouldLog:  true,
 		},
+		{
+			name:       "Warn Log at Info Level",
+			logLevel:   "info",
+			logFunc:    Warn,
+			logMessage: "Test warn message",
+			shouldLog:  true,
+		},
+		{
+			name:       "Warn Log at Warn Level",
+			logLevel:   "warn",
+			logFunc:    Warn,
+			logMessage: "Test warn message",
+			shouldLog:  true,
+		},
+		{
+			name:       "Warn Log at Error Level", 
+			logLevel:   "error",
+			logFunc:    Warn,
+			logMessage: "Test warn message",
+			shouldLog:  false,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -271,3 +292,99 @@ func TestEmptyLogPath(t *testing.T) {
 		})
 	}
 }
+
+// TestWarnFunction tests the Warn logging function specifically
+func TestWarnFunction(t *testing.T) {
+	logDir := t.TempDir()
+
+	// Test Warn function at different log levels
+	testCases := []struct {
+		name       string
+		logLevel   string
+		shouldLog  bool
+	}{
+		{"Warn at info level", "info", true},
+		{"Warn at warn level", "warn", true},
+		{"Warn at debug level", "debug", false}, // warn not included in debug
+		{"Warn at error level", "error", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Reset logger state
+			logFile = nil
+			infoLogger = nil
+			errorLogger = nil
+			debugLogger = nil
+
+			// Use unique log file path for each test case
+			logPath := filepath.Join(logDir, fmt.Sprintf("warn_test_%s.log", tc.name))
+			
+			cfg := LoggerConfig{
+				LogPath:     logPath,
+				LogLevel:    tc.logLevel,
+				MaxLogFiles: 3,
+			}
+
+			err := InitLogger(cfg)
+			if err != nil {
+				t.Fatalf("Failed to initialize logger: %v", err)
+			}
+			defer Close()
+
+			// Log a warning message
+			testMessage := "Test warning message"
+			Warn(testMessage)
+
+			// Read log file and check contents
+			content, err := os.ReadFile(logPath)
+			if err != nil {
+				t.Fatalf("Failed to read log file: %v", err)
+			}
+
+			logged := strings.Contains(string(content), testMessage)
+			if logged != tc.shouldLog {
+				t.Errorf("Unexpected logging behavior for level %s. Expected log: %v, Actual log: %v", 
+					tc.logLevel, tc.shouldLog, logged)
+			}
+		})
+	}
+}
+
+// TestRotateLogFilesCoverage tests additional paths in rotateLogFiles for better coverage
+func TestRotateLogFilesCoverage(t *testing.T) {
+	logDir := t.TempDir()
+	baseLogPath := filepath.Join(logDir, "rotate_coverage.log")
+
+	// Test case where MaxLogFiles is 0 (no rotation)
+	t.Run("no rotation when MaxLogFiles is 0", func(t *testing.T) {
+		cfg := LoggerConfig{
+			LogPath:     baseLogPath,
+			LogLevel:    "info",
+			MaxLogFiles: 0,
+		}
+
+		// Create some files first
+		for i := 0; i < 3; i++ {
+			filename := fmt.Sprintf("%s.%d", baseLogPath, i)
+			file, err := os.Create(filename)
+			if err != nil {
+				t.Fatalf("Failed to create test log file: %v", err)
+			}
+			file.Close()
+		}
+
+		filesBefore, _ := filepath.Glob(baseLogPath + "*")
+		
+		// Call rotate - should do nothing
+		rotateLogFiles(cfg)
+		
+		filesAfter, _ := filepath.Glob(baseLogPath + "*")
+		
+		if len(filesAfter) != len(filesBefore) {
+			t.Errorf("Files should not be rotated when MaxLogFiles is 0. Before: %d, After: %d", 
+				len(filesBefore), len(filesAfter))
+		}
+	})
+}
+
