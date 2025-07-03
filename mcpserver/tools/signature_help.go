@@ -43,8 +43,18 @@ func SignatureHelpTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
+			// Safe conversions for line and character
+			lineUint32, err := safeUint32(line)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid line number: %v", err)), nil
+			}
+			characterUint32, err := safeUint32(character)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
+			}
+
 			// Execute bridge method
-			result, err := bridge.GetSignatureHelp(uri, uint32(line), uint32(character))
+			result, err := bridge.GetSignatureHelp(uri, lineUint32, characterUint32)
 			if err != nil {
 				logger.Error("signature_help: Request failed", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to get signature help: %+v", err)), nil

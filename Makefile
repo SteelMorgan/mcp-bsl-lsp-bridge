@@ -69,6 +69,14 @@ test-mcp-new-tools:
 	@echo "Testing newly fixed implementation and signature help tools..."
 	@cd scripts && python3 test_new_tools.py
 
+.PHONY: security-scan gosec
+security-scan: gosec nancy
+
+gosec: 
+	docker run --rm -w /mcp-lsp-bridge/ -v $$(pwd):/mcp-lsp-bridge securego/gosec /mcp-lsp-bridge/...
+nancy:
+	go list -json -deps ./... | docker run --rm -i sonatypecommunity/nancy:latest sleuth
+
 # Test hover optimization workflow
 .PHONY: test-mcp-hover-optimization
 test-mcp-hover-optimization:
@@ -233,6 +241,7 @@ help:
 	@echo "  deps         - Download dependencies"
 	@echo "  deps-update  - Update dependencies"
 	@echo "  security     - Check for security vulnerabilities"
+	@echo "  security-scan - Run security scanning (gosec + nancy)"
 	@echo "  dev-setup    - Setup development environment"
 	@echo "  docker-build - Build Docker image"
 	@echo "  help         - Show this help message"

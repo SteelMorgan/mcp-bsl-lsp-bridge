@@ -39,7 +39,10 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid start_line parameter: %v", err)), nil
 			}
 
-			startLine := uint32(startLineInt)
+			startLine, err := safeUint32(startLineInt)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid start line number: %v", err)), nil
+			}
 
 			startCharInt, err := request.RequireInt("start_character")
 			if err != nil {
@@ -47,7 +50,10 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid start_character parameter: %v", err)), nil
 			}
 
-			startCharacter := uint32(startCharInt)
+			startCharacter, err := safeUint32(startCharInt)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid start character position: %v", err)), nil
+			}
 
 			endLineInt, err := request.RequireInt("end_line")
 			if err != nil {
@@ -55,7 +61,10 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid end_line parameter: %v", err)), nil
 			}
 
-			endLine := uint32(endLineInt)
+			endLine, err := safeUint32(endLineInt)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid end line number: %v", err)), nil
+			}
 
 			endCharInt, err := request.RequireInt("end_character")
 			if err != nil {
@@ -63,7 +72,10 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid end_character parameter: %v", err)), nil
 			}
 
-			endCharacter := uint32(endCharInt)
+			endCharacter, err := safeUint32(endCharInt)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid end character position: %v", err)), nil
+			}
 
 			// Parse strict parameter (defaults to false)
 			strict := request.GetBool("strict", false)
@@ -89,7 +101,11 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 			lines := strings.Split(string(content), "\n")
 
 			// Validate basic line range - these should be hard errors
-			if startLine >= uint32(len(lines)) || endLine >= uint32(len(lines)) {
+			linesLen, err := safeUint32(len(lines))
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("File too large: %v", err)), nil
+			}
+			if startLine >= linesLen || endLine >= linesLen {
 				logger.Error("get_range_content: Line range out of file bounds", fmt.Errorf("line range %d-%d out of bounds (file has %d lines)", startLine, endLine, len(lines)))
 				return mcp.NewToolResultError(fmt.Sprintf("Line range %d-%d out of bounds (file has %d lines)", startLine, endLine, len(lines))), nil
 			}
@@ -102,7 +118,10 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 
 			// Helper function to handle character bounds based on strictness
 			handleCharacterBounds := func(line string, pos uint32, lineNum uint32, posType string) (uint32, error) {
-				lineLen := uint32(len(line))
+				lineLen, err := safeUint32(len(line))
+				if err != nil {
+					return 0, fmt.Errorf("line too long: %v", err)
+				}
 				if pos > lineLen {
 					if strict {
 						return 0, fmt.Errorf("invalid %s character on line %d: %d (line length: %d)", posType, lineNum, pos, lineLen)
@@ -142,7 +161,11 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 				}
 
 				// Handle edge case where start character is at end of line
-				if adjustedStartChar >= uint32(len(line)) {
+				lineLen, err := safeUint32(len(line))
+				if err != nil {
+					return mcp.NewToolResultError(fmt.Sprintf("Line too long: %v", err)), nil
+				}
+				if adjustedStartChar >= lineLen {
 					resultLines = append(resultLines, "")
 				} else {
 					resultLines = append(resultLines, line[adjustedStartChar:adjustedEndChar])
@@ -157,7 +180,11 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 					return mcp.NewToolResultError(err.Error()), nil
 				}
 
-				if adjustedStartChar >= uint32(len(firstLine)) {
+				firstLineLen, err := safeUint32(len(firstLine))
+				if err != nil {
+					return mcp.NewToolResultError(fmt.Sprintf("First line too long: %v", err)), nil
+				}
+				if adjustedStartChar >= firstLineLen {
 					resultLines = append(resultLines, "")
 				} else {
 					resultLines = append(resultLines, firstLine[adjustedStartChar:])
@@ -165,7 +192,7 @@ func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolH
 
 				// Middle lines (full lines)
 				for i := startLine + 1; i < endLine; i++ {
-					if i < uint32(len(lines)) {
+					if i < linesLen {
 						resultLines = append(resultLines, lines[i])
 					} else {
 						// Should not happen with previous range validation, but as a safeguard

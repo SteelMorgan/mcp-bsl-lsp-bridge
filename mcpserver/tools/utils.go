@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"math"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +13,28 @@ import (
 
 type ToolServer interface {
 	AddTool(tool mcp.Tool, handler server.ToolHandlerFunc)
+}
+
+// safeUint32 safely converts an int to uint32, checking for overflow
+func safeUint32(val int) (uint32, error) {
+	if val < 0 {
+		return 0, fmt.Errorf("value cannot be negative: %d", val)
+	}
+	if val > math.MaxUint32 {
+		return 0, fmt.Errorf("value exceeds uint32 maximum: %d", val)
+	}
+	return uint32(val), nil
+}
+
+// safeInt32 safely converts an int to int32, checking for overflow
+func safeInt32(val int) (int32, error) {
+	if val < math.MinInt32 {
+		return 0, fmt.Errorf("value below int32 minimum: %d", val)
+	}
+	if val > math.MaxInt32 {
+		return 0, fmt.Errorf("value exceeds int32 maximum: %d", val)
+	}
+	return int32(val), nil
 }
 
 // symbolKindToString converts a SymbolKind to a human-readable string

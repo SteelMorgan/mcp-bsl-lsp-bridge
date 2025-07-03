@@ -109,7 +109,7 @@ func Info(v ...any) {
 	}
 }
 
-// Warn logs an informational message with caller context
+// Warn logs a warning message with caller context
 func Warn(v ...any) {
 	if config.LogLevel == "info" || config.LogLevel == "warn" {
 		if infoLogger != nil {

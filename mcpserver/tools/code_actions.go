@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -55,7 +56,24 @@ func CodeActionTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 			}
 
 			// Execute bridge method
-			actions, err := bridge.GetCodeActions(uri, uint32(line), uint32(character), uint32(endLine), uint32(endCharacter))
+			lineUint32, err := safeUint32(line)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid line number: %v", err)), nil
+			}
+			characterUint32, err := safeUint32(character)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
+			}
+			endLineUint32, err := safeUint32(endLine)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid end line number: %v", err)), nil
+			}
+			endCharacterUint32, err := safeUint32(endCharacter)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid end character position: %v", err)), nil
+			}
+			
+			actions, err := bridge.GetCodeActions(uri, lineUint32, characterUint32, endLineUint32, endCharacterUint32)
 			if err != nil {
 				logger.Error("code_actions: Request failed", err)
 				return mcp.NewToolResultError("Failed to get code actions"), nil

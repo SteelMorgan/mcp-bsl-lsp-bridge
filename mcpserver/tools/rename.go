@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -55,8 +56,18 @@ func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandler
 				applyChanges = (val == "true" || val == "True" || val == "TRUE")
 			}
 
+			// Safe conversions for line and character  
+			lineUint32, err := safeUint32(line)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid line number: %v", err)), nil
+			}
+			characterUint32, err := safeUint32(character)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
+			}
+
 			// Execute bridge method to get rename edits
-			result, err := bridge.RenameSymbol(uri, uint32(line), uint32(character), newName, false) // Always get actual edits
+			result, err := bridge.RenameSymbol(uri, lineUint32, characterUint32, newName, false) // Always get actual edits
 			if err != nil {
 				logger.Error("rename: Request failed", err)
 				return mcp.NewToolResultError("Failed to rename symbol"), nil

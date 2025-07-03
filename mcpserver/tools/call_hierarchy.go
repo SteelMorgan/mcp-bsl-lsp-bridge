@@ -52,7 +52,16 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			}
 
 			// First, prepare call hierarchy
-			items, err := bridge.PrepareCallHierarchy(uri, uint32(line), uint32(character))
+			lineUint32, err := safeUint32(line)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid line number: %v", err)), nil
+			}
+			characterUint32, err := safeUint32(character)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
+			}
+			
+			items, err := bridge.PrepareCallHierarchy(uri, lineUint32, characterUint32)
 			if err != nil {
 				logger.Error("call_hierarchy: Prepare failed", err)
 				return mcp.NewToolResultError("Failed to prepare call hierarchy"), nil

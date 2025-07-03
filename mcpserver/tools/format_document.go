@@ -40,7 +40,12 @@ func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeIn
 		insertSpaces := true
 
 		// Execute bridge method to get formatting edits
-		edits, err := bridge.FormatDocument(uri, uint32(tabSize), insertSpaces)
+		tabSizeUint32, err := safeUint32(tabSize)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("Invalid tab size: %v", err)), nil
+		}
+		
+		edits, err := bridge.FormatDocument(uri, tabSizeUint32, insertSpaces)
 		if err != nil {
 			logger.Error("format_document: Request failed", err)
 			return mcp.NewToolResultError(fmt.Sprintf("Failed to format document: %+v", err)), nil

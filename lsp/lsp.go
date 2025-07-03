@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -26,24 +27,53 @@ type AnalyzeCodeResult struct {
 	CodeActions   []protocol.CodeAction
 }
 
+// safeUint32 safely converts an int32 to uint32, checking for overflow
+func safeUint32FromInt32(val int32) (uint32, error) {
+	if val < 0 {
+		return 0, fmt.Errorf("value cannot be negative: %d", val)
+	}
+	return uint32(val), nil
+}
+
+// safeUint32 safely converts an int to uint32, checking for overflow  
+func safeUint32(val int) (uint32, error) {
+	if val < 0 {
+		return 0, fmt.Errorf("value cannot be negative: %d", val)
+	}
+	if val > math.MaxUint32 {
+		return 0, fmt.Errorf("value exceeds uint32 maximum: %d", val)
+	}
+	return uint32(val), nil
+}
+
 // AnalyzeCode provides comprehensive code analysis for a given file and position
 func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeResult, error) {
 	result := &AnalyzeCodeResult{}
 
 	uri := protocol.DocumentUri(opts.Uri)
 
+	// Safe conversions for opts.Line and opts.Character
+	lineUint32, err := safeUint32FromInt32(opts.Line)
+	if err != nil {
+		return nil, fmt.Errorf("invalid line number: %v", err)
+	}
+	characterUint32, err := safeUint32FromInt32(opts.Character)
+	if err != nil {
+		return nil, fmt.Errorf("invalid character position: %v", err)
+	}
+
 	// Hover request
 	hoverParams := protocol.HoverParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: uri},
 		Position: protocol.Position{
-			Line:      uint32(opts.Line),
-			Character: uint32(opts.Character),
+			Line:      lineUint32,
+			Character: characterUint32,
 		},
 	}
 
 	var hoverResult protocol.HoverResponse
 
-	err := client.SendRequest("textDocument/hover", hoverParams, &hoverResult, 5*time.Second)
+	err = client.SendRequest("textDocument/hover", hoverParams, &hoverResult, 5*time.Second)
 	if err == nil {
 		result.Hover = &hoverResult
 	} else {
@@ -54,8 +84,8 @@ func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeR
 	completionParams := protocol.CompletionParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: uri},
 		Position: protocol.Position{
-			Line:      uint32(opts.Line),
-			Character: uint32(opts.Character),
+			Line:      lineUint32,
+			Character: characterUint32,
 		},
 	}
 
@@ -72,8 +102,8 @@ func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeR
 	signatureParams := protocol.SignatureHelpParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: uri},
 		Position: protocol.Position{
-			Line:      uint32(opts.Line),
-			Character: uint32(opts.Character),
+			Line:      lineUint32,
+			Character: characterUint32,
 		},
 	}
 
@@ -92,12 +122,24 @@ func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeR
 	// Placeholder for diagnostic retrieval logic
 	result.Diagnostics = diagnostics
 
-	// Code actions request
+	// Code actions request with safe bounds checking
+	endCharacterInt32 := max(0, opts.Character+1)
+	endCharacterUint32, err := safeUint32FromInt32(endCharacterInt32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end character position: %v", err)
+	}
+
 	actionParams := protocol.CodeActionParams{
 		TextDocument: protocol.TextDocumentIdentifier{Uri: uri},
 		Range: protocol.Range{
-			Start: protocol.Position{Line: uint32(opts.Line), Character: uint32(opts.Character)},
-			End:   protocol.Position{Line: uint32(opts.Line), Character: uint32(opts.Character + 1)},
+			Start: protocol.Position{
+				Line:      lineUint32,
+				Character: characterUint32,
+			},
+			End: protocol.Position{
+				Line:      lineUint32,
+				Character: endCharacterUint32,
+			},
 		},
 	}
 

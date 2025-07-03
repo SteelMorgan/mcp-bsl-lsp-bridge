@@ -61,7 +61,25 @@ func SemanticTokensTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 				"comment", "string", "number", "regexp", "operator",
 			}
 
-			positions, err := bridge.SemanticTokens(uri, targetTypes, uint32(startLine), uint32(startCharacter), uint32(endLine), uint32(endCharacter))
+			// Safe conversions for parameters
+			startLineUint32, err := safeUint32(startLine)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid start line number: %v", err)), nil
+			}
+			startCharacterUint32, err := safeUint32(startCharacter)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid start character position: %v", err)), nil
+			}
+			endLineUint32, err := safeUint32(endLine)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid end line number: %v", err)), nil
+			}
+			endCharacterUint32, err := safeUint32(endCharacter)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid end character position: %v", err)), nil
+			}
+
+			positions, err := bridge.SemanticTokens(uri, targetTypes, startLineUint32, startCharacterUint32, endLineUint32, endCharacterUint32)
 			logger.Debug(fmt.Sprintf("SemanticTokensTool: Processed positions: %+v", positions))
 
 			if err != nil {

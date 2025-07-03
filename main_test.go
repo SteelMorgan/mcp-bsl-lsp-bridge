@@ -13,7 +13,13 @@ import (
 
 // createTestConfig creates a minimal test configuration
 func createTestConfig() *lsp.LSPServerConfig {
-	config, err := lsp.LoadLSPConfig("lsp_config.example.json")
+	// Get current working directory for validation
+	cwd, _ := os.Getwd()
+	
+	// Use an allowed directory for config
+	allowedDirs := []string{cwd, "."}
+	
+	config, err := lsp.LoadLSPConfig("lsp_config.example.json", allowedDirs)
 	if err != nil {
 		// Fallback to a minimal config if file doesn't exist
 		return &lsp.LSPServerConfig{

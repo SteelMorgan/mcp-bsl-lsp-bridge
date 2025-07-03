@@ -216,7 +216,11 @@ func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset,
 
 			// Calculate precise positions within the identifier
 			if nameLen > 3 {
-				midChar := startChar + uint32(nameLen/2)
+				midOffset, err := safeUint32(nameLen / 2)
+				if err != nil {
+					midOffset = 0
+				}
+				midChar := startChar + midOffset
 				fmt.Fprintf(response, "\t - Alternative: line=%d, character=%d\n", startLine, midChar)
 			}
 
@@ -225,7 +229,11 @@ func handleWorkspaceSymbols(lspClient *lsp.LanguageClient, query string, offset,
 
 			if nameLen > 1 {
 				offset := min(nameLen/2, 5)
-				bestHoverChar = startChar + uint32(offset)
+				offsetUint32, err := safeUint32(offset)
+				if err != nil {
+					offsetUint32 = 0
+				}
+				bestHoverChar = startChar + offsetUint32
 			}
 
 			fmt.Fprintf(response, "\tRecommended hover coordinate: uri=\"%s\", line=%d, character=%d\n",

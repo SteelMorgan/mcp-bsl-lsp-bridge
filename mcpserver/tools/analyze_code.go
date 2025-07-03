@@ -70,10 +70,19 @@ func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandle
 			}
 
 			// Perform code analysis
+			lineInt32, err := safeInt32(line)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid line number: %v", err)), nil
+			}
+			characterInt32, err := safeInt32(character)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
+			}
+			
 			analyzeOpts := lsp.AnalyzeCodeOptions{
 				Uri:        uri,
-				Line:       int32(line),
-				Character:  int32(character),
+				Line:       lineInt32,
+				Character:  characterInt32,
 				LanguageId: string(*language),
 			}
 

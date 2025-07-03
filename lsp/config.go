@@ -6,26 +6,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"rockerboo/mcp-lsp-bridge/logger"
 	"strings"
+
+	"rockerboo/mcp-lsp-bridge/logger"
+	"rockerboo/mcp-lsp-bridge/security"
 )
 
-// LoadLSPConfig loads the LSP configuration from a JSON file
-func LoadLSPConfig(path string) (config *LSPServerConfig, err error) {
-	// Clean and validate the path
-	cleanPath := filepath.Clean(path)
-
-	// Ensure it's not an absolute path to system directories
-	if filepath.IsAbs(cleanPath) {
-		return nil, errors.New("absolute paths not allowed")
+// LoadLSPConfig loads the LSP configuration from a JSON file with security validation
+func LoadLSPConfig(path string, allowedDirectories []string) (config *LSPServerConfig, err error) {
+	// Validate path using secure path validation
+	cleanPath, err := security.ValidateConfigPath(path, allowedDirectories)
+	if err != nil {
+		return nil, fmt.Errorf("config path validation failed: %w", err)
 	}
 
-	// Check for path traversal attempts
-	if strings.Contains(cleanPath, "..") {
-		return nil, errors.New("path traversal not allowed")
-	}
-
-	file, err := os.Open(cleanPath)
+	file, err := os.Open(cleanPath) // #nosec G304 - Path validated by security.ValidateConfigPath
 	if err != nil {
 		return nil, fmt.Errorf("failed to open config file: %w", err)
 	}

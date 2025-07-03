@@ -5,6 +5,8 @@ package bridge
 import (
 	"path/filepath"
 	"testing"
+
+	"rockerboo/mcp-lsp-bridge/security"
 )
 
 func TestUnixSpecificPaths(t *testing.T) {
@@ -54,15 +56,15 @@ func TestUnixSpecificPaths(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getCleanAbsPath(tt.path)
+			got, err := security.GetCleanAbsPath(tt.path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getCleanAbsPath() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("security.GetCleanAbsPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
 			if !tt.wantErr {
 				if tt.want != "" && got != tt.want {
-					t.Errorf("getCleanAbsPath() = %v, want %v", got, tt.want)
+					t.Errorf("security.GetCleanAbsPath() = %v, want %v", got, tt.want)
 				}
 				// Verify it's a valid Unix absolute path
 				if !filepath.IsAbs(got) {
@@ -106,7 +108,7 @@ func TestUnixIsWithinAllowedDirectory(t *testing.T) {
 			name:    "parent directory escape attempt",
 			path:    "/home/rockerboo/code/mcp-lsp-bridge/../..",
 			baseDir: "/home/rockerboo/code/mcp-lsp-bridge",
-			allowed: true,
+			allowed: false,
 		},
 		{
 			name:    "symlink-like path (resolved by filepath.Abs)",
@@ -130,9 +132,9 @@ func TestUnixIsWithinAllowedDirectory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isWithinAllowedDirectory(tt.path, tt.baseDir)
+			result := security.IsWithinAllowedDirectory(tt.path, tt.baseDir)
 			if result != tt.allowed {
-				t.Errorf("isWithinAllowedDirectory(%s, %s) = %v, want %v",
+				t.Errorf("security.IsWithinAllowedDirectory(%s, %s) = %v, want %v",
 					tt.path, tt.baseDir, result, tt.allowed)
 			}
 		})
@@ -157,15 +159,15 @@ func TestUnixPermissions(t *testing.T) {
 			name:    "non-existent parent attempt",
 			path:    "/home/rockerboo/code/../../../etc",
 			baseDir: "/home/rockerboo/code",
-			allowed: true,
+			allowed: false, // /etc is NOT within /home/rockerboo/code
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isWithinAllowedDirectory(tt.path, tt.baseDir)
+			result := security.IsWithinAllowedDirectory(tt.path, tt.baseDir)
 			if result != tt.allowed {
-				t.Errorf("isWithinAllowedDirectory(%s, %s) = %v, want %v",
+				t.Errorf("security.IsWithinAllowedDirectory(%s, %s) = %v, want %v",
 					tt.path, tt.baseDir, result, tt.allowed)
 			}
 		})
@@ -202,9 +204,9 @@ func TestUnixSymlinks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isWithinAllowedDirectory(tt.path, tt.baseDir)
+			result := security.IsWithinAllowedDirectory(tt.path, tt.baseDir)
 			if result != tt.allowed {
-				t.Errorf("isWithinAllowedDirectory(%s, %s) = %v, want %v",
+				t.Errorf("security.IsWithinAllowedDirectory(%s, %s) = %v, want %v",
 					tt.path, tt.baseDir, result, tt.allowed)
 			}
 		})

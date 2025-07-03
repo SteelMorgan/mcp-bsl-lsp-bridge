@@ -3,6 +3,7 @@ package bridge
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/security"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -44,24 +46,7 @@ func DefaultConnectionConfig() ConnectionAttemptConfig {
 }
 
 func (b *MCPLSPBridge) IsAllowedDirectory(path string) (string, error) {
-	absPath, err := getCleanAbsPath(path)
-	if err != nil {
-		return "", err
-	}
-
-	isAllowedDirectory := false
-	for _, allowedDirectory := range b.allowedDirectories {
-		if isWithinAllowedDirectory(absPath, allowedDirectory) {
-			isAllowedDirectory = true
-			break
-		}
-	}
-
-	if !isAllowedDirectory {
-		return "", fmt.Errorf("file path is not allowed: %s", absPath)
-	}
-
-	return absPath, nil
+	return security.ValidateConfigPath(path, b.allowedDirectories)
 }
 
 func (b *MCPLSPBridge) AllowedDirectories() []string {
@@ -116,7 +101,13 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 
 		root_path := "file://" + absPath
 		root_uri := protocol.DocumentUri(root_path)
-		process_id := int32(os.Getpid())
+		// Process IDs are typically small positive integers, safe to convert
+		// But we'll add bounds checking for completeness
+		pid := os.Getpid()
+		if pid < 0 || pid > math.MaxInt32 {
+			return nil, fmt.Errorf("process ID out of range: %d", pid)
+		}
+		process_id := int32(pid)
 
 		// Prepare initialization parameters
 		workspaceFolders := []protocol.WorkspaceFolder{
@@ -543,7 +534,7 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client lsp.LanguageClientInterface, ur
 
 	for _, allowedBaseDir := range projectRoots {
 		// Validate against allowed base directory
-		if !isWithinAllowedDirectory(absPath, allowedBaseDir) {
+		if !security.IsWithinAllowedDirectory(absPath, allowedBaseDir) {
 			return errors.New("access denied: path outside allowed directory")
 		}
 	}
@@ -1143,24 +1134,3 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 	return allReports, nil
 }
 
-func isWithinAllowedDirectory(path, baseDir string) bool {
-	absBase, _ := filepath.Abs(baseDir)
-	absPath, _ := filepath.Abs(path)
-	if absPath == absBase {
-		return true
-	}
-	return strings.HasPrefix(path, absBase+string(filepath.Separator))
-}
-
-func getCleanAbsPath(path string) (string, error) {
-	if path == "" || path == "." {
-		return "", errors.New("path cannot be empty or current directory")
-	}
-
-	cleanPath := filepath.Clean(path)
-	absPath, err := filepath.Abs(cleanPath)
-	if err != nil {
-		return "", fmt.Errorf("invalid file path: %w", err)
-	}
-	return absPath, nil
-}

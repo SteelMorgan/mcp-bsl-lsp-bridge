@@ -13,14 +13,31 @@ import (
 	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mcpserver"
+	"rockerboo/mcp-lsp-bridge/security"
 
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// tryLoadConfig attempts to load configuration from multiple locations
-func tryLoadConfig(primaryPath, configDir string) (*lsp.LSPServerConfig, error) {
+// tryLoadConfig attempts to load configuration from multiple locations with security validation
+func tryLoadConfig(primaryPath, configDir string, allowedDirectories ...[]string) (*lsp.LSPServerConfig, error) {
+	var configAllowedDirectories []string
+
+	// If allowed directories are not provided, use default
+	if len(allowedDirectories) > 0 {
+		configAllowedDirectories = allowedDirectories[0]
+	} else {
+		// Get current working directory for validation
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current working directory: %w", err)
+		}
+
+		// Get allowed directories for config files
+		configAllowedDirectories = security.GetConfigAllowedDirectories(configDir, cwd)
+	}
+
 	// Try primary path first (from command line or default)
-	if config, err := lsp.LoadLSPConfig(primaryPath); err == nil {
+	if config, err := lsp.LoadLSPConfig(primaryPath, configAllowedDirectories); err == nil {
 		return config, nil
 	}
 
@@ -33,7 +50,7 @@ func tryLoadConfig(primaryPath, configDir string) (*lsp.LSPServerConfig, error) 
 
 	for _, fallbackPath := range fallbackPaths {
 		if fallbackPath != primaryPath {
-			if config, err := lsp.LoadLSPConfig(fallbackPath); err == nil {
+			if config, err := lsp.LoadLSPConfig(fallbackPath, configAllowedDirectories); err == nil {
 				fmt.Fprintf(os.Stderr, "INFO: Loaded configuration from fallback location: %s\n", fallbackPath)
 				return config, nil
 			}
@@ -41,6 +58,33 @@ func tryLoadConfig(primaryPath, configDir string) (*lsp.LSPServerConfig, error) 
 	}
 
 	return nil, errors.New("no valid configuration found")
+}
+
+// validateCommandLineArgs validates command line arguments for security
+func validateCommandLineArgs(confPath, logPath, configDir, logDir string) error {
+	// Get current working directory for validation
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	// Validate config path if provided
+	if confPath != "" {
+		configAllowedDirs := security.GetConfigAllowedDirectories(configDir, cwd)
+		if _, err := security.ValidateConfigPath(confPath, configAllowedDirs); err != nil {
+			return fmt.Errorf("invalid config path: %w", err)
+		}
+	}
+
+	// Validate log path if provided
+	if logPath != "" {
+		logAllowedDirs := []string{logDir, cwd, "."}
+		if _, err := security.ValidateConfigPath(logPath, logAllowedDirs); err != nil {
+			return fmt.Errorf("invalid log path: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func main() {
@@ -75,6 +119,12 @@ func main() {
 	flag.StringVar(&logPath, "l", "", "Path to log file (short)")
 	flag.StringVar(&logLevel, "log-level", "", "Log level: debug, info, warn, error (overrides config)")
 	flag.Parse()
+
+	// Validate command line arguments for security
+	if err := validateCommandLineArgs(confPath, logPath, configDir, logDir); err != nil {
+		fmt.Fprintf(os.Stderr, "ERROR: Invalid command line arguments: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Load LSP configuration
 	// Attempt to load config from multiple locations

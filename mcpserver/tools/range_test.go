@@ -391,7 +391,7 @@ func TestGetRangeContentTool_ParameterValidation(t *testing.T) {
 				"end_line":        0,
 				"end_character":   5,
 			},
-			checkAllowed: true,
+			checkAllowed: false,
 			expectError: true,
 			description: "Should handle negative start_line (converted to large uint32)",
 		},

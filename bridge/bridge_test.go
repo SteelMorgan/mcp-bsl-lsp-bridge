@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+
+	"rockerboo/mcp-lsp-bridge/security"
 	"testing"
 	"time"
 
@@ -911,7 +913,7 @@ func createTestPaths() (projectRoots []string, testCases []struct {
 			{"subdirectory", "/home/rockerboo/code/mcp-lsp-bridge/lsp", true},
 			{"not allowed", "/not/allowed/directory", false},
 			{"parent with ..", "/home/rockerboo/code/mcp-lsp-bridge/lsp/..", true},
-			{"parent .. attempt", "/home/rockerboo/code/mcp-lsp-bridge/lsp/../..", true}, // Should go outside allowed dir
+			{"parent .. attempt", "/home/rockerboo/code/mcp-lsp-bridge/lsp/../..", false}, // Should go outside allowed dir
 			{"other exact match", "/other/allowed/directory", true},
 			{"other subdirectory", "/other/allowed/directory/lsp", true},
 			{"root", "/", false},
@@ -927,14 +929,14 @@ func TestIsWithinAllowedDirectory(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			isAllowed := false
 			for _, projectRoot := range projectRoots {
-				if isWithinAllowedDirectory(tt.dir, projectRoot) {
+				if security.IsWithinAllowedDirectory(tt.dir, projectRoot) {
 					isAllowed = true
 					break
 				}
 			}
 
 			if tt.allowed != isAllowed {
-				t.Errorf("isWithinAllowedDirectory(%s, %v) = %v, want %v", tt.dir, projectRoots, isAllowed, tt.allowed)
+				t.Errorf("security.IsWithinAllowedDirectory(%s, %v) = %v, want %v", tt.dir, projectRoots, isAllowed, tt.allowed)
 			}
 		})
 	}
@@ -963,15 +965,15 @@ func TestIsWithinAllowedDirectoryRelative(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isWithinAllowedDirectory(tt.dir, tt.base)
+			result := security.IsWithinAllowedDirectory(tt.dir, tt.base)
 			if result != tt.allowed {
-				t.Errorf("isWithinAllowedDirectory(%s, %s) = %v, want %v", tt.dir, tt.base, result, tt.allowed)
+				t.Errorf("security.IsWithinAllowedDirectory(%s, %s) = %v, want %v", tt.dir, tt.base, result, tt.allowed)
 			}
 		})
 	}
 }
 
-func Test_getCleanAbsPath(t *testing.T) {
+func TestGetCleanAbsPath(t *testing.T) {
 	// Get current working directory for relative path tests
 	cwd, err := filepath.Abs(".")
 	if err != nil {
@@ -1083,18 +1085,18 @@ func Test_getCleanAbsPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, gotErr := getCleanAbsPath(tt.path)
+			got, gotErr := security.GetCleanAbsPath(tt.path)
 			if gotErr != nil {
 				if !tt.wantErr {
-					t.Errorf("getCleanAbsPath() failed: %v", gotErr)
+					t.Errorf("security.GetCleanAbsPath() failed: %v", gotErr)
 				}
 				return
 			}
 			if tt.wantErr {
-				t.Fatal("getCleanAbsPath() succeeded unexpectedly")
+				t.Fatal("security.GetCleanAbsPath() succeeded unexpectedly")
 			}
 			if tt.want != got {
-				t.Errorf("getCleanAbsPath() = %v, want %v", got, tt.want)
+				t.Errorf("security.GetCleanAbsPath() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1128,19 +1130,19 @@ func Test_getCleanAbsPathWithTempDir(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getCleanAbsPath(tt.path)
+			got, err := security.GetCleanAbsPath(tt.path)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getCleanAbsPath() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("security.GetCleanAbsPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !tt.wantErr {
 				// Verify it's an absolute path
 				if !filepath.IsAbs(got) {
-					t.Errorf("getCleanAbsPath() returned non-absolute path: %v", got)
+					t.Errorf("security.GetCleanAbsPath() returned non-absolute path: %v", got)
 				}
 				// Verify it's clean (no . or .. components)
 				if got != filepath.Clean(got) {
-					t.Errorf("getCleanAbsPath() returned unclean path: %v", got)
+					t.Errorf("security.GetCleanAbsPath() returned unclean path: %v", got)
 				}
 			}
 		})
@@ -1766,10 +1768,11 @@ func TestIsAllowedDirectory(t *testing.T) {
 			expectAllowed: true,
 		},
 		{
-			name:          "relative path resolution",
+			name:          "relative path outside allowed dirs",
 			allowedDirs:   []string{"/home/user/project"},
-			testPath:      "project/../project/file.go",
-			expectAllowed: false, // Will depend on current working directory
+			testPath:      "../../../etc/passwd",
+			expectAllowed: false, // Should be blocked as it goes outside allowed dirs
+			expectError:   "file path is not allowed",
 		},
 	}
 

@@ -36,9 +36,8 @@ func TestLoggerInitialization(t *testing.T) {
 
 // TestLogLevels tests logging at different log levels
 func TestLogLevels(t *testing.T) {
-	// Create a temporary log path
+	// Create a temporary log directory
 	logDir := t.TempDir()
-	logPath := filepath.Join(logDir, "levels.log")
 
 	// Test different log levels
 	testCases := []struct {
@@ -107,9 +106,12 @@ func TestLogLevels(t *testing.T) {
 			errorLogger = nil
 			debugLogger = nil
 
+			// Create unique log path for this test case
+			testLogPath := filepath.Join(logDir, fmt.Sprintf("test_%s.log", strings.ReplaceAll(tc.name, " ", "_")))
+
 			// Initialize logger with test configuration
 			cfg := LoggerConfig{
-				LogPath:     logPath,
+				LogPath:     testLogPath,
 				LogLevel:    tc.logLevel,
 				MaxLogFiles: 3,
 			}
@@ -125,7 +127,7 @@ func TestLogLevels(t *testing.T) {
 			tc.logFunc(tc.logMessage)
 
 			// Read log file and check contents
-			content, err := os.ReadFile(logPath) // #nosec G304
+			content, err := os.ReadFile(testLogPath) // #nosec G304
 			if err != nil {
 				t.Fatalf("Failed to read log file: %v", err)
 			}

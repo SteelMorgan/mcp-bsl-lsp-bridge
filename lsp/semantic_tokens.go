@@ -74,7 +74,7 @@ func (p *SemanticTokenParser) FindTokensByType(
 		}
 
 		// Get token type name
-		if tokenTypeIndex >= uint32(len(p.tokenTypes)) {
+		if int(tokenTypeIndex) >= len(p.tokenTypes) {
 			continue // Skip invalid token types
 		}
 
