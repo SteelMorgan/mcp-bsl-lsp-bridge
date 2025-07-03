@@ -339,7 +339,10 @@ func TestTryLoadConfig(t *testing.T) {
 			primaryPath, configDir, cleanup := tt.setupFunc(t)
 			defer cleanup()
 
-			config, err := tryLoadConfig(primaryPath, configDir)
+			// For CI/Docker compatibility, add the temp directory to allowed paths
+			tempDir := filepath.Dir(primaryPath)
+			allowedDirs := []string{tempDir, configDir, "."}
+			config, err := tryLoadConfig(primaryPath, configDir, allowedDirs)
 
 			if tt.expectSuccess {
 				require.NoError(t, err)
