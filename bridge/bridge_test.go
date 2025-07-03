@@ -388,6 +388,8 @@ func TestGetSignatureHelp(t *testing.T) {
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 	testURI := "file://" + testFile
 
+	activeParameter := uint32(0)
+
 	expectedSigHelp := &protocol.SignatureHelp{
 		Signatures: []protocol.SignatureInformation{
 			{
@@ -398,7 +400,7 @@ func TestGetSignatureHelp(t *testing.T) {
 			},
 		},
 		ActiveSignature: 0,
-		ActiveParameter: func() **uint32 { v := uint32(0); p := &v; return &p }(),
+		ActiveParameter: &activeParameter,
 	}
 
 	mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)

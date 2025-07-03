@@ -18,7 +18,7 @@ type MockLSPConnectionInterface struct {
 	ctx context.Context
 }
 
-func (m *MockLSPConnectionInterface) Call(ctx context.Context, method string, params, result interface{}, opts ...jsonrpc2.CallOption) error {
+func (m *MockLSPConnectionInterface) Call(ctx context.Context, method string, params, result any, opts ...jsonrpc2.CallOption) error {
 	m.ctx = ctx
 	args := m.Called(ctx, method, params, result, opts)
 
@@ -149,10 +149,9 @@ func TestInitialize(t *testing.T) {
 
 	pid := int32(1)
 	rootPath := "/test"
-	rootPathPtr := &rootPath
 	params := protocol.InitializeParams{
 		ProcessId: &pid,
-		RootPath:  &rootPathPtr,
+		RootPath:  &rootPath,
 		Capabilities: protocol.ClientCapabilities{
 			TextDocument: &protocol.TextDocumentClientCapabilities{},
 			Workspace:    &protocol.WorkspaceClientCapabilities{},
