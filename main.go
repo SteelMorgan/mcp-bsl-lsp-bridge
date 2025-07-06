@@ -14,6 +14,7 @@ import (
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mcpserver"
 	"rockerboo/mcp-lsp-bridge/security"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/server"
 )
@@ -45,12 +46,13 @@ func tryLoadConfig(primaryPath, configDir string, allowedDirectories ...[]string
 	fallbackPaths := []string{
 		"lsp_config.json",                       // Current directory
 		filepath.Join(configDir, "config.json"), // Alternative name in config dir
-		"example.lsp_config.json",               // Example config in current dir
+		"lsp_config.example.json",               // Example config in current dir
 	}
 
 	for _, fallbackPath := range fallbackPaths {
 		if fallbackPath != primaryPath {
 			if config, err := lsp.LoadLSPConfig(fallbackPath, configAllowedDirectories); err == nil {
+				logger.Warn(fmt.Sprintf("INFO: Loaded configuration from fallback location: %s\n", fallbackPath))
 				fmt.Fprintf(os.Stderr, "INFO: Loaded configuration from fallback location: %s\n", fallbackPath)
 				return config, nil
 			}
@@ -146,9 +148,9 @@ func main() {
 
 		// Create minimal default LSP config so bridge can initialize
 		config = &lsp.LSPServerConfig{
-			LanguageServers:      make(map[lsp.Language]lsp.LanguageServerConfig),
-			ExtensionLanguageMap: make(map[string]lsp.Language),
-			LanguageExtensionMap: make(map[lsp.Language][]string),
+			LanguageServers:      make(map[types.Language]lsp.LanguageServerConfig),
+			ExtensionLanguageMap: make(map[string]types.Language),
+			LanguageExtensionMap: make(map[types.Language][]string),
 			Global: struct {
 				LogPath            string `json:"log_file_path"`
 				LogLevel           string `json:"log_level"`

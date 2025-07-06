@@ -71,22 +71,22 @@ class MCPToolRunner:
         mcp__lsp__diagnostics (MCP)(report_type="all")
         """
         command_str = command_str.strip()
-        
+
         # Updated regex to capture both lsp: and mcp__lsp__ formats
         match = re.match(
-            r'^(?:●\s*)?(?:lsp:(\w+)|mcp__lsp__(\w+))\s*(?:\(MCP\))?\s*\((.*)\)$',
-            command_str
+            r"^(?:●\s*)?(?:lsp:(\w+)|mcp__lsp__(\w+))\s*(?:\(MCP\))?\s*\((.*)\)$",
+            command_str,
         )
-        
+
         if not match:
             logger.error(f"Failed to match command structure: '{command_str}'")
             raise ValueError(f"Invalid MCP command format: {command_str}")
-        
+
         # tool_name is in either group 1 (lsp:) or group 2 (mcp__lsp__)
         tool_name = match.group(1) or match.group(2)
         params_str = match.group(3)
         logger.info(f"params string: {params_str}")
-        
+
         params = {}
         if params_str:
             # Updated regex to handle URLs and complex values
@@ -94,22 +94,40 @@ class MCPToolRunner:
             param_regex = r'(\w+)\s*[=|:]\s*(?:"([^"]*)"|\'([^\']*)\'|([^,\s)]+))'
             param_matches = re.findall(param_regex, params_str)
             if not param_matches and params_str.strip():
-                 logger.warning(f"Could not parse any parameters from: '{params_str}' for command: {command_str}")
-            
-            for key, double_quoted_value, single_quoted_value, unquoted_value in param_matches:
+                logger.warning(
+                    f"Could not parse any parameters from: '{params_str}' for command: {command_str}"
+                )
+
+            for (
+                key,
+                double_quoted_value,
+                single_quoted_value,
+                unquoted_value,
+            ) in param_matches:
                 # Prioritize: double-quoted, then single-quoted, then unquoted
                 value = double_quoted_value or single_quoted_value or unquoted_value
                 # Attempt to convert known integer parameters
-                if key in ["line", "character", "start_line", "start_character", "end_line", "end_character", "tab_size"]:
+                if key in [
+                    "line",
+                    "character",
+                    "start_line",
+                    "start_character",
+                    "end_line",
+                    "end_character",
+                    "tab_size",
+                ]:
                     try:
                         params[key] = int(value)
                     except ValueError:
-                        logger.warning(f"Could not convert parameter '{key}' value '{value}' to int. Keeping as string.")
+                        logger.warning(
+                            f"Could not convert parameter '{key}' value '{value}' to int. Keeping as string."
+                        )
                         params[key] = value
                 else:
                     params[key] = value
         logger.info(f"Parsed command: Tool='{tool_name}', Params={params}")
         return tool_name, params
+
     def run_mcp_tool(self, tool_name, params):
         """
         Run MCP tool by sending JSON-RPC request via stdio

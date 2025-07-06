@@ -6,6 +6,23 @@ A Go-based bridge that combines MCP (Model Context Protocol) server capabilities
 
 **NOTE**: Currently working to build up functionality and laying down the groundwork for the interface. Consider that many things may change as we work into making it more streamlined.
 
+## Usage
+
+For example with Claude Code, you can configure the bridge like this:
+
+```
+{
+  "mcpServers": {
+    "lsp": {
+      "type": "stdio",
+      "command": "mcp-lsp-bridge",
+      "args": [],
+      "env": {}
+    }
+  }
+}
+```
+
 ## What the MCP LSP Bridge Unlocks for You
 
 The MCP LSP Bridge empowers MCP-compatible agents (like LLMs) with powerful Language Server Protocol (LSP) capabilities, transforming how they interact with and understand code. It acts as an intelligent intermediary, providing a wide range of code analysis, navigation, and modification tools across many programming languages.
@@ -46,10 +63,10 @@ The bridge is designed to work with over 20 programming languages (e.g., Go, Pyt
 
 ```bash
 # Build the project
-go build
+go build -o mcp-lsp-bridge
 
-# Run with default configuration
-./mcp-lsp-bridge
+# Now you can configure the bridge with your MCP client
+
 ```
 
 ### Command-Line Options

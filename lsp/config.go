@@ -10,6 +10,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/security"
+	"rockerboo/mcp-lsp-bridge/types"
 )
 
 // LoadLSPConfig loads the LSP configuration from a JSON file with security validation
@@ -38,7 +39,7 @@ func LoadLSPConfig(path string, allowedDirectories []string) (config *LSPServerC
 
 	// Compute extension to language mapping if not provided
 	if config.ExtensionLanguageMap == nil {
-		config.ExtensionLanguageMap = make(map[string]Language)
+		config.ExtensionLanguageMap = make(map[string]types.Language)
 		for language, serverConfig := range config.LanguageServers {
 			for _, ext := range serverConfig.Filetypes {
 				config.ExtensionLanguageMap[ext] = language
@@ -48,7 +49,7 @@ func LoadLSPConfig(path string, allowedDirectories []string) (config *LSPServerC
 
 	// Compute language to extensions mapping if not provided
 	if config.LanguageExtensionMap == nil {
-		config.LanguageExtensionMap = make(map[Language][]string)
+		config.LanguageExtensionMap = make(map[types.Language][]string)
 		for language, serverConfig := range config.LanguageServers {
 			config.LanguageExtensionMap[language] = serverConfig.Filetypes
 		}
@@ -61,19 +62,20 @@ func (c *LSPServerConfig) GlobalConfig() GlobalConfig {
 	return c.Global
 }
 
-func (c *LSPServerConfig) FindExtLanguage(ext string) (*Language, error) {
+func (c *LSPServerConfig) FindExtLanguage(ext string) (*types.Language, error) {
 	language, exists := c.ExtensionLanguageMap[ext]
 
 	if !exists {
 		return nil, fmt.Errorf("no language found for %s", ext)
 	}
 
-	return &language, nil
+	typesLanguage := types.Language(language)
+	return &typesLanguage, nil
 }
 
-func (c LSPServerConfig) FindServerConfig(language string) (*LanguageServerConfig, error) {
+func (c LSPServerConfig) FindServerConfig(language string) (types.LanguageServerConfigProvider, error) {
 	for lang, serverConfig := range c.LanguageServers {
-		if lang == Language(language) {
+		if lang == types.Language(language) {
 			return &serverConfig, nil
 		}
 	}
@@ -117,7 +119,7 @@ func GetProjectRootMarkers() []ProjectRootMarker {
 
 // DetectProjectLanguages scans a directory for project root markers and file extensions
 // to determine all languages used in the project, returning them in priority order
-func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]Language, error) {
+func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]types.Language, error) {
 	if projectPath == "" {
 		return nil, errors.New("project path cannot be empty")
 	}
@@ -193,9 +195,9 @@ func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]Language,
 	}
 
 	// Extract just the language names
-	var result []Language
+	var result []types.Language
 	for _, ls := range sortedLanguages {
-		result = append(result, Language(ls.language))
+		result = append(result, types.Language(ls.language))
 	}
 
 	if len(result) == 0 {
@@ -205,16 +207,20 @@ func (c LSPServerConfig) DetectProjectLanguages(projectPath string) ([]Language,
 	return result, nil
 }
 
-func (c LSPServerConfig) GetGlobalConfig() GlobalConfig {
-	return c.Global
+func (c LSPServerConfig) GetGlobalConfig() types.GlobalConfig {
+	return types.GlobalConfig(c.Global)
 }
 
-func (c LSPServerConfig) GetLanguageServers() map[Language]LanguageServerConfig {
-	return c.LanguageServers
+func (c LSPServerConfig) GetLanguageServers() map[types.Language]types.LanguageServerConfigProvider {
+	result := make(map[types.Language]types.LanguageServerConfigProvider)
+	for lang, config := range c.LanguageServers {
+		result[types.Language(lang)] = &config
+	}
+	return result
 }
 
 // DetectPrimaryProjectLanguage returns the most likely primary language for a project
-func (c LSPServerConfig) DetectPrimaryProjectLanguage(projectPath string) (*Language, error) {
+func (c LSPServerConfig) DetectPrimaryProjectLanguage(projectPath string) (*types.Language, error) {
 	languages, err := c.DetectProjectLanguages(projectPath)
 	if err != nil {
 		return nil, err
@@ -224,7 +230,7 @@ func (c LSPServerConfig) DetectPrimaryProjectLanguage(projectPath string) (*Lang
 		return nil, errors.New("no project language detected")
 	}
 
-	language := Language(languages[0])
+	language := types.Language(languages[0])
 
 	return &language, nil
 }

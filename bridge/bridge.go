@@ -11,17 +11,18 @@ import (
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/logger"
+	"rockerboo/mcp-lsp-bridge/types"
 	"rockerboo/mcp-lsp-bridge/lsp"
-	"rockerboo/mcp-lsp-bridge/security"
+		"rockerboo/mcp-lsp-bridge/security"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
 // NewMCPLSPBridge creates a new bridge instance with provided configuration and client factory
-func NewMCPLSPBridge(config lsp.LSPServerConfigProvider, allowedDirectories []string) *MCPLSPBridge {
+func NewMCPLSPBridge(config types.LSPServerConfigProvider, allowedDirectories []string) *MCPLSPBridge {
 	bridge := &MCPLSPBridge{
-		clients:            make(map[lsp.Language]lsp.LanguageClientInterface),
+		clients:            make(map[types.Language]types.LanguageClientInterface),
 		config:             config,
 		allowedDirectories: allowedDirectories,
 	}
@@ -54,7 +55,7 @@ func (b *MCPLSPBridge) AllowedDirectories() []string {
 }
 
 // validateAndConnectClient attempts to validate and establish a language server connection using the injected factory
-func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *lsp.LanguageServerConfig, config ConnectionAttemptConfig) (lsp.LanguageClientInterface, error) {
+func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig types.LanguageServerConfigProvider, config ConnectionAttemptConfig) (types.LanguageClientInterface, error) {
 	// Attempt connection with retry mechanism
 	var lastErr error
 
@@ -67,6 +68,8 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 	// }
 	dirs := b.AllowedDirectories()
 	dir := dirs[0] // Get first directory (for now)
+	
+	logger.Debug(fmt.Sprintf("validateAndConnectClient: Using directory: %s from allowed dirs: %v", dir, dirs))
 
 	absPath, err := b.IsAllowedDirectory(dir)
 	if err != nil {
@@ -84,7 +87,7 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 
 		var err error
 
-		client, err = lsp.NewLanguageClient(serverConfig.Command, serverConfig.Args...)
+		client, err = lsp.NewLanguageClient(serverConfig.GetCommand(), serverConfig.GetArgs()...)
 		if err != nil {
 			lastErr = fmt.Errorf("failed to create language client on attempt %d: %w", attempt+1, err)
 			continue
@@ -99,8 +102,10 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 			continue
 		}
 
-		root_path := "file://" + absPath
-		root_uri := protocol.DocumentUri(root_path)
+		rootPath := "file://" + absPath
+		// root_uri := protocol.DocumentUri(root_path)
+		
+		logger.Debug("validateAndConnectClient: Root path for LSP: " + rootPath)
 		// Process IDs are typically small positive integers, safe to convert
 		// But we'll add bounds checking for completeness
 		pid := os.Getpid()
@@ -112,31 +117,12 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 		// Prepare initialization parameters
 		workspaceFolders := []protocol.WorkspaceFolder{
 			{
-				Uri:  protocol.URI("file://" + absPath),
+				Uri:  protocol.URI(rootPath),
 				Name: filepath.Base(absPath),
 			},
 		}
 
 		client.SetProjectRoots([]string{dir})
-
-		semanticTokens := protocol.SemanticTokensClientCapabilities{
-			TokenTypes: []string{
-				"namespace", "type", "class", "enum", "interface", "struct",
-				"typeParameter", "parameter", "variable", "property", "enumMember",
-				"event", "function", "method", "macro", "keyword", "modifier",
-				"comment", "string", "number", "regexp", "operator",
-			},
-
-			TokenModifiers: []string{
-				"declaration", "definition", "readonly", "static", "deprecated",
-				"abstract", "async", "modification", "documentation", "defaultLibrary",
-			},
-			Formats:               []protocol.TokenFormat{protocol.TokenFormatRelative},
-			DynamicRegistration:   false,
-			MultilineTokenSupport: false,
-			ServerCancelSupport:   false,
-			AugmentsSyntaxTokens:  true,
-		}
 
 		params := protocol.InitializeParams{
 			ProcessId: &process_id,
@@ -144,21 +130,26 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 				Name:    "MCP-LSP Bridge",
 				Version: "1.0.0",
 			},
-			RootUri:          &root_uri,
+			// RootUri:          &root_uri,
 			WorkspaceFolders: &workspaceFolders,
-			Capabilities: protocol.ClientCapabilities{
-				TextDocument: &protocol.TextDocumentClientCapabilities{
-					SignatureHelp:  &protocol.SignatureHelpClientCapabilities{},
-					SemanticTokens: &semanticTokens,
-				},
-			},
+			// Capabilities: protocol.ClientCapabilities{
+			// 	TextDocument: &protocol.TextDocumentClientCapabilities{
+			// 		SignatureHelp: &protocol.SignatureHelpClientCapabilities{},
+			// 	},
+			// },
 		}
 
 		// Apply any initialization options from the configuration
-		if serverConfig.InitializationOptions != nil {
-			params.InitializationOptions = serverConfig.InitializationOptions
-		}
+		// if serverConfig.GetInitializationOptions() != nil {
+		// 	params.InitializationOptions = serverConfig.GetInitializationOptions()
+		// }
 
+		// Check connection status before initialize
+		metrics := client.GetMetrics()
+		logger.Debug(fmt.Sprintf("STATUS: Before Initialize - Client connected: %v, ctx.Err(): %v", metrics.IsConnected(), client.Context().Err()))
+
+		logger.Debug(fmt.Sprintf("STATUS: client %+v", client))
+		
 		// Send initialize request
 		result, err := client.Initialize(params)
 		if err != nil {
@@ -174,6 +165,10 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 
 			continue
 		}
+
+		logger.Debug(fmt.Sprintf("STATUS: After Initialize - Client connected: %v, ctx.Err(): %v", metrics.IsConnected(), client.Context().Err()))
+		logger.Debug(fmt.Sprintf("STATUS: Initialize result: %+v", result))
+		logger.Debug(fmt.Sprintf("STATUS: Setting up semantic tokens provider: %+v", client.ServerCapabilities().SemanticTokensProvider))
 
 		// Set server capabilities
 		client.SetServerCapabilities(result.Capabilities)
@@ -201,17 +196,9 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 			if supportsSemanticTokens {
 				err = client.SetupSemanticTokens()
 				if err != nil {
-					lastErr = fmt.Errorf("failed to setup semantic tokens on attempt %d: %w", attempt+1, err)
-					logger.Error(lastErr)
-
-					err = client.Close()
-					if err != nil {
-						return nil, err
-					}
-
-					time.Sleep(config.RetryDelay)
-
-					continue
+					// Semantic tokens setup failure is non-fatal - many servers don't support this feature
+					logger.Warn(fmt.Sprintf("Failed to setup semantic tokens on attempt %d (non-fatal): %v", attempt+1, err))
+					// Continue without semantic tokens support
 				}
 			}
 		}
@@ -262,9 +249,9 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig *l
 }
 
 // GetClientForLanguage retrieves or creates a language server client for a specific language
-func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClientInterface, error) {
+func (b *MCPLSPBridge) GetClientForLanguage(language string) (types.LanguageClientInterface, error) {
 	// Check if client already exists
-	if existingClient, exists := b.clients[lsp.Language(language)]; exists {
+	if existingClient, exists := b.clients[types.Language(language)]; exists {
 		// Check if client context is still valid (not cancelled)
 		if existingClient.Context().Err() == nil {
 			// Reset status to connected if it was in error state but context is still valid
@@ -281,7 +268,7 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClient
 			return nil, err
 		}
 
-		delete(b.clients, lsp.Language(language))
+		delete(b.clients, types.Language(language))
 	}
 
 	// Find the server configuration
@@ -297,7 +284,7 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (lsp.LanguageClient
 	}
 
 	// Store the new client
-	b.clients[lsp.Language(language)] = client
+	b.clients[types.Language(language)] = client
 
 	return client, nil
 }
@@ -311,11 +298,11 @@ func (b *MCPLSPBridge) CloseAllClients() {
 		}
 	}
 
-	b.clients = make(map[lsp.Language]lsp.LanguageClientInterface)
+	b.clients = make(map[types.Language]types.LanguageClientInterface)
 }
 
 // InferLanguage infers the programming language from a file path
-func (b *MCPLSPBridge) InferLanguage(filePath string) (*lsp.Language, error) {
+func (b *MCPLSPBridge) InferLanguage(filePath string) (*types.Language, error) {
 	ext := filepath.Ext(filePath)
 	language, err := b.GetConfig().FindExtLanguage(ext)
 
@@ -327,7 +314,7 @@ func (b *MCPLSPBridge) InferLanguage(filePath string) (*lsp.Language, error) {
 }
 
 // GetConfig returns the bridge's configuration
-func (b *MCPLSPBridge) GetConfig() lsp.LSPServerConfigProvider {
+func (b *MCPLSPBridge) GetConfig() types.LSPServerConfigProvider {
 	return b.config
 }
 
@@ -342,7 +329,7 @@ func (b *MCPLSPBridge) SetServer(mcpServer *server.MCPServer) {
 }
 
 // DetectProjectLanguages detects all languages used in a project directory
-func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]lsp.Language, error) {
+func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]types.Language, error) {
 	if b.config == nil {
 		return nil, errors.New("no LSP configuration available")
 	}
@@ -351,7 +338,7 @@ func (b *MCPLSPBridge) DetectProjectLanguages(projectPath string) ([]lsp.Languag
 }
 
 // DetectPrimaryProjectLanguage detects the primary language of a project
-func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (*lsp.Language, error) {
+func (b *MCPLSPBridge) DetectPrimaryProjectLanguage(projectPath string) (*types.Language, error) {
 	if b.config == nil {
 		return nil, errors.New("no LSP configuration available")
 	}
@@ -407,8 +394,8 @@ func (b *MCPLSPBridge) SearchTextInWorkspace(language, query string) ([]protocol
 }
 
 // GetMultiLanguageClients gets language clients for multiple languages with fallback
-func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[lsp.Language]lsp.LanguageClientInterface, error) {
-	clients := make(map[lsp.Language]lsp.LanguageClientInterface)
+func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[types.Language]types.LanguageClientInterface, error) {
+	clients := make(map[types.Language]types.LanguageClientInterface)
 
 	var mu sync.Mutex
 
@@ -435,7 +422,7 @@ func (b *MCPLSPBridge) GetMultiLanguageClients(languages []string) (map[lsp.Lang
 			}
 
 			mu.Lock()
-			clients[lsp.Language(lang)] = client
+			clients[types.Language(lang)] = client
 			mu.Unlock()
 		}(language)
 	}
@@ -516,7 +503,7 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (
 
 // ensureDocumentOpen sends a textDocument/didOpen notification to the language server
 // This is often required before other document operations can be performed
-func (b *MCPLSPBridge) ensureDocumentOpen(client lsp.LanguageClientInterface, uri, language string) error {
+func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, uri, language string) error {
 	// Read the file content
 	// Remove file:// prefix to get the actual file path
 	filePath := strings.TrimPrefix(uri, "file://")
@@ -609,7 +596,7 @@ func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol
 	return symbols, nil
 }
 
-func (b *MCPLSPBridge) GetServerConfig(language string) (lsp.LanguageServerConfigProvider, error) {
+func (b *MCPLSPBridge) GetServerConfig(language string) (types.LanguageServerConfigProvider, error) {
 	languageServer, err := b.GetConfig().FindServerConfig(language)
 	if err != nil {
 		return nil, err
@@ -1005,7 +992,7 @@ func (b *MCPLSPBridge) FindImplementations(uri string, line, character uint32) (
 	return implementations, nil
 }
 
-func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]lsp.TokenPosition, error) {
+func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]types.TokenPosition, error) {
 	language, err := b.InferLanguage(uri)
 	if err != nil {
 		return nil, fmt.Errorf("failed to infer language: %w", err)

@@ -2,19 +2,31 @@ package lsp
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
+	"rockerboo/mcp-lsp-bridge/logger"
 )
 
 // LSP Protocol Method Implementations
 
 // Initialize sends an initialize request to the language server
 func (lc *LanguageClient) Initialize(params protocol.InitializeParams) (*protocol.InitializeResult, error) {
+	// Check connection status before sending request
+	logger.Debug(fmt.Sprintf("STATUS: Initialize - About to call SendRequest, ctx.Err()=%v", lc.ctx.Err()))
+	select {
+	case <-lc.conn.DisconnectNotify():
+		logger.Error("STATUS: Initialize - Connection already disconnected!")
+		return nil, errors.New("connection already disconnected")
+	default:
+		logger.Debug("STATUS: Initialize - Connection appears healthy")
+	}
+	
 	var result protocol.InitializeResult
 
-	err := lc.SendRequest("initialize", params, &result, 10*time.Second)
+	err := lc.SendRequest("initialize", params, &result, 5*time.Second)
 	if err != nil {
 		return nil, err
 	}

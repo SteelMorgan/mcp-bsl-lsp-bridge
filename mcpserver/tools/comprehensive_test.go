@@ -7,6 +7,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/mcptest"
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -20,7 +21,7 @@ func TestInferLanguageToolHandler(t *testing.T) {
 
 	// Setup mock expectations
 	mockConfig := &lsp.LSPServerConfig{
-		ExtensionLanguageMap: map[string]lsp.Language{
+		ExtensionLanguageMap: map[string]types.Language{
 			".go":   "go",
 			".js":   "javascript",
 			".py":   "python",

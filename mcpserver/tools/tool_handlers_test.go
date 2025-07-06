@@ -8,6 +8,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
@@ -22,7 +23,7 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 		uri            string
 		line           int
 		character      int
-		mockLanguage   lsp.Language
+		mockLanguage   types.Language
 		mockClient     any
 		mockResult     *lsp.AnalyzeCodeResult
 		expectError    bool
@@ -59,7 +60,7 @@ func TestAnalyzeCodeToolExecution(t *testing.T) {
 			// Set up mock expectations based on test case
 			if tc.expectError {
 				// For error cases, mock should return an error
-				bridge.On("InferLanguage", tc.uri).Return((*lsp.Language)(nil), errors.New("unknown language"))
+				bridge.On("InferLanguage", tc.uri).Return((*types.Language)(nil), errors.New("unknown language"))
 			} else {
 				// For success cases, mock should return the expected language
 				bridge.On("InferLanguage", tc.uri).Return(&tc.mockLanguage, nil)
@@ -110,7 +111,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 		filePath     string
 		mockConfig   *lsp.LSPServerConfig
 		expectError  bool
-		expectedLang lsp.Language
+		expectedLang types.Language
 	}{
 		{
 			name:         "go file",
@@ -142,7 +143,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
 			if tc.expectError {
-				bridge.On("InferLanguage", tc.filePath).Return((*lsp.Language)(nil), errors.New("No language found"))
+				bridge.On("InferLanguage", tc.filePath).Return((*types.Language)(nil), errors.New("No language found"))
 			} else {
 				bridge.On("InferLanguage", tc.filePath).Return(&tc.expectedLang, nil)
 			}
@@ -189,7 +190,7 @@ func TestInferLanguageToolExecution(t *testing.T) {
 func TestLSPConnectToolExecution(t *testing.T) {
 	testCases := []struct {
 		name        string
-		language    lsp.Language
+		language    types.Language
 		mockConfig  *lsp.LSPServerConfig
 		mockClient  any
 		expectError bool
@@ -198,7 +199,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 			name:     "successful connection",
 			language: "go",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {Command: "gopls"},
 				},
 			},
@@ -209,7 +210,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 			name:     "language not configured",
 			language: "rust",
 			mockConfig: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {Command: "gopls"},
 				},
 			},
@@ -229,7 +230,7 @@ func TestLSPConnectToolExecution(t *testing.T) {
 
 			// Only set up GetClientForLanguageInterface expectation if we'll call it
 			if tc.mockConfig != nil {
-				if _, exists := tc.mockConfig.LanguageServers[tc.language]; exists {
+				if _, exists := tc.mockConfig.LanguageServers[types.Language(tc.language)]; exists {
 
 					if tc.expectError && tc.mockClient == nil {
 						// This test case expects an error when getting the client
@@ -289,15 +290,15 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 		name          string
 		projectPath   string
 		mode          string
-		mockLanguages []lsp.Language
-		mockPrimary   lsp.Language
+		mockLanguages []types.Language
+		mockPrimary   types.Language
 		expectError   bool
 	}{
 		{
 			name:          "detect all languages",
 			projectPath:   "/path/to/project",
 			mode:          "all",
-			mockLanguages: []lsp.Language{"go", "python", "javascript"},
+			mockLanguages: []types.Language{"go", "python", "javascript"},
 			expectError:   false,
 		},
 		{
@@ -323,13 +324,13 @@ func TestProjectLanguageDetectionToolExecution(t *testing.T) {
 			switch tc.mode {
 			case "primary":
 				if tc.expectError {
-					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return((*lsp.Language)(nil), errors.New("detection failed"))
+					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return((*types.Language)(nil), errors.New("detection failed"))
 				} else {
 					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return(&tc.mockPrimary, nil)
 				}
 			default: // "all"
 				if tc.expectError {
-					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]lsp.Language(nil), errors.New("detection failed"))
+					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]types.Language(nil), errors.New("detection failed"))
 				} else {
 					bridge.On("DetectProjectLanguages", tc.projectPath).Return(tc.mockLanguages, nil)
 				}

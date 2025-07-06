@@ -7,7 +7,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
-	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -91,10 +91,10 @@ func SemanticTokensTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 		}
 }
 
-func formatTokensByType(positions []lsp.TokenPosition) string {
+func formatTokensByType(positions []types.TokenPosition) string {
 	var response strings.Builder
 
-	tokensByType := make(map[string][]lsp.TokenPosition)
+	tokensByType := make(map[string][]types.TokenPosition)
 
 	// Group tokens by type
 	for _, pos := range positions {

@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"rockerboo/mcp-lsp-bridge/types"
 	"testing"
 	"time"
 
@@ -58,20 +59,29 @@ func TestLanguageClientMetrics(t *testing.T) {
 	// Retrieve and check metrics
 	metrics := client.GetMetrics()
 
-	if metrics.TotalRequests != 5 {
-		t.Errorf("Expected 5 total requests, got %v", metrics.TotalRequests)
+	// Verify initial metric properties
+	if metrics.GetCommand() != "mock-lsp-server" {
+		t.Errorf("Unexpected command: %v", metrics.GetCommand())
 	}
 
-	// Verify other metric properties
-	if metrics.Command != "mock-lsp-server" {
-		t.Errorf("Unexpected command: %v", metrics.Command)
+	if metrics.GetTotalRequests() != 5 {
+		t.Errorf("Expected 5 total requests initially, got %v", metrics.GetTotalRequests())
 	}
 
-	t.Logf("Metrics: %v", metrics)
+	if metrics.GetSuccessfulRequests() != 0 {
+		t.Errorf("Expected 0 successful requests initially, got %v", metrics.GetSuccessfulRequests())
+	}
 
-	// Since we're sending invalid method requests, the client should be marked as disconnected
-	if metrics.IsConnected != false {
-		t.Error("Client should be marked as disconnected after failed requests")
+	if metrics.GetFailedRequests() != 5 {
+		t.Errorf("Expected 5 failed requests initially, got %v", metrics.GetFailedRequests())
+	}
+
+	if metrics.IsConnected() != false {
+		t.Error("Client should not be marked as connected initially")
+	}
+
+	if metrics.GetStatus() != StatusError.Status() {
+		t.Errorf("Expected initial status StatusError, got %v", metrics.GetStatus())
 	}
 }
 
@@ -96,12 +106,12 @@ func TestLanguageClientClose(t *testing.T) {
 		t.Error("Client should not be connected after Close()")
 	}
 
-	if client.Status() != StatusUninitialized {
+	if client.Status() != StatusUninitialized.Status() {
 		t.Errorf("Expected status Uninitialized after Close(), got %v", client.Status())
 	}
 }
 
-func TestSendRequestErrorHandling(t *testing.T) {
+func TestConnectErrorHandling(t *testing.T) {
 	client, err := NewLanguageClient("nonexistent_command")
 	if err != nil {
 		t.Fatal("Expected error when creating client with nonexistent command")
@@ -189,7 +199,7 @@ func BenchmarkSendRequest(b *testing.B) {
 	}
 }
 
-func closeClient(t *testing.T, client LanguageClientInterface) func() {
+func closeClient(t *testing.T, client types.LanguageClientInterface) func() {
 	return func() {
 		if err := client.Close(); err != nil {
 			t.Logf("failed to close client: %v", err)

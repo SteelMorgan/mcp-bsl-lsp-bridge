@@ -8,6 +8,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 	"github.com/stretchr/testify/assert"
@@ -82,7 +83,7 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 		Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{Value: "func main()"},
 	}
 
-	language := lsp.Language("go")
+	language := types.Language("go")
 	mockBridge.On("InferLanguage", "file:///test.go").Return(&language, nil).Once()
 
 	mockBridge.On("GetHoverInformation", "file:///test.go", uint32(10), uint32(5)).Return(&hoverResult, nil).Once()
@@ -131,7 +132,7 @@ func TestMCPToolIntegration_HoverTool(t *testing.T) {
 
 func TestMCPToolIntegration_InferLanguageTool(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
-	language := lsp.Language("go")
+	language := types.Language("go")
 	mockBridge.On("InferLanguage", "file:///path/to/main.go").Return(&language, nil).Once() // Changed to file:/// URI
 
 	// Initialize tool and handler directly
@@ -260,7 +261,7 @@ func TestMCPToolIntegration_LSPDisconnectTool(t *testing.T) {
 }
 func TestMCPToolIntegration_ErrorHandling(t *testing.T) {
 	mockBridge := new(mocks.MockBridge)
-	language := lsp.Language("")
+	language := types.Language("")
 	mockBridge.On("InferLanguage", "file:///invalid.xyz").Return(&language, errors.New("unsupported file type")).Once()
 
 	mockBridge.On("GetHoverInformation", "file:///invalid.xyz", uint32(10), uint32(5)).Return((*protocol.Hover)(nil), errors.New("unsupported file type")).Once()

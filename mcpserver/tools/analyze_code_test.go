@@ -7,6 +7,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
@@ -17,14 +18,14 @@ import (
 func TestAnalyzeCodeTool_Success(t *testing.T) {
 	bridge := &mocks.MockBridge{}
 	uri := "file:///test.go"
-	mockLanguage := lsp.Language("go")
+	mockLanguage := types.Language("go")
 	mockClient := &mocks.MockLanguageClient{}
 
 	// Set up mock expectations
 	bridge.On("InferLanguage", uri).Return(&mockLanguage, nil)
 
 	bridge.On("GetClientForLanguage", string(mockLanguage)).Return(
-		lsp.LanguageClientInterface(mockClient), nil)
+		types.LanguageClientInterface(mockClient), nil)
 
 	tool, handler := AnalyzeCode(bridge)
 	// Create MCP server and register tool
@@ -65,7 +66,7 @@ func TestAnalyzeCodeTool_LanguageInferenceFailure(t *testing.T) {
 	uri := "file:///unknown.xyz"
 
 	// Set up mock to return error
-	bridge.On("InferLanguage", uri).Return((*lsp.Language)(nil), errors.New("unsupported file type"))
+	bridge.On("InferLanguage", uri).Return((*types.Language)(nil), errors.New("unsupported file type"))
 
 	tool, handler := AnalyzeCode(bridge)
 	// Create MCP server and register tool
@@ -104,11 +105,11 @@ func TestAnalyzeCodeTool_LanguageInferenceFailure(t *testing.T) {
 func TestAnalyzeCodeTool_ClientCreationFailure(t *testing.T) {
 	bridge := &mocks.MockBridge{}
 	uri := "file:///test.go"
-	mockLanguage := lsp.Language("unsupported")
+	mockLanguage := types.Language("unsupported")
 
 	// Set up mocks - language inference succeeds, client creation fails
 	bridge.On("InferLanguage", uri).Return(&mockLanguage, nil)
-	bridge.On("GetClientForLanguage", string(mockLanguage)).Return((lsp.LanguageClientInterface)(nil), errors.New("unsupported language"))
+	bridge.On("GetClientForLanguage", string(mockLanguage)).Return((types.LanguageClientInterface)(nil), errors.New("unsupported language"))
 
 	tool, handler := AnalyzeCode(bridge)
 	// Create MCP server and register tool

@@ -1,7 +1,7 @@
 package interfaces
 
 import (
-	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
@@ -21,7 +21,7 @@ type BridgeInterface interface {
 }
 
 type InformationProvider interface {
-	SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]lsp.TokenPosition, error)
+	SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]types.TokenPosition, error)
 	GetCodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error)
 }
 type CallHierarchyProvider interface {
@@ -61,20 +61,20 @@ type DirectoryManager interface {
 }
 
 type ClientManager interface {
-	GetClientForLanguage(language string) (lsp.LanguageClientInterface, error)
-	GetMultiLanguageClients(languages []string) (map[lsp.Language]lsp.LanguageClientInterface, error)
+	GetClientForLanguage(language string) (types.LanguageClientInterface, error)
+	GetMultiLanguageClients(languages []string) (map[types.Language]types.LanguageClientInterface, error)
 	CloseAllClients()
 }
 
 type ConfigManager interface {
-	GetConfig() lsp.LSPServerConfigProvider
-	GetServerConfig(language string) (lsp.LanguageServerConfigProvider, error)
+	GetConfig() types.LSPServerConfigProvider
+	GetServerConfig(language string) (types.LanguageServerConfigProvider, error)
 }
 
 type LanguageDetector interface {
-	InferLanguage(filePath string) (*lsp.Language, error)
-	DetectProjectLanguages(projectPath string) ([]lsp.Language, error)
-	DetectPrimaryProjectLanguage(projectPath string) (*lsp.Language, error)
+	InferLanguage(filePath string) (*types.Language, error)
+	DetectProjectLanguages(projectPath string) ([]types.Language, error)
+	DetectPrimaryProjectLanguage(projectPath string) (*types.Language, error)
 }
 
 // type ProjectRootManager interface {

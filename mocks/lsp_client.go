@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"context"
-	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/types"
 	"time"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -15,9 +15,9 @@ type MockLanguageClient struct {
 }
 
 // Core client methods
-func (m *MockLanguageClient) Connect() (lsp.LanguageClientInterface, error) {
+func (m *MockLanguageClient) Connect() (types.LanguageClientInterface, error) {
 	args := m.Called()
-	return args.Get(0).(lsp.LanguageClientInterface), args.Error(1)
+	return args.Get(0).(types.LanguageClientInterface), args.Error(1)
 }
 
 func (m *MockLanguageClient) SendRequest(method string, params any, result any, timeout time.Duration) error {
@@ -40,9 +40,9 @@ func (m *MockLanguageClient) Context() context.Context {
 	return args.Get(0).(context.Context)
 }
 
-func (m *MockLanguageClient) GetMetrics() lsp.ClientMetrics {
+func (m *MockLanguageClient) GetMetrics() types.ClientMetricsProvider {
 	args := m.Called()
-	return args.Get(0).(lsp.ClientMetrics)
+	return args.Get(0).(types.ClientMetricsProvider)
 }
 
 func (m *MockLanguageClient) IsConnected() bool {
@@ -50,9 +50,9 @@ func (m *MockLanguageClient) IsConnected() bool {
 	return args.Bool(0)
 }
 
-func (m *MockLanguageClient) Status() lsp.ClientStatus {
+func (m *MockLanguageClient) Status() int {
 	args := m.Called()
-	return args.Get(0).(lsp.ClientStatus)
+	return args.Int(0)
 }
 
 func (m *MockLanguageClient) ProjectRoots() []string {
@@ -106,9 +106,9 @@ func (m *MockLanguageClient) SetupSemanticTokens() error {
 	return args.Error(1)
 }
 
-func (m *MockLanguageClient) TokenParser() *lsp.SemanticTokenParser {
+func (m *MockLanguageClient) TokenParser() types.SemanticTokensParserProvider {
 	args := m.Called()
-	return args.Get(0).(*lsp.SemanticTokenParser)
+	return args.Get(0).(types.SemanticTokensParserProvider)
 }
 
 // Text document synchronization

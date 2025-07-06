@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"rockerboo/mcp-lsp-bridge/bridge"
 	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/types"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ func createTestConfig() *lsp.LSPServerConfig {
 	if err != nil {
 		// Fallback to a minimal config if file doesn't exist
 		return &lsp.LSPServerConfig{
-			LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+			LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 				"go": {
 					Command:   "gopls",
 					Args:      []string{},
@@ -31,10 +32,10 @@ func createTestConfig() *lsp.LSPServerConfig {
 					Filetypes: []string{".go"},
 				},
 			},
-			ExtensionLanguageMap: map[string]lsp.Language{
+			ExtensionLanguageMap: map[string]types.Language{
 				".go": "go",
 			},
-			LanguageExtensionMap: map[lsp.Language][]string{
+			LanguageExtensionMap: map[types.Language][]string{
 				"go": {".go"},
 			},
 		}
@@ -65,7 +66,7 @@ func TestInferLanguage(t *testing.T) {
 
 	testCases := []struct {
 		filePath   string
-		expected   lsp.Language
+		expected   types.Language
 		shouldFail bool
 	}{
 		{"/path/to/example.go", "go", false},
@@ -256,7 +257,7 @@ func TestTryLoadConfig(t *testing.T) {
 					}
 				}`
 				
-				fallbackPath := "example.lsp_config.json"
+				fallbackPath := "lsp_config.example.json"
 				err = os.WriteFile(fallbackPath, []byte(configContent), 0600)
 				require.NoError(t, err)
 				

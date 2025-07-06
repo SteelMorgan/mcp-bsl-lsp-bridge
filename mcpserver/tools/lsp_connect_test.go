@@ -7,6 +7,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
@@ -17,8 +18,8 @@ func TestLSPConnectTool(t *testing.T) {
 	testCases := []struct {
 		name        string
 		language    string
-		mockConfig  lsp.LSPServerConfigProvider
-		mockClient  lsp.LanguageClientInterface
+		mockConfig  types.LSPServerConfigProvider
+		mockClient  types.LanguageClientInterface
 		expectError bool
 		description string
 	}{
@@ -89,7 +90,7 @@ func TestLSPConnectTool(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
 			if tc.expectError {
-				bridge.On("GetClientForLanguage", tc.language).Return((lsp.LanguageClientInterface)(nil), fmt.Errorf("failed to create client for language: %s", tc.language))
+				bridge.On("GetClientForLanguage", tc.language).Return((types.LanguageClientInterface)(nil), fmt.Errorf("failed to create client for language: %s", tc.language))
 			} else {
 				bridge.On("GetClientForLanguage", tc.language).Return(tc.mockClient, nil)
 			}
@@ -136,7 +137,7 @@ func TestLSPConnectTool(t *testing.T) {
 func TestLSPConnectValidation(t *testing.T) {
 	t.Run("validate language server configuration", func(t *testing.T) {
 		config := &lsp.LSPServerConfig{
-			LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+			LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 				"go": {
 					Command:   "gopls",
 					Args:      []string{"serve"},
@@ -177,7 +178,7 @@ func TestLSPConnectValidation(t *testing.T) {
 
 	t.Run("multiple language server support", func(t *testing.T) {
 		config := &lsp.LSPServerConfig{
-			LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+			LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 				"go": {
 					Command:   "gopls",
 					Filetypes: []string{".go"},
@@ -199,7 +200,7 @@ func TestLSPConnectValidation(t *testing.T) {
 
 		expectedLanguages := []string{"go", "python", "typescript", "rust"}
 		for _, lang := range expectedLanguages {
-			serverConfig, exists := config.LanguageServers[lsp.Language(lang)]
+			serverConfig, exists := config.LanguageServers[types.Language(lang)]
 			if !exists {
 				t.Errorf("Expected %s language server config", lang)
 				continue

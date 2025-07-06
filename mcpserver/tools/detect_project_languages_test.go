@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"rockerboo/mcp-lsp-bridge/mocks"
-	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/types"
 	"strings"
 	"testing"
 
@@ -16,8 +16,8 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 		name            string
 		projectPath     string
 		mode            string
-		mockLanguages   []lsp.Language
-		mockPrimary     lsp.Language
+		mockLanguages   []types.Language
+		mockPrimary     types.Language
 		expectError     bool
 		expectedContent string
 		description     string
@@ -26,7 +26,7 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 			name:            "detect all languages in Go project",
 			projectPath:     "/path/to/go-project",
 			mode:            "all",
-			mockLanguages:   []lsp.Language{"go", "shell", "yaml"},
+			mockLanguages:   []types.Language{"go", "shell", "yaml"},
 			expectError:     false,
 			expectedContent: "Detected languages:",
 			description:     "Should detect multiple languages in a Go project",
@@ -44,7 +44,7 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 			name:            "detect all languages in Python project",
 			projectPath:     "/path/to/python-project",
 			mode:            "all",
-			mockLanguages:   []lsp.Language{"python", "yaml", "toml"},
+			mockLanguages:   []types.Language{"python", "yaml", "toml"},
 			expectError:     false,
 			expectedContent: "Detected languages:",
 			description:     "Should detect multiple languages in a Python project",
@@ -62,7 +62,7 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 			name:            "detect languages in TypeScript project",
 			projectPath:     "/path/to/ts-project",
 			mode:            "all",
-			mockLanguages:   []lsp.Language{"typescript", "javascript", "json"},
+			mockLanguages:   []types.Language{"typescript", "javascript", "json"},
 			expectError:     false,
 			expectedContent: "Detected languages:",
 			description:     "Should detect TypeScript and related languages",
@@ -80,7 +80,7 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 			name:            "detect languages in multi-language project",
 			projectPath:     "/path/to/multi-lang-project",
 			mode:            "all",
-			mockLanguages:   []lsp.Language{"go", "python", "typescript", "rust", "shell"},
+			mockLanguages:   []types.Language{"go", "python", "typescript", "rust", "shell"},
 			expectError:     false,
 			expectedContent: "Detected languages:",
 			description:     "Should detect multiple languages in a polyglot project",
@@ -103,7 +103,7 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 			name:            "default mode (should behave like 'all')",
 			projectPath:     "/path/to/default-project",
 			mode:            "",
-			mockLanguages:   []lsp.Language{"go", "yaml"},
+			mockLanguages:   []types.Language{"go", "yaml"},
 			expectError:     false,
 			expectedContent: "Detected languages:",
 			description:     "Should default to 'all' mode when mode is not specified",
@@ -119,14 +119,14 @@ func TestDetectProjectLanguagesTool(t *testing.T) {
 			case "primary":
 				// Only primary language detection needed
 				if tc.expectError {
-					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return((*lsp.Language)(nil), fmt.Errorf("primary language detection failed for %s", tc.projectPath))
+					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return((*types.Language)(nil), fmt.Errorf("primary language detection failed for %s", tc.projectPath))
 				} else {
 					bridge.On("DetectPrimaryProjectLanguage", tc.projectPath).Return(&tc.mockPrimary, nil)
 				}
 			case "all", "":
 				// All languages detection needed
 				if tc.expectError {
-					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]lsp.Language(nil), fmt.Errorf("project detection failed for %s", tc.projectPath))
+					bridge.On("DetectProjectLanguages", tc.projectPath).Return([]types.Language(nil), fmt.Errorf("project detection failed for %s", tc.projectPath))
 				} else {
 					bridge.On("DetectProjectLanguages", tc.projectPath).Return(tc.mockLanguages, nil)
 				}
@@ -199,8 +199,8 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 		bridge := &mocks.MockBridge{}
 
 		// Set up mock expectations
-		bridge.On("DetectProjectLanguages", "/path/to/empty-project").Return([]lsp.Language{}, nil)
-		bridge.On("DetectPrimaryProjectLanguage", "/path/to/empty-project").Return((*lsp.Language)(nil), errors.New("no primary language detected"))
+		bridge.On("DetectProjectLanguages", "/path/to/empty-project").Return([]types.Language{}, nil)
+		bridge.On("DetectPrimaryProjectLanguage", "/path/to/empty-project").Return((*types.Language)(nil), errors.New("no primary language detected"))
 
 		// Test empty language detection
 		languages, err := bridge.DetectProjectLanguages("/path/to/empty-project")
@@ -225,10 +225,10 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 	t.Run("project with single language", func(t *testing.T) {
 		bridge := &mocks.MockBridge{}
 
-		language := lsp.Language("go")
+		language := types.Language("go")
 
 		// Set up mock expectations
-		bridge.On("DetectProjectLanguages", "/path/to/single-lang").Return([]lsp.Language{"go"}, nil)
+		bridge.On("DetectProjectLanguages", "/path/to/single-lang").Return([]types.Language{"go"}, nil)
 		bridge.On("DetectPrimaryProjectLanguage", "/path/to/single-lang").Return(&language, nil)
 
 		// Test single language detection
@@ -251,7 +251,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		if *primary != lsp.Language("go") {
+		if *primary != types.Language("go") {
 			t.Errorf("Expected 'go', got '%s'", string(*primary))
 		}
 
@@ -260,10 +260,10 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 	})
 
 	t.Run("project with many languages prioritization", func(t *testing.T) {
-		languages := []lsp.Language{"go", "python", "typescript", "javascript", "rust", "c", "cpp", "java", "shell", "yaml", "json", "dockerfile"}
+		languages := []types.Language{"go", "python", "typescript", "javascript", "rust", "c", "cpp", "java", "shell", "yaml", "json", "dockerfile"}
 		bridge := &mocks.MockBridge{}
 
-		language := lsp.Language("go")
+		language := types.Language("go")
 
 		// Set up mock expectations
 		bridge.On("DetectProjectLanguages", "/path/to/polyglot-project").Return(languages, nil)
@@ -281,7 +281,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 
 		// Verify the languages match (order matters)
 		for i, expectedLang := range languages {
-			if i < len(detectedLangs) && detectedLangs[i] != lsp.Language(expectedLang) {
+			if i < len(detectedLangs) && detectedLangs[i] != types.Language(expectedLang) {
 				t.Errorf("Expected language %s at index %d, got %s", expectedLang, i, detectedLangs[i])
 			}
 		}
@@ -292,7 +292,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		if *primary != lsp.Language("go") {
+		if *primary != types.Language("go") {
 			t.Errorf("Expected 'go' as primary, got '%s'", string(*primary))
 		}
 
@@ -303,7 +303,7 @@ func TestDetectProjectLanguagesEdgeCases(t *testing.T) {
 func TestDetectProjectLanguagesConfiguration(t *testing.T) {
 	t.Run("validate language detection patterns", func(t *testing.T) {
 		// Test that common project patterns are recognized
-		projectPatterns := map[string][]lsp.Language{
+		projectPatterns := map[string][]types.Language{
 			"/go-project":         {"go", "mod", "yaml"},
 			"/python-project":     {"python", "requirements", "yaml"},
 			"/node-project":       {"typescript", "javascript", "json"},
@@ -333,7 +333,7 @@ func TestDetectProjectLanguagesConfiguration(t *testing.T) {
 
 				// Verify the languages match (assuming order matters)
 				for i, expectedLang := range expectedLanguages {
-					if i < len(languages) && languages[i] != lsp.Language(expectedLang) {
+					if i < len(languages) && languages[i] != types.Language(expectedLang) {
 						t.Errorf("For %s at index %d: expected %s, got %s", projectPath, i, expectedLang, languages[i])
 					}
 				}

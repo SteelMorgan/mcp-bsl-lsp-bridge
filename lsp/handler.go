@@ -11,7 +11,7 @@ import (
 
 // ClientHandler handles incoming messages from the language server
 type ClientHandler struct {
-	client *LanguageClient
+	// No client reference needed - handler is stateless
 }
 
 func (h *ClientHandler) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {

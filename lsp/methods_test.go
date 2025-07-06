@@ -2,144 +2,26 @@ package lsp
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
+	"rockerboo/mcp-lsp-bridge/mocks"
+
 	"github.com/myleshyson/lsprotocol-go/protocol"
-	"github.com/sourcegraph/jsonrpc2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-// MockLSPConnectionInterface simulates the LSP connection
-type MockLSPConnectionInterface struct {
-	mock.Mock
-	ctx context.Context
-}
-
-func (m *MockLSPConnectionInterface) Call(ctx context.Context, method string, params, result any, opts ...jsonrpc2.CallOption) error {
-	m.ctx = ctx
-	args := m.Called(ctx, method, params, result, opts)
-
-	// Simulate populating results for different methods
-	if args.Error(0) == nil {
-		switch method {
-		case "initialize":
-			if r, ok := result.(*protocol.InitializeResult); ok {
-				*r = protocol.InitializeResult{
-					Capabilities: protocol.ServerCapabilities{},
-				}
-			}
-		case "textDocument/definition":
-			if r, ok := result.(*json.RawMessage); ok {
-				// Return empty array as JSON
-				*r = json.RawMessage("[]")
-			}
-		case "textDocument/hover":
-			if r, ok := result.(*protocol.Hover); ok {
-				*r = protocol.Hover{
-					Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{
-						Value: protocol.MarkupContent{
-							Kind:  "markdown",
-							Value: "Test hover content",
-						},
-					},
-				}
-			}
-		case "workspace/symbol":
-			if r, ok := result.(*[]protocol.WorkspaceSymbol); ok {
-				*r = []protocol.WorkspaceSymbol{}
-			}
-		case "textDocument/references":
-			if r, ok := result.(*[]protocol.Location); ok {
-				*r = []protocol.Location{}
-			}
-		case "textDocument/documentSymbol":
-			if r, ok := result.(*[]protocol.DocumentSymbol); ok {
-				*r = []protocol.DocumentSymbol{
-					{
-						Name: "TestSymbol",
-						Kind: 12, // Function kind
-						Range: protocol.Range{
-							Start: protocol.Position{Line: 0, Character: 0},
-							End:   protocol.Position{Line: 1, Character: 0},
-						},
-						SelectionRange: protocol.Range{
-							Start: protocol.Position{Line: 0, Character: 0},
-							End:   protocol.Position{Line: 0, Character: 10},
-						},
-					},
-				}
-			}
-		case "textDocument/implementation":
-			if r, ok := result.(*[]protocol.Location); ok {
-				*r = []protocol.Location{}
-			}
-		case "textDocument/signatureHelp":
-			if r, ok := result.(*json.RawMessage); ok {
-				*r = json.RawMessage(`{"signatures": []}`)
-			}
-		case "textDocument/codeAction":
-			if r, ok := result.(*[]protocol.CodeAction); ok {
-				*r = []protocol.CodeAction{}
-			}
-		case "textDocument/rename":
-			if r, ok := result.(*protocol.WorkspaceEdit); ok {
-				*r = protocol.WorkspaceEdit{}
-			}
-		case "workspace/diagnostic":
-			if r, ok := result.(*protocol.WorkspaceDiagnosticReport); ok {
-				*r = protocol.WorkspaceDiagnosticReport{}
-			}
-		case "textDocument/formatting":
-			if r, ok := result.(*[]protocol.TextEdit); ok {
-				*r = []protocol.TextEdit{}
-			}
-		case "textDocument/prepareCallHierarchy":
-			if r, ok := result.(*[]protocol.CallHierarchyItem); ok {
-				*r = []protocol.CallHierarchyItem{}
-			}
-		case "textDocument/semanticTokens":
-			if r, ok := result.(*protocol.SemanticTokens); ok {
-				*r = protocol.SemanticTokens{}
-			}
-		case "textDocument/semanticTokens/range":
-			if r, ok := result.(*protocol.SemanticTokens); ok {
-				*r = protocol.SemanticTokens{}
-			}
-		}
-	}
-
-	return args.Error(0)
-}
-
-func (m *MockLSPConnectionInterface) Notify(ctx context.Context, method string, params any, opts ...jsonrpc2.CallOption) error {
-	m.ctx = ctx
-	args := m.Called(ctx, method, params, opts)
-	return args.Error(0)
-}
-
-func (m *MockLSPConnectionInterface) Reply(ctx context.Context, id jsonrpc2.ID, result any) error {
-	m.ctx = ctx
-	args := m.Called(ctx, id, result)
-	return args.Error(0)
-}
-
-func (m *MockLSPConnectionInterface) Close() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
 // Initialization Method Tests
 func TestInitialize(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
-	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful initialization
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "initialize", mock.AnythingOfType("protocol.InitializeParams"), mock.AnythingOfType("*protocol.InitializeResult"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "initialize", mock.AnythingOfType("protocol.InitializeParams"), mock.AnythingOfType("*protocol.InitializeResult"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	// mock DisconnectNotify to return a channel that closes when disconnectCtx is canceled
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn:      mockConn,
@@ -167,7 +49,7 @@ func TestInitialize(t *testing.T) {
 }
 
 func TestInitialized(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
 	ctx := context.Background()
@@ -187,13 +69,14 @@ func TestInitialized(t *testing.T) {
 }
 
 func TestShutdown(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful shutdown
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "shutdown", mock.Anything, mock.AnythingOfType("*protocol.ShutdownResponse"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "shutdown", mock.Anything, mock.AnythingOfType("*protocol.ShutdownResponse"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -207,7 +90,7 @@ func TestShutdown(t *testing.T) {
 }
 
 func TestExit(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
 	ctx := context.Background()
@@ -227,7 +110,7 @@ func TestExit(t *testing.T) {
 }
 
 func TestDidOpen(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
 	ctx := context.Background()
@@ -247,7 +130,7 @@ func TestDidOpen(t *testing.T) {
 }
 
 func TestDidChange(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
 	ctx := context.Background()
@@ -278,7 +161,7 @@ func TestDidChange(t *testing.T) {
 }
 
 func TestDidSave(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
 	ctx := context.Background()
@@ -304,7 +187,7 @@ func TestDidSave(t *testing.T) {
 }
 
 func TestDidClose(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
 	ctx := context.Background()
@@ -324,13 +207,14 @@ func TestDidClose(t *testing.T) {
 }
 
 func TestDefinition(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful definition request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/definition", mock.AnythingOfType("protocol.DefinitionParams"), mock.Anything, mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/definition", mock.AnythingOfType("protocol.DefinitionParams"), mock.Anything, mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -345,13 +229,14 @@ func TestDefinition(t *testing.T) {
 }
 
 func TestHover(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful hover request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/hover", mock.AnythingOfType("protocol.HoverParams"), mock.AnythingOfType("*protocol.Hover"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/hover", mock.AnythingOfType("protocol.HoverParams"), mock.AnythingOfType("*protocol.Hover"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -366,13 +251,14 @@ func TestHover(t *testing.T) {
 }
 
 func TestWorkspaceSymbols(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful workspace symbols request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "workspace/symbol", mock.AnythingOfType("protocol.WorkspaceSymbolParams"), mock.AnythingOfType("*[]protocol.WorkspaceSymbol"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "workspace/symbol", mock.AnythingOfType("protocol.WorkspaceSymbolParams"), mock.AnythingOfType("*[]protocol.WorkspaceSymbol"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -387,13 +273,14 @@ func TestWorkspaceSymbols(t *testing.T) {
 }
 
 func TestReferences(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful references request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/references", mock.AnythingOfType("protocol.ReferenceParams"), mock.AnythingOfType("*[]protocol.Location"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/references", mock.AnythingOfType("protocol.ReferenceParams"), mock.AnythingOfType("*[]protocol.Location"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -408,13 +295,14 @@ func TestReferences(t *testing.T) {
 }
 
 func TestDocumentSymbols(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful document symbols request (newer format)
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/documentSymbol", mock.AnythingOfType("protocol.DocumentSymbolParams"), mock.AnythingOfType("*[]protocol.DocumentSymbol"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/documentSymbol", mock.AnythingOfType("protocol.DocumentSymbolParams"), mock.AnythingOfType("*[]protocol.DocumentSymbol"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -431,13 +319,14 @@ func TestDocumentSymbols(t *testing.T) {
 }
 
 func TestImplementation(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful implementation request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/implementation", mock.AnythingOfType("protocol.ImplementationParams"), mock.AnythingOfType("*[]protocol.Location"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/implementation", mock.AnythingOfType("protocol.ImplementationParams"), mock.AnythingOfType("*[]protocol.Location"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -452,13 +341,14 @@ func TestImplementation(t *testing.T) {
 }
 
 func TestSignatureHelp(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful signature help request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/signatureHelp", mock.AnythingOfType("protocol.SignatureHelpParams"), mock.AnythingOfType("*json.RawMessage"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/signatureHelp", mock.AnythingOfType("protocol.SignatureHelpParams"), mock.AnythingOfType("*json.RawMessage"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -473,13 +363,14 @@ func TestSignatureHelp(t *testing.T) {
 }
 
 func TestCodeActions(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful code actions request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/codeAction", mock.AnythingOfType("protocol.CodeActionParams"), mock.AnythingOfType("*[]protocol.CodeAction"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/codeAction", mock.AnythingOfType("protocol.CodeActionParams"), mock.AnythingOfType("*[]protocol.CodeAction"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -494,13 +385,14 @@ func TestCodeActions(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful rename request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/rename", mock.AnythingOfType("protocol.RenameParams"), mock.AnythingOfType("*protocol.WorkspaceEdit"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/rename", mock.AnythingOfType("protocol.RenameParams"), mock.AnythingOfType("*protocol.WorkspaceEdit"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -515,13 +407,14 @@ func TestRename(t *testing.T) {
 }
 
 func TestWorkspaceDiagnostic(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful workspace diagnostic request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "workspace/diagnostic", mock.AnythingOfType("protocol.WorkspaceDiagnosticParams"), mock.AnythingOfType("*protocol.WorkspaceDiagnosticReport"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "workspace/diagnostic", mock.AnythingOfType("protocol.WorkspaceDiagnosticParams"), mock.AnythingOfType("*protocol.WorkspaceDiagnosticReport"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -536,13 +429,14 @@ func TestWorkspaceDiagnostic(t *testing.T) {
 }
 
 func TestFormatting(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful formatting request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/formatting", mock.AnythingOfType("protocol.DocumentFormattingParams"), mock.AnythingOfType("*[]protocol.TextEdit"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/formatting", mock.AnythingOfType("protocol.DocumentFormattingParams"), mock.AnythingOfType("*[]protocol.TextEdit"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -557,13 +451,14 @@ func TestFormatting(t *testing.T) {
 }
 
 func TestPrepareCallHierarchy(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful prepare call hierarchy request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/prepareCallHierarchy", mock.AnythingOfType("protocol.CallHierarchyPrepareParams"), mock.AnythingOfType("*[]protocol.CallHierarchyItem"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/prepareCallHierarchy", mock.AnythingOfType("protocol.CallHierarchyPrepareParams"), mock.AnythingOfType("*[]protocol.CallHierarchyItem"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -578,13 +473,14 @@ func TestPrepareCallHierarchy(t *testing.T) {
 }
 
 func TestSemanticTokens(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful semantic tokens request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/semanticTokens", mock.AnythingOfType("protocol.SemanticTokensParams"), mock.AnythingOfType("*protocol.SemanticTokens"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/semanticTokens", mock.AnythingOfType("protocol.SemanticTokensParams"), mock.AnythingOfType("*protocol.SemanticTokens"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,
@@ -599,13 +495,14 @@ func TestSemanticTokens(t *testing.T) {
 }
 
 func TestSemanticTokensRange(t *testing.T) {
-	mockConn := new(MockLSPConnectionInterface)
+	mockConn := new(mocks.MockLSPConnectionInterface)
 
 	// Prepare a context
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Successful semantic tokens range request
-	mockConn.On("Call", mock.AnythingOfType("*context.timerCtx"), "textDocument/semanticTokens/range", mock.AnythingOfType("protocol.SemanticTokensRangeParams"), mock.AnythingOfType("*protocol.SemanticTokens"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("Call", mock.Anything, "textDocument/semanticTokens/range", mock.AnythingOfType("protocol.SemanticTokensRangeParams"), mock.AnythingOfType("*protocol.SemanticTokens"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
+	mockConn.On("DisconnectNotify").Return(ctx.Done())
 
 	client := &LanguageClient{
 		conn: mockConn,

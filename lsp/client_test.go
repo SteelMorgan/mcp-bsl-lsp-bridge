@@ -2,9 +2,10 @@ package lsp_test
 
 import (
 	"context"
-	"rockerboo/mcp-lsp-bridge/lsp"
 	"testing"
 	"time"
+
+	"rockerboo/mcp-lsp-bridge/lsp"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )

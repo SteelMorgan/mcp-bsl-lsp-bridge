@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -10,33 +10,33 @@ type MockLSPServerConfig struct {
 	mock.Mock
 }
 
-func (m *MockLSPServerConfig) DetectProjectLanguages(projectPath string) ([]lsp.Language, error) {
+func (m *MockLSPServerConfig) DetectProjectLanguages(projectPath string) ([]types.Language, error) {
 	args := m.Called(projectPath)
-	return args.Get(0).([]lsp.Language), args.Error(1)
+	return args.Get(0).([]types.Language), args.Error(1)
 }
 
-func (m *MockLSPServerConfig) DetectPrimaryProjectLanguage(projectPath string) (*lsp.Language, error) {
+func (m *MockLSPServerConfig) DetectPrimaryProjectLanguage(projectPath string) (*types.Language, error) {
 	args := m.Called(projectPath)
-	return args.Get(0).(*lsp.Language), args.Error(1)
+	return args.Get(0).(*types.Language), args.Error(1)
 }
 
-func (m *MockLSPServerConfig) FindServerConfig(language string) (*lsp.LanguageServerConfig, error) {
+func (m *MockLSPServerConfig) FindServerConfig(language string) (types.LanguageServerConfigProvider, error) {
 	args := m.Called(language)
-	return args.Get(0).(*lsp.LanguageServerConfig), args.Error(1)
+	return args.Get(0).(types.LanguageServerConfigProvider), args.Error(1)
 }
 
 
-func (m *MockLSPServerConfig) GetGlobalConfig() lsp.GlobalConfig {
+func (m *MockLSPServerConfig) GetGlobalConfig() types.GlobalConfig {
 	args := m.Called()
-	return args.Get(0).(lsp.GlobalConfig)
+	return args.Get(0).(types.GlobalConfig)
 }
 
-func (m *MockLSPServerConfig) GetLanguageServers() map[lsp.Language]lsp.LanguageServerConfig {
+func (m *MockLSPServerConfig) GetLanguageServers() map[types.Language]types.LanguageServerConfigProvider {
 	args := m.Called()
-	return args.Get(0).(map[lsp.Language]lsp.LanguageServerConfig)
+	return args.Get(0).(map[types.Language]types.LanguageServerConfigProvider)
 }
 
-func (m *MockLSPServerConfig) FindExtLanguage(ext string) (*lsp.Language, error) {
+func (m *MockLSPServerConfig) FindExtLanguage(ext string) (*types.Language, error) {
 	args := m.Called(ext)
-	return args.Get(0).(*lsp.Language), args.Error(1)
+	return args.Get(0).(*types.Language), args.Error(1)
 }

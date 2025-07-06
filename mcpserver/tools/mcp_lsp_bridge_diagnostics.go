@@ -59,14 +59,14 @@ func MCPLSPDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.
 					sb.WriteString("No language servers configured.\n")
 				} else {
 					for lang, lsConfig := range languageServers {
-						initializationOptions, err := json.MarshalIndent(lsConfig.InitializationOptions, "", "  ")
+						initializationOptions, err := json.MarshalIndent(lsConfig.GetInitializationOptions(), "", "  ")
 						if err != nil {
 							sb.WriteString(fmt.Sprintf("Error unmarshaling initialization options for %s: %v\n", lang, err))
 						}
 
 						sb.WriteString(fmt.Sprintf("  Language: %s\n", lang))
-						sb.WriteString(fmt.Sprintf("    Command: %s %s\n", lsConfig.Command, strings.Join(lsConfig.Args, " ")))
-						sb.WriteString(fmt.Sprintf("    Filetypes: %s\n", strings.Join(lsConfig.Filetypes, ", ")))
+						sb.WriteString(fmt.Sprintf("    Command: %s %s\n", lsConfig.GetCommand(), strings.Join(lsConfig.GetArgs(), " ")))
+						sb.WriteString(fmt.Sprintf("    Filetypes: %s\n", "N/A - available in concrete type"))
 						sb.WriteString(fmt.Sprintf("    Initialization Options: %s\n", string(initializationOptions)))
 					}
 				}
@@ -89,10 +89,10 @@ func MCPLSPDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.
 					for lang, client := range connectedClients {
 						metrics := client.GetMetrics()
 						sb.WriteString(fmt.Sprintf("  Language: %s\n", lang))
-						sb.WriteString(fmt.Sprintf("    Status: %s\n", metrics.Status))
-						sb.WriteString(fmt.Sprintf("    Last Error: %v\n", metrics.LastError))
-						sb.WriteString(fmt.Sprintf("    Connection Attempts: %d\n", metrics.TotalRequests))
-						sb.WriteString(fmt.Sprintf("    Last Connected At: %s\n", metrics.LastInitialized))
+						sb.WriteString(fmt.Sprintf("    Status: %d\n", metrics.GetStatus()))
+						sb.WriteString(fmt.Sprintf("    Last Error: %v\n", metrics.GetLastError()))
+						sb.WriteString(fmt.Sprintf("    Connection Attempts: %d\n", metrics.GetTotalRequests()))
+						sb.WriteString(fmt.Sprintf("    Last Connected At: %s\n", metrics.GetLastInitialized()))
 					}
 				}
 			}

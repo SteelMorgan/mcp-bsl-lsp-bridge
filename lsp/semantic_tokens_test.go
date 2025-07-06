@@ -15,24 +15,24 @@ func TestNewSemanticTokenParser(t *testing.T) {
 	parser := NewSemanticTokenParser(tokenTypes, tokenModifiers)
 	
 	require.NotNil(t, parser)
-	assert.Equal(t, tokenTypes, parser.tokenTypes)
-	assert.Equal(t, tokenModifiers, parser.tokenModifiers)
+	assert.Equal(t, tokenTypes, parser.TokenTypes())
+	assert.Equal(t, tokenModifiers, parser.TokenModifiers())
 }
 
 func TestNewSemanticTokenParser_EmptySlices(t *testing.T) {
 	parser := NewSemanticTokenParser([]string{}, []string{})
 	
 	require.NotNil(t, parser)
-	assert.Empty(t, parser.tokenTypes)
-	assert.Empty(t, parser.tokenModifiers)
+	assert.Empty(t, parser.TokenTypes())
+	assert.Empty(t, parser.TokenModifiers())
 }
 
 func TestNewSemanticTokenParser_NilSlices(t *testing.T) {
 	parser := NewSemanticTokenParser(nil, nil)
 	
 	require.NotNil(t, parser)
-	assert.Nil(t, parser.tokenTypes)
-	assert.Nil(t, parser.tokenModifiers)
+	assert.Nil(t, parser.TokenTypes())
+	assert.Nil(t, parser.TokenModifiers())
 }
 
 func TestFindTokensByType_BasicFunctionality(t *testing.T) {

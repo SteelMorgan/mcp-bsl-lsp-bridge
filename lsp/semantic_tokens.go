@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"errors"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
@@ -19,12 +20,12 @@ import (
 // 	"abstract", "async", "modification", "documentation", "defaultLibrary",
 // }
 
-// TokenPosition represents a found token with its position and type
-type TokenPosition struct {
-	TokenType string
-	Text      string // The actual text if available
-	Range     protocol.Range
-}
+// // TokenPosition represents a found token with its position and type
+// type TokenPosition struct {
+// 	TokenType string
+// 	Text      string // The actual text if available
+// 	Range     protocol.Range
+// }
 
 // SemanticTokenParser handles parsing of semantic tokens
 type SemanticTokenParser struct {
@@ -33,7 +34,7 @@ type SemanticTokenParser struct {
 }
 
 // NewSemanticTokenParser creates a new parser with the given token types and modifiers
-func NewSemanticTokenParser(tokenTypes, tokenModifiers []string) *SemanticTokenParser {
+func NewSemanticTokenParser(tokenTypes, tokenModifiers []string) types.SemanticTokensParserProvider {
 	return &SemanticTokenParser{
 		tokenTypes:     tokenTypes,
 		tokenModifiers: tokenModifiers,
@@ -45,8 +46,8 @@ func (p *SemanticTokenParser) FindTokensByType(
 	tokens *protocol.SemanticTokens,
 	targetTypes []string,
 	baseRange protocol.Range,
-) ([]TokenPosition, error) {
-	var results []TokenPosition
+) ([]types.TokenPosition, error) {
+	var results []types.TokenPosition
 
 	targetTypeSet := make(map[string]bool)
 	for _, t := range targetTypes {
@@ -93,7 +94,7 @@ func (p *SemanticTokenParser) FindTokensByType(
 				},
 			}
 
-			results = append(results, TokenPosition{
+			results = append(results, types.TokenPosition{
 				TokenType: tokenType,
 				Range:     tokenRange,
 			})
@@ -107,7 +108,7 @@ func (p *SemanticTokenParser) FindTokensByType(
 func (p *SemanticTokenParser) FindFunctionNames(
 	tokens *protocol.SemanticTokens,
 	baseRange protocol.Range,
-) ([]TokenPosition, error) {
+) ([]types.TokenPosition, error) {
 	return p.FindTokensByType(tokens, []string{"function", "method"}, baseRange)
 }
 
@@ -115,7 +116,7 @@ func (p *SemanticTokenParser) FindFunctionNames(
 func (p *SemanticTokenParser) FindParameters(
 	tokens *protocol.SemanticTokens,
 	baseRange protocol.Range,
-) ([]TokenPosition, error) {
+) ([]types.TokenPosition, error) {
 	return p.FindTokensByType(tokens, []string{"parameter"}, baseRange)
 }
 
@@ -123,7 +124,7 @@ func (p *SemanticTokenParser) FindParameters(
 func (p *SemanticTokenParser) FindVariables(
 	tokens *protocol.SemanticTokens,
 	baseRange protocol.Range,
-) ([]TokenPosition, error) {
+) ([]types.TokenPosition, error) {
 	return p.FindTokensByType(tokens, []string{"variable"}, baseRange)
 }
 
@@ -131,8 +132,16 @@ func (p *SemanticTokenParser) FindVariables(
 func (p *SemanticTokenParser) FindTypes(
 	tokens *protocol.SemanticTokens,
 	baseRange protocol.Range,
-) ([]TokenPosition, error) {
+) ([]types.TokenPosition, error) {
 	return p.FindTokensByType(tokens, []string{"type", "class", "interface", "struct"}, baseRange)
+}
+
+func (p *SemanticTokenParser) TokenTypes() []string {
+	return p.tokenTypes
+}
+
+func (p *SemanticTokenParser) TokenModifiers() []string {
+	return p.tokenModifiers
 }
 
 // GetTokenTypeFromServerCapabilities extracts token types from server capabilities

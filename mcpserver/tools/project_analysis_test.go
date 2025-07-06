@@ -8,6 +8,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
@@ -21,7 +22,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 		name            string
 		workspaceUri    string
 		query           string
-		mockLanguages   []lsp.Language
+		mockLanguages   []types.Language
 		mockResults     []protocol.WorkspaceSymbol
 		expectError     bool
 		expectedContent string
@@ -30,7 +31,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 			name:          "successful workspace symbols search",
 			workspaceUri:  "file:///workspace",
 			query:         "main",
-			mockLanguages: []lsp.Language{"go"},
+			mockLanguages: []types.Language{"go"},
 			mockResults: []protocol.WorkspaceSymbol{
 				{
 					Name: "main",
@@ -53,7 +54,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 			name:          "empty query",
 			workspaceUri:  "file:///workspace",
 			query:         "",
-			mockLanguages: []lsp.Language{"go"},
+			mockLanguages: []types.Language{"go"},
 			mockResults:   []protocol.WorkspaceSymbol{},
 			expectError:   false,
 		},
@@ -69,7 +70,8 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
 
 			if len(tc.mockLanguages) > 0 {
-				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
+				mockClients := make(map[types.Language]types.LanguageClientInterface)
+				
 				for _, lang := range tc.mockLanguages {
 					client, err := lsp.NewLanguageClient("mock-lsp-server")
 					if err != nil {
@@ -137,7 +139,7 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 		name           string
 		workspaceUri   string
 		query          string
-		mockLanguages  []lsp.Language
+		mockLanguages  []types.Language
 		mockReferences []protocol.Location
 		expectError    bool
 	}{
@@ -145,7 +147,7 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 			name:          "successful symbol references search",
 			workspaceUri:  "file:///workspace",
 			query:         "main",
-			mockLanguages: []lsp.Language{"go"},
+			mockLanguages: []types.Language{"go"},
 			mockReferences: []protocol.Location{
 				{
 					Uri: "file:///main.go",
@@ -175,7 +177,7 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 			// Set up mock expectations
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
 
-			mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
+			mockClients := make(map[types.Language]types.LanguageClientInterface)
 			if len(tc.mockLanguages) > 0 {
 				for _, lang := range tc.mockLanguages {
 					client, err := lsp.NewLanguageClient("mock-lsp-server")
@@ -243,7 +245,7 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 		name            string
 		workspaceUri    string
 		query           string
-		mockLanguages   []lsp.Language
+		mockLanguages   []types.Language
 		mockDefinitions []protocol.Or2[protocol.LocationLink, protocol.Location]
 		expectError     bool
 	}{
@@ -251,7 +253,7 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 			name:          "successful symbol definitions search",
 			workspaceUri:  "file:///workspace",
 			query:         "main",
-			mockLanguages: []lsp.Language{"go"},
+			mockLanguages: []types.Language{"go"},
 			mockDefinitions: []protocol.Or2[protocol.LocationLink, protocol.Location]{
 				{
 					Value: protocol.Location{
@@ -269,7 +271,7 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 			name:            "symbol not found",
 			workspaceUri:    "file:///workspace",
 			query:           "nonexistent",
-			mockLanguages:   []lsp.Language{"go"},
+			mockLanguages:   []types.Language{"go"},
 			mockDefinitions: []protocol.Or2[protocol.LocationLink, protocol.Location]{},
 			expectError:     false,
 		},
@@ -285,7 +287,7 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
 
 			if len(tc.mockLanguages) > 0 {
-				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
+				mockClients := make(map[types.Language]types.LanguageClientInterface)
 				for _, lang := range tc.mockLanguages {
 
 					client, err := lsp.NewLanguageClient("mock-lsp-server")
@@ -355,7 +357,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 		name          string
 		workspaceUri  string
 		query         string
-		mockLanguages []lsp.Language
+		mockLanguages []types.Language
 		mockResults   []protocol.WorkspaceSymbol
 		expectError   bool
 	}{
@@ -363,7 +365,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 			name:          "successful text search",
 			workspaceUri:  "file:///workspace",
 			query:         "TODO",
-			mockLanguages: []lsp.Language{"go"},
+			mockLanguages: []types.Language{"go"},
 			mockResults: []protocol.WorkspaceSymbol{
 				{
 					Name:          "main",
@@ -387,7 +389,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 			name:          "no matches found",
 			workspaceUri:  "file:///workspace",
 			query:         "nonexistent_pattern",
-			mockLanguages: []lsp.Language{"go"},
+			mockLanguages: []types.Language{"go"},
 			mockResults:   []protocol.WorkspaceSymbol{},
 			expectError:   false,
 		},
@@ -403,7 +405,7 @@ func TestProjectAnalysisTool_TextSearch(t *testing.T) {
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
 
 			if len(tc.mockLanguages) > 0 {
-				mockClients := make(map[lsp.Language]lsp.LanguageClientInterface)
+				mockClients := make(map[types.Language]types.LanguageClientInterface)
 				for _, lang := range tc.mockLanguages {
 
 					client, err := lsp.NewLanguageClient("mock-lsp-server")
@@ -483,7 +485,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 			query:        "",
 			setupMock: func(bridge *mocks.MockBridge) {
 				// This case expects DetectProjectLanguages to fail
-				bridge.On("DetectProjectLanguages", "/nonexistent").Return([]lsp.Language{}, errors.New("project not found"))
+				bridge.On("DetectProjectLanguages", "/nonexistent").Return([]types.Language{}, errors.New("project not found"))
 			},
 			expectError: true,
 			errorMsg:    "project not found",
@@ -494,8 +496,8 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 			query:        "",
 			setupMock: func(bridge *mocks.MockBridge) {
 				// This case expects DetectProjectLanguages to succeed, and then GetMultiLanguageClients to fail
-				bridge.On("DetectProjectLanguages", "/workspace").Return([]lsp.Language{"go"}, nil)
-				bridge.On("GetMultiLanguageClients", []string{"go"}).Return(map[lsp.Language]lsp.LanguageClientInterface{}, errors.New("failed to create clients"))
+				bridge.On("DetectProjectLanguages", "/workspace").Return([]types.Language{"go"}, nil)
+				bridge.On("GetMultiLanguageClients", []string{"go"}).Return(map[types.Language]types.LanguageClientInterface{}, errors.New("failed to create clients"))
 			},
 			expectError: true,
 			errorMsg:    "failed to create clients",

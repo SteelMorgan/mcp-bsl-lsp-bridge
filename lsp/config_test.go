@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"rockerboo/mcp-lsp-bridge/types"
 )
 
 // Helper function to create a temporary project directory with specific files
@@ -34,7 +36,7 @@ func createTempProjectWithFiles(t *testing.T, files map[string]string) string {
 func TestDetectProjectLanguages(t *testing.T) {
 	// Create a test configuration
 	config := &LSPServerConfig{
-		LanguageServers: map[Language]LanguageServerConfig{
+		LanguageServers: map[types.Language]LanguageServerConfig{
 			"go": {
 				Filetypes: []string{".go"},
 			},
@@ -45,7 +47,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				Filetypes: []string{".ts", ".js"},
 			},
 		},
-		ExtensionLanguageMap: map[string]Language{
+		ExtensionLanguageMap: map[string]types.Language{
 			".go": "go",
 			".py": "python",
 			".ts": "typescript",
@@ -56,7 +58,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 	testCases := []struct {
 		name          string
 		projectFiles  map[string]string
-		expectedLangs []Language
+		expectedLangs []types.Language
 	}{
 		{
 			name: "Go Project",
@@ -64,7 +66,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				"go.mod":  "module example.com/myproject\n",
 				"main.go": "package main\n\nfunc main() {}\n",
 			},
-			expectedLangs: []Language{"go"},
+			expectedLangs: []types.Language{"go"},
 		},
 		{
 			name: "Python Project",
@@ -72,7 +74,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				"pyproject.toml": "[tool.poetry]\nname = \"myproject\"\n",
 				"main.py":        "def main():\n    pass\n",
 			},
-			expectedLangs: []Language{"python"},
+			expectedLangs: []types.Language{"python"},
 		},
 		{
 			name: "Mixed Project",
@@ -82,7 +84,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				"index.ts":  "const x = 42;\n",
 				"script.py": "def hello():\n    print('world')\n",
 			},
-			expectedLangs: []Language{"go", "typescript", "python"},
+			expectedLangs: []types.Language{"go", "typescript", "python"},
 		},
 		{
 			name: "No Recognized Languages",
@@ -90,7 +92,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 				"README.md":   "# My Project\n",
 				"config.json": "{\"key\": \"value\"}\n",
 			},
-			expectedLangs: []Language{},
+			expectedLangs: []types.Language{},
 		},
 	}
 
@@ -134,7 +136,7 @@ func TestDetectProjectLanguages(t *testing.T) {
 func TestDetectPrimaryProjectLanguage(t *testing.T) {
 	// Create a test configuration
 	config := &LSPServerConfig{
-		LanguageServers: map[Language]LanguageServerConfig{
+		LanguageServers: map[types.Language]LanguageServerConfig{
 			"go": {
 				Filetypes: []string{".go"},
 			},
@@ -145,7 +147,7 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 				Filetypes: []string{".ts", ".js"},
 			},
 		},
-		ExtensionLanguageMap: map[string]Language{
+		ExtensionLanguageMap: map[string]types.Language{
 			".go": "go",
 			".py": "python",
 			".ts": "typescript",
@@ -156,7 +158,7 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 	testCases := []struct {
 		name            string
 		projectFiles    map[string]string
-		expectedPrimary Language
+		expectedPrimary types.Language
 	}{
 		{
 			name: "Go Project",

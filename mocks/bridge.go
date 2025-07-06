@@ -1,7 +1,7 @@
 package mocks
 
 import (
-	"rockerboo/mcp-lsp-bridge/lsp"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 	"github.com/stretchr/testify/mock"
@@ -11,7 +11,7 @@ type MockBridge struct {
 	mock.Mock
 }
 
-func (m *MockBridge) GetClientForLanguage(language string) (lsp.LanguageClientInterface, error) {
+func (m *MockBridge) GetClientForLanguage(language string) (types.LanguageClientInterface, error) {
 	args := m.Called(language)
 
 	// Safe type assertion with error checking
@@ -20,20 +20,20 @@ func (m *MockBridge) GetClientForLanguage(language string) (lsp.LanguageClientIn
 	}
 
 	// Try to assert to the interface type
-	if client, ok := args.Get(0).(lsp.LanguageClientInterface); ok {
+	if client, ok := args.Get(0).(types.LanguageClientInterface); ok {
 		return client, args.Error(1)
 	}
 
 	return nil, args.Error(1)
 }
 
-func (m *MockBridge) InferLanguage(filePath string) (*lsp.Language, error) {
+func (m *MockBridge) InferLanguage(filePath string) (*types.Language, error) {
 	args := m.Called(filePath)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
-	return args.Get(0).(*lsp.Language), args.Error(1)
+	return args.Get(0).(*types.Language), args.Error(1)
 }
 
 func (m *MockBridge) ProjectRoots() ([]string, error) {
@@ -59,24 +59,24 @@ func (m *MockBridge) CloseAllClients() {
 	m.Called()
 }
 
-func (m *MockBridge) GetConfig() lsp.LSPServerConfigProvider {
+func (m *MockBridge) GetConfig() types.LSPServerConfigProvider {
 	args := m.Called()
-	return args.Get(0).(lsp.LSPServerConfigProvider)
+	return args.Get(0).(types.LSPServerConfigProvider)
 }
 
-func (m *MockBridge) GetServerConfig(language string) (lsp.LanguageServerConfigProvider, error) {
+func (m *MockBridge) GetServerConfig(language string) (types.LanguageServerConfigProvider, error) {
 	args := m.Called(language)
-	return args.Get(0).(lsp.LanguageServerConfigProvider), args.Error(1)
+	return args.Get(0).(types.LanguageServerConfigProvider), args.Error(1)
 }
 
-func (m *MockBridge) DetectProjectLanguages(projectPath string) ([]lsp.Language, error) {
+func (m *MockBridge) DetectProjectLanguages(projectPath string) ([]types.Language, error) {
 	args := m.Called(projectPath)
-	return args.Get(0).([]lsp.Language), args.Error(1)
+	return args.Get(0).([]types.Language), args.Error(1)
 }
 
-func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (*lsp.Language, error) {
+func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (*types.Language, error) {
 	args := m.Called(projectPath)
-	return args.Get(0).(*lsp.Language), args.Error(1)
+	return args.Get(0).(*types.Language), args.Error(1)
 }
 
 func (m *MockBridge) FindSymbolReferences(language, uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
@@ -94,9 +94,9 @@ func (m *MockBridge) SearchTextInWorkspace(language, query string) ([]protocol.W
 	return args.Get(0).([]protocol.WorkspaceSymbol), args.Error(1)
 }
 
-func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[lsp.Language]lsp.LanguageClientInterface, error) {
+func (m *MockBridge) GetMultiLanguageClients(languages []string) (map[types.Language]types.LanguageClientInterface, error) {
 	args := m.Called(languages)
-	return args.Get(0).(map[lsp.Language]lsp.LanguageClientInterface), args.Error(1)
+	return args.Get(0).(map[types.Language]types.LanguageClientInterface), args.Error(1)
 }
 
 func (m *MockBridge) GetHoverInformation(uri string, line, character uint32) (*protocol.Hover, error) {
@@ -149,9 +149,9 @@ func (m *MockBridge) FindImplementations(uri string, line, character uint32) ([]
 	return args.Get(0).([]protocol.Location), args.Error(1)
 }
 
-func (m *MockBridge) SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]lsp.TokenPosition, error) {
+func (m *MockBridge) SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]types.TokenPosition, error) {
 	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter)
-	return args.Get(0).([]lsp.TokenPosition), args.Error(1)
+	return args.Get(0).([]types.TokenPosition), args.Error(1)
 }
 
 func (m *MockBridge) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {

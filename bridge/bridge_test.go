@@ -10,6 +10,7 @@ import (
 	"runtime"
 
 	"rockerboo/mcp-lsp-bridge/security"
+	"rockerboo/mcp-lsp-bridge/types"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 // Test helper functions
 func createTestBridge(allowedDirs []string) *MCPLSPBridge {
 	config := &lsp.LSPServerConfig{
-		LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+		LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 			"go": {
 				Command: "gopls",
 				Args:    []string{},
@@ -40,7 +41,7 @@ func createTestBridge(allowedDirs []string) *MCPLSPBridge {
 				Args:    []string{},
 			},
 		},
-		ExtensionLanguageMap: map[string]lsp.Language{
+		ExtensionLanguageMap: map[string]types.Language{
 			".go": "go",
 			".ts": "typescript",
 			".py": "python",
@@ -63,7 +64,7 @@ func createTempFile(t *testing.T, name, content string) string {
 // Test NewMCPLSPBridge
 func TestNewMCPLSPBridge(t *testing.T) {
 	config := &lsp.LSPServerConfig{
-		LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+		LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 			"go": {Command: "gopls"},
 		},
 	}
@@ -92,7 +93,7 @@ func TestInferLanguage(t *testing.T) {
 	tests := []struct {
 		name     string
 		filePath string
-		want     lsp.Language
+		want     types.Language
 		wantErr  bool
 	}{
 		{
@@ -222,7 +223,7 @@ func TestFindSymbolReferences(t *testing.T) {
 	// Mock the client creation and connection
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 
 	bridge.clients["go"] = mockClient
 
@@ -252,7 +253,7 @@ func TestFindSymbolDefinitions(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 
 	bridge.clients["go"] = mockClient
 
@@ -283,7 +284,7 @@ func TestFindSymbolDefinitionsWithError(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 
 	bridge.clients["go"] = mockClient
 
@@ -303,7 +304,7 @@ func TestSearchTextInWorkspace(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 
 	bridge.clients["go"] = mockClient
 
@@ -337,7 +338,7 @@ func TestGetDocumentSymbols(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"."})
 	mockClient.On("SetProjectRoots", []string{"."})
 
@@ -380,7 +381,7 @@ func TestGetSignatureHelp(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
 	bridge.clients["go"] = mockClient
@@ -419,7 +420,7 @@ func TestGetHoverInformation(t *testing.T) {
 	mockClient := &mocks.MockLanguageClient{}
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 	bridge.clients["go"] = mockClient
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
@@ -500,7 +501,7 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient := &mocks.MockLanguageClient{}
 		ctx := context.Background()
 		mockClient.On("Context").Return(ctx)
-		mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 		bridge.clients["go"] = mockClient
 
@@ -561,7 +562,7 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient := &mocks.MockLanguageClient{}
 		ctx := context.Background()
 		mockClient.On("Context").Return(ctx)
-		mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 		bridge.clients["go"] = mockClient
 
@@ -600,7 +601,7 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient := &mocks.MockLanguageClient{}
 		ctx := context.Background()
 		mockClient.On("Context").Return(ctx)
-		mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 		bridge.clients["go"] = mockClient
 
@@ -625,7 +626,7 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient := &mocks.MockLanguageClient{}
 		ctx := context.Background()
 		mockClient.On("Context").Return(ctx)
-		mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 		bridge.clients["go"] = mockClient
 
@@ -678,7 +679,7 @@ func TestRenameSymbol(t *testing.T) {
 
 				ctx := context.Background()
 				mockClient.On("Context").Return(ctx)
-				mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+				mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 				mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 				mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
 				mockClient.On("Rename", "file://"+testFile, uint32(2), uint32(7), "newMain").Return(&expectedWorkspaceEdit, nil)
@@ -714,9 +715,9 @@ func TestRenameSymbol(t *testing.T) {
 					mockClient := &mocks.MockLanguageClient{}
 					ctx := context.Background()
 					mockClient.On("Context").Return(ctx)
-					mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+					mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 					mockClient.On("ProjectRoots").Return([]string{"/tmp"})
-					bridge.clients[tc.language] = mockClient
+					bridge.clients[types.Language(tc.language)] = mockClient
 
 					testFile := createTempFile(t, tc.filename, tc.content)
 					testURI := "file://" + testFile
@@ -764,7 +765,7 @@ func TestFindImplementations(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
 	bridge.clients["go"] = mockClient
@@ -798,7 +799,7 @@ func TestPrepareCallHierarchy(t *testing.T) {
 	mockClient := &mocks.MockLanguageClient{}
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	bridge.clients["go"] = mockClient
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 	testURI := "file://" + testFile
@@ -845,7 +846,7 @@ func TestGetClientForLanguageInterface(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
 
 	bridge.clients["go"] = mockClient
@@ -1175,13 +1176,13 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "successful code actions",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
@@ -1210,13 +1211,13 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "no code actions",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
@@ -1235,13 +1236,13 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "error - failed to infer language",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
@@ -1260,10 +1261,10 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "error - failed to get client for language",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					// No language server configured for Go
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
@@ -1282,13 +1283,13 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 		{
 			name: "error - client code actions failed",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
@@ -1315,7 +1316,7 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				b.clients["go"] = mockClient
 
 				// Set up mock expectations
-				mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+				mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 				mockClient.On("CodeActions", tt.uri, tt.line, tt.character, tt.endLine, tt.endCharacter).Return(tt.mockCodeActions, tt.mockError)
 				ctx := context.Background()
 				mockClient.On("Context").Return(ctx)
@@ -1360,11 +1361,11 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		want         []protocol.WorkspaceDiagnosticReport
 		wantErr      bool
 		// Mock setup parameters
-		mockDetectedLanguages []lsp.Language
+		mockDetectedLanguages []types.Language
 		mockDetectError       error
-		mockClientsSetup      map[lsp.Language]*mocks.MockLanguageClient           // language -> mock client
-		mockReports           map[lsp.Language]*protocol.WorkspaceDiagnosticReport // language -> report
-		mockReportErrors      map[lsp.Language]error                               // language -> error
+		mockClientsSetup      map[types.Language]*mocks.MockLanguageClient           // language -> mock client
+		mockReports           map[types.Language]*protocol.WorkspaceDiagnosticReport // language -> report
+		mockReportErrors      map[types.Language]error                               // language -> error
 		serverConfig          *lsp.LanguageServerConfig
 		serverConfigError     error
 		setupClients          bool
@@ -1372,25 +1373,25 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "successful workspace diagnostics - single language",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
 			allowedDirectories:    []string{"."},
 			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
 			identifier:            "workspace-1",
-			mockDetectedLanguages: []lsp.Language{"go"},
+			mockDetectedLanguages: []types.Language{"go"},
 			mockDetectError:       nil,
-			mockClientsSetup: map[lsp.Language]*mocks.MockLanguageClient{
+			mockClientsSetup: map[types.Language]*mocks.MockLanguageClient{
 				"go": {},
 			},
-			mockReports: map[lsp.Language]*protocol.WorkspaceDiagnosticReport{
+			mockReports: map[types.Language]*protocol.WorkspaceDiagnosticReport{
 				"go": {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
@@ -1412,7 +1413,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					},
 				},
 			},
-			mockReportErrors: map[lsp.Language]error{
+			mockReportErrors: map[types.Language]error{
 				"go": nil,
 			},
 			want: []protocol.WorkspaceDiagnosticReport{
@@ -1443,7 +1444,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "successful workspace diagnostics - multiple languages",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
@@ -1453,7 +1454,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 						Args:    []string{"--stdio"},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 					".ts": "typescript",
 				},
@@ -1461,13 +1462,13 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 			allowedDirectories:    []string{"."},
 			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
 			identifier:            "workspace-1",
-			mockDetectedLanguages: []lsp.Language{"go", "typescript"},
+			mockDetectedLanguages: []types.Language{"go", "typescript"},
 			mockDetectError:       nil,
-			mockClientsSetup: map[lsp.Language]*mocks.MockLanguageClient{
+			mockClientsSetup: map[types.Language]*mocks.MockLanguageClient{
 				"go":         {},
 				"typescript": {},
 			},
-			mockReports: map[lsp.Language]*protocol.WorkspaceDiagnosticReport{
+			mockReports: map[types.Language]*protocol.WorkspaceDiagnosticReport{
 				"go": {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
@@ -1491,7 +1492,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					},
 				},
 			},
-			mockReportErrors: map[lsp.Language]error{
+			mockReportErrors: map[types.Language]error{
 				"go":         nil,
 				"typescript": nil,
 			},
@@ -1525,24 +1526,24 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "no languages detected",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
 			allowedDirectories:    []string{"."},
 			workspaceUri:          "file:///home/rockerboo/code/empty-project",
 			identifier:            "workspace-1",
-			mockDetectedLanguages: []lsp.Language{}, // No languages detected
+			mockDetectedLanguages: []types.Language{}, // No languages detected
 			mockDetectError:       nil,
-			mockClientsSetup:      map[lsp.Language]*mocks.MockLanguageClient{},
-			mockReports:           map[lsp.Language]*protocol.WorkspaceDiagnosticReport{},
-			mockReportErrors:      map[lsp.Language]error{},
+			mockClientsSetup:      map[types.Language]*mocks.MockLanguageClient{},
+			mockReports:           map[types.Language]*protocol.WorkspaceDiagnosticReport{},
+			mockReportErrors:      map[types.Language]error{},
 			want:                  []protocol.WorkspaceDiagnosticReport{}, // Empty result
 			wantErr:               false,
 			setupClients:          false,
@@ -1550,24 +1551,24 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "error - failed to detect project languages",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
 			allowedDirectories:    []string{"."},
 			workspaceUri:          "file:///invalid/path",
 			identifier:            "workspace-1",
-			mockDetectedLanguages: []lsp.Language{},
+			mockDetectedLanguages: []types.Language{},
 			mockDetectError:       errors.New("failed to access workspace directory"),
-			mockClientsSetup:      map[lsp.Language]*mocks.MockLanguageClient{},
-			mockReports:           map[lsp.Language]*protocol.WorkspaceDiagnosticReport{},
-			mockReportErrors:      map[lsp.Language]error{},
+			mockClientsSetup:      map[types.Language]*mocks.MockLanguageClient{},
+			mockReports:           map[types.Language]*protocol.WorkspaceDiagnosticReport{},
+			mockReportErrors:      map[types.Language]error{},
 			want:                  []protocol.WorkspaceDiagnosticReport{},
 			wantErr:               false,
 			setupClients:          false,
@@ -1575,21 +1576,21 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "error - failed to get language clients",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					// No language servers configured
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 				},
 			},
 			allowedDirectories:    []string{"."},
 			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
 			identifier:            "workspace-1",
-			mockDetectedLanguages: []lsp.Language{"go"},
+			mockDetectedLanguages: []types.Language{"go"},
 			mockDetectError:       nil,
-			mockClientsSetup:      map[lsp.Language]*mocks.MockLanguageClient{},
-			mockReports:           map[lsp.Language]*protocol.WorkspaceDiagnosticReport{},
-			mockReportErrors:      map[lsp.Language]error{},
+			mockClientsSetup:      map[types.Language]*mocks.MockLanguageClient{},
+			mockReports:           map[types.Language]*protocol.WorkspaceDiagnosticReport{},
+			mockReportErrors:      map[types.Language]error{},
 			serverConfig:          &lsp.LanguageServerConfig{},
 			serverConfigError:     errors.New("Could not find server config"),
 			want:                  nil,
@@ -1599,7 +1600,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 		{
 			name: "partial success - one client fails, one succeeds",
 			config: &lsp.LSPServerConfig{
-				LanguageServers: map[lsp.Language]lsp.LanguageServerConfig{
+				LanguageServers: map[types.Language]lsp.LanguageServerConfig{
 					"go": {
 						Command: "gopls",
 						Args:    []string{},
@@ -1609,7 +1610,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 						Args:    []string{"--stdio"},
 					},
 				},
-				ExtensionLanguageMap: map[string]lsp.Language{
+				ExtensionLanguageMap: map[string]types.Language{
 					".go": "go",
 					".ts": "typescript",
 				},
@@ -1617,13 +1618,13 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 			allowedDirectories:    []string{"."},
 			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
 			identifier:            "workspace-1",
-			mockDetectedLanguages: []lsp.Language{"go", "typescript"},
+			mockDetectedLanguages: []types.Language{"go", "typescript"},
 			mockDetectError:       nil,
-			mockClientsSetup: map[lsp.Language]*mocks.MockLanguageClient{
+			mockClientsSetup: map[types.Language]*mocks.MockLanguageClient{
 				"go":         {},
 				"typescript": {},
 			},
-			mockReports: map[lsp.Language]*protocol.WorkspaceDiagnosticReport{
+			mockReports: map[types.Language]*protocol.WorkspaceDiagnosticReport{
 				"go": {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
@@ -1639,7 +1640,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{}, // This will be ignored due to error
 				},
 			},
-			mockReportErrors: map[lsp.Language]error{
+			mockReportErrors: map[types.Language]error{
 				"go":         nil,
 				"typescript": errors.New("typescript language server failed"),
 			},
@@ -1677,10 +1678,10 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 			// Set up mock clients if needed
 			if tt.setupClients {
 				for language, mockClient := range tt.mockClientsSetup {
-					b.clients[language] = mockClient
+					b.clients[types.Language(language)] = mockClient
 
 					// Set up mock expectations
-					mockClient.On("GetMetrics").Return(lsp.ClientMetrics{Status: 3})
+					mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
 					ctx := context.Background()
 					mockClient.On("Context").Return(ctx)
 
@@ -1847,23 +1848,23 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 	tests := []struct {
 		name         string
 		files        []string
-		expectedLang *lsp.Language
+		expectedLang *types.Language
 		expectError  bool
 	}{
 		{
 			name:         "go project with go.mod",
 			files:        []string{"go.mod", "main.go"},
-			expectedLang: func() *lsp.Language { l := lsp.Language("go"); return &l }(),
+			expectedLang: func() *types.Language { l := types.Language("go"); return &l }(),
 		},
 		{
 			name:         "python project with requirements.txt",
 			files:        []string{"requirements.txt", "main.py"},
-			expectedLang: func() *lsp.Language { l := lsp.Language("python"); return &l }(),
+			expectedLang: func() *types.Language { l := types.Language("python"); return &l }(),
 		},
 		{
 			name:         "mixed project - should detect primary",
 			files:        []string{"go.mod", "main.go", "script.py"},
-			expectedLang: func() *lsp.Language { l := lsp.Language("go"); return &l }(),
+			expectedLang: func() *types.Language { l := types.Language("go"); return &l }(),
 		},
 		{
 			name:        "empty directory",

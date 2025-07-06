@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"fmt"
 	"context"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
@@ -29,7 +30,7 @@ func SetupMCPServer(bridge interfaces.BridgeInterface) *server.MCPServer {
 		logger.Debug("beforeInitialize:", id, message)
 	})
 	hooks.AddOnRequestInitialization(func(ctx context.Context, id any, message any) error {
-		logger.Debug("AddOnRequestInitialization:", id, message)
+		logger.Debug(fmt.Sprintf("AddOnRequestInitialization: %s %+v", id, message))
 		// authorization verification and other preprocessing tasks are performed.
 		return nil
 	})
