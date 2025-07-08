@@ -19,6 +19,7 @@ func RegisterImplementationTool(mcpServer ToolServer, bridge interfaces.BridgeIn
 func ImplementationTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("implementation",
 			mcp.WithDescription("Find implementations of a symbol (interfaces, abstract methods)"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to the file")),
 			mcp.WithNumber("line", mcp.Description("Line number (0-based)")),
 			mcp.WithNumber("character", mcp.Description("Character position (0-based)")),
@@ -51,7 +52,7 @@ func ImplementationTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
 			}
-			
+
 			implementations, err := bridge.FindImplementations(uri, lineUint32, characterUint32)
 			if err != nil {
 				logger.Error("implementation: Request failed", err)

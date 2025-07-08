@@ -19,6 +19,7 @@ func RegisterSignatureHelpTool(mcpServer ToolServer, bridge interfaces.BridgeInt
 func SignatureHelpTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("signature_help",
 			mcp.WithDescription("Get function parameter information at call sites. Use when positioned inside function calls (between parentheses) to see parameter details and overloads."),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to the file")),
 			mcp.WithNumber("line", mcp.Description("Line number (0-based) - position at function call site")),
 			mcp.WithNumber("character", mcp.Description("Character position (0-based) - position within function call parentheses")),

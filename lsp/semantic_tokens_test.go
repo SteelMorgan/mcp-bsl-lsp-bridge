@@ -13,7 +13,7 @@ func TestNewSemanticTokenParser(t *testing.T) {
 	tokenModifiers := []string{"declaration", "definition", "readonly"}
 
 	parser := NewSemanticTokenParser(tokenTypes, tokenModifiers)
-	
+
 	require.NotNil(t, parser)
 	assert.Equal(t, tokenTypes, parser.TokenTypes())
 	assert.Equal(t, tokenModifiers, parser.TokenModifiers())
@@ -21,7 +21,7 @@ func TestNewSemanticTokenParser(t *testing.T) {
 
 func TestNewSemanticTokenParser_EmptySlices(t *testing.T) {
 	parser := NewSemanticTokenParser([]string{}, []string{})
-	
+
 	require.NotNil(t, parser)
 	assert.Empty(t, parser.TokenTypes())
 	assert.Empty(t, parser.TokenModifiers())
@@ -29,7 +29,7 @@ func TestNewSemanticTokenParser_EmptySlices(t *testing.T) {
 
 func TestNewSemanticTokenParser_NilSlices(t *testing.T) {
 	parser := NewSemanticTokenParser(nil, nil)
-	
+
 	require.NotNil(t, parser)
 	assert.Nil(t, parser.TokenTypes())
 	assert.Nil(t, parser.TokenModifiers())
@@ -45,7 +45,7 @@ func TestFindTokensByType_BasicFunctionality(t *testing.T) {
 		Data: []uint32{
 			// First token: function at line 0, char 0, length 5
 			0, 0, 5, 0, 0, // "function" type (index 0)
-			// Second token: variable at line 0, char 10, length 3  
+			// Second token: variable at line 0, char 10, length 3
 			0, 5, 3, 1, 0, // "variable" type (index 1)
 			// Third token: function at line 1, char 0, length 4
 			1, 0, 4, 0, 0, // "function" type (index 0)
@@ -68,7 +68,7 @@ func TestFindTokensByType_BasicFunctionality(t *testing.T) {
 	assert.Equal(t, uint32(0), results[0].Range.Start.Character)
 	assert.Equal(t, uint32(5), results[0].Range.End.Character)
 
-	// Check second function token  
+	// Check second function token
 	assert.Equal(t, "function", results[1].TokenType)
 	assert.Equal(t, uint32(1), results[1].Range.Start.Line)
 	assert.Equal(t, uint32(0), results[1].Range.Start.Character)
@@ -175,7 +175,7 @@ func TestFindTokensByType_ComplexDeltas(t *testing.T) {
 		Data: []uint32{
 			// Token at line 0, character 5
 			0, 5, 8, 0, 0, // function
-			// Token at line 2 (deltaLine=2), character 10  
+			// Token at line 2 (deltaLine=2), character 10
 			2, 10, 4, 1, 0, // variable
 			// Token at same line (deltaLine=0), character 20 (10 + 10)
 			0, 10, 6, 2, 0, // type

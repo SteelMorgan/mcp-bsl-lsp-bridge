@@ -21,6 +21,7 @@ func RegisterAnalyzeCodeTool(mcpServer ToolServer, bridge interfaces.BridgeInter
 func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("analyze_code",
 			mcp.WithDescription("Analyze code for completion suggestions and insights"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to the file location to analyze")),
 			mcp.WithNumber("line", mcp.Description("Line of the file to analyze")),
 			mcp.WithNumber("character", mcp.Description("Character of the line to analyze")),
@@ -78,7 +79,7 @@ func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandle
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
 			}
-			
+
 			analyzeOpts := lsp.AnalyzeCodeOptions{
 				Uri:        uri,
 				Line:       lineInt32,

@@ -34,7 +34,6 @@ func safeUint32FromInt32(val int32) (uint32, error) {
 	return uint32(val), nil
 }
 
-
 // AnalyzeCode provides comprehensive code analysis for a given file and position
 func AnalyzeCode(client *LanguageClient, opts AnalyzeCodeOptions) (*AnalyzeCodeResult, error) {
 	result := &AnalyzeCodeResult{}

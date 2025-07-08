@@ -71,7 +71,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 
 			if len(tc.mockLanguages) > 0 {
 				mockClients := make(map[types.Language]types.LanguageClientInterface)
-				
+
 				for _, lang := range tc.mockLanguages {
 					client, err := lsp.NewLanguageClient("mock-lsp-server")
 					if err != nil {

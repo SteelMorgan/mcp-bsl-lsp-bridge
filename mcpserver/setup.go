@@ -1,8 +1,8 @@
 package mcpserver
 
 import (
-	"fmt"
 	"context"
+	"fmt"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -10,8 +10,6 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
-
-
 
 // SetupMCPServer configures the MCP server with AI-powered tools
 func SetupMCPServer(bridge interfaces.BridgeInterface) *server.MCPServer {

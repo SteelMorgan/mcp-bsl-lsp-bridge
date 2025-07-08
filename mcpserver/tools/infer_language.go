@@ -20,6 +20,7 @@ func RegisterInferLanguageTool(mcpServer ToolServer, bridge interfaces.BridgeInt
 func InferLanguageTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("infer_language",
 			mcp.WithDescription("Infer the programming language for a file"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("file_path", mcp.Description("Path to the file to infer language")),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			filePath, err := request.RequireString("file_path")

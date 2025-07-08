@@ -16,10 +16,10 @@ import (
 func createTestConfig() *lsp.LSPServerConfig {
 	// Get current working directory for validation
 	cwd, _ := os.Getwd()
-	
+
 	// Use an allowed directory for config
 	allowedDirs := []string{cwd, "."}
-	
+
 	config, err := lsp.LoadLSPConfig("lsp_config.example.json", allowedDirs)
 	if err != nil {
 		// Fallback to a minimal config if file doesn't exist
@@ -128,7 +128,7 @@ func TestTryLoadConfig(t *testing.T) {
 				tempDir := t.TempDir()
 				primaryPath := filepath.Join(tempDir, "test_config.json")
 				configDir := filepath.Join(tempDir, "config")
-				
+
 				// Create a valid config file
 				configContent := `{
 					"language_servers": {
@@ -146,10 +146,10 @@ func TestTryLoadConfig(t *testing.T) {
 						"go": [".go"]
 					}
 				}`
-				
+
 				err := os.WriteFile(primaryPath, []byte(configContent), 0600)
 				require.NoError(t, err)
-				
+
 				return primaryPath, configDir, func() {}
 			},
 			expectSuccess: true,
@@ -159,14 +159,14 @@ func TestTryLoadConfig(t *testing.T) {
 			setupFunc: func(t *testing.T) (string, string, func()) {
 				tempDir := t.TempDir()
 				originalWd, _ := os.Getwd()
-				
+
 				// Change to temp directory
 				err := os.Chdir(tempDir)
 				require.NoError(t, err)
-				
+
 				primaryPath := filepath.Join(tempDir, "nonexistent.json")
 				configDir := filepath.Join(tempDir, "config")
-				
+
 				// Create fallback config in current directory
 				configContent := `{
 					"language_servers": {
@@ -181,11 +181,11 @@ func TestTryLoadConfig(t *testing.T) {
 						".py": "python"
 					}
 				}`
-				
+
 				fallbackPath := "lsp_config.json"
 				err = os.WriteFile(fallbackPath, []byte(configContent), 0600)
 				require.NoError(t, err)
-				
+
 				return primaryPath, configDir, func() {
 					if err := os.Chdir(originalWd); err != nil {
 						t.Errorf("Failed to restore working directory: %v", err)
@@ -200,11 +200,11 @@ func TestTryLoadConfig(t *testing.T) {
 				tempDir := t.TempDir()
 				primaryPath := filepath.Join(tempDir, "nonexistent.json")
 				configDir := filepath.Join(tempDir, "config")
-				
+
 				// Create config directory
 				err := os.MkdirAll(configDir, 0750)
 				require.NoError(t, err)
-				
+
 				// Create fallback config in config directory
 				configContent := `{
 					"language_servers": {
@@ -220,11 +220,11 @@ func TestTryLoadConfig(t *testing.T) {
 						".tsx": "typescript"
 					}
 				}`
-				
+
 				fallbackPath := filepath.Join(configDir, "config.json")
 				err = os.WriteFile(fallbackPath, []byte(configContent), 0600)
 				require.NoError(t, err)
-				
+
 				return primaryPath, configDir, func() {}
 			},
 			expectSuccess: true,
@@ -234,14 +234,14 @@ func TestTryLoadConfig(t *testing.T) {
 			setupFunc: func(t *testing.T) (string, string, func()) {
 				tempDir := t.TempDir()
 				originalWd, _ := os.Getwd()
-				
+
 				// Change to temp directory
 				err := os.Chdir(tempDir)
 				require.NoError(t, err)
-				
+
 				primaryPath := filepath.Join(tempDir, "nonexistent.json")
 				configDir := filepath.Join(tempDir, "config")
-				
+
 				// Create example config in current directory
 				configContent := `{
 					"language_servers": {
@@ -256,11 +256,11 @@ func TestTryLoadConfig(t *testing.T) {
 						".rs": "rust"
 					}
 				}`
-				
+
 				fallbackPath := "lsp_config.example.json"
 				err = os.WriteFile(fallbackPath, []byte(configContent), 0600)
 				require.NoError(t, err)
-				
+
 				return primaryPath, configDir, func() {
 					if err := os.Chdir(originalWd); err != nil {
 						t.Errorf("Failed to restore working directory: %v", err)
@@ -274,14 +274,14 @@ func TestTryLoadConfig(t *testing.T) {
 			setupFunc: func(t *testing.T) (string, string, func()) {
 				tempDir := t.TempDir()
 				originalWd, _ := os.Getwd()
-				
+
 				// Change to temp directory where no config files exist
 				err := os.Chdir(tempDir)
 				require.NoError(t, err)
-				
+
 				primaryPath := filepath.Join(tempDir, "nonexistent.json")
 				configDir := filepath.Join(tempDir, "config")
-				
+
 				// Don't create any config files
 				return primaryPath, configDir, func() {
 					if err := os.Chdir(originalWd); err != nil {
@@ -297,15 +297,15 @@ func TestTryLoadConfig(t *testing.T) {
 			setupFunc: func(t *testing.T) (string, string, func()) {
 				tempDir := t.TempDir()
 				originalWd, _ := os.Getwd()
-				
+
 				// Change to temp directory
 				err := os.Chdir(tempDir)
 				require.NoError(t, err)
-				
+
 				// Use "lsp_config.json" as primary path (same as fallback)
 				primaryPath := "lsp_config.json"
 				configDir := filepath.Join(tempDir, "config")
-				
+
 				// Create config with primary path name
 				configContent := `{
 					"language_servers": {
@@ -321,10 +321,10 @@ func TestTryLoadConfig(t *testing.T) {
 						".jsx": "javascript"
 					}
 				}`
-				
+
 				err = os.WriteFile(primaryPath, []byte(configContent), 0600)
 				require.NoError(t, err)
-				
+
 				return primaryPath, configDir, func() {
 					if err := os.Chdir(originalWd); err != nil {
 						t.Errorf("Failed to restore working directory: %v", err)

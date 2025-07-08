@@ -61,7 +61,7 @@ func TestWindowsSpecificPaths(t *testing.T) {
 				t.Errorf("security.GetCleanAbsPath() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			
+
 			if !tt.wantErr {
 				if tt.want != "" && got != tt.want {
 					t.Errorf("security.GetCleanAbsPath() = %v, want %v", got, tt.want)
@@ -130,7 +130,7 @@ func TestWindowsIsWithinAllowedDirectory(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			result := security.IsWithinAllowedDirectory(tt.path, tt.baseDir)
 			if result != tt.allowed {
-				t.Errorf("security.IsWithinAllowedDirectory(%s, %s) = %v, want %v", 
+				t.Errorf("security.IsWithinAllowedDirectory(%s, %s) = %v, want %v",
 					tt.path, tt.baseDir, result, tt.allowed)
 			}
 		})
@@ -139,9 +139,9 @@ func TestWindowsIsWithinAllowedDirectory(t *testing.T) {
 
 func TestWindowsDriveLetters(t *testing.T) {
 	tests := []struct {
-		name     string
-		path     string
-		wantVol  string
+		name    string
+		path    string
+		wantVol string
 	}{
 		{
 			name:    "C drive",

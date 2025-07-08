@@ -86,12 +86,12 @@ func TestSafePrettyPrint_CircularReference(t *testing.T) {
 	node2.Next = node1 // Creates circular reference
 
 	result := mcp_lsp_bridge.SafePrettyPrint(node1)
-	
+
 	// Should not panic and should contain circular reference indication
 	if result == "" {
 		t.Error("SafePrettyPrint should not return empty string for circular reference")
 	}
-	
+
 	// Should contain both nodes and handle the circular reference
 	// The exact format may vary but it should not crash
 	t.Logf("Circular reference result: %s", result)
@@ -100,11 +100,11 @@ func TestSafePrettyPrint_CircularReference(t *testing.T) {
 func TestSafePrettyPrint_ComplexStructures(t *testing.T) {
 	// Test that SafePrettyPrint handles complex structures correctly
 	// This indirectly tests the simplifyForJSON function
-	
+
 	tests := []struct {
-		name        string
-		input       any
-		shouldMatch string // exact match
+		name          string
+		input         any
+		shouldMatch   string   // exact match
 		shouldContain []string // strings that should be in output
 	}{
 		{
@@ -116,13 +116,13 @@ func TestSafePrettyPrint_ComplexStructures(t *testing.T) {
 			shouldContain: []string{"Name", "John"},
 		},
 		{
-			name: "nil pointer",
-			input: (*string)(nil),
+			name:        "nil pointer",
+			input:       (*string)(nil),
 			shouldMatch: "null",
 		},
 		{
-			name: "valid pointer",
-			input: func() *string { s := "hello"; return &s }(),
+			name:        "valid pointer",
+			input:       func() *string { s := "hello"; return &s }(),
 			shouldMatch: "\"hello\"",
 		},
 	}
@@ -130,19 +130,19 @@ func TestSafePrettyPrint_ComplexStructures(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := mcp_lsp_bridge.SafePrettyPrint(tt.input)
-			
+
 			if tt.shouldMatch != "" {
 				if result != tt.shouldMatch {
 					t.Errorf("Expected exact match %q, got %q", tt.shouldMatch, result)
 				}
 			}
-			
+
 			for _, contain := range tt.shouldContain {
 				if !contains(result, contain) {
 					t.Errorf("Expected result to contain %q, got %q", contain, result)
 				}
 			}
-			
+
 			// For struct with unexported field test, ensure 'age' is not present
 			if tt.name == "struct with unexported field" {
 				if contains(result, "age") {

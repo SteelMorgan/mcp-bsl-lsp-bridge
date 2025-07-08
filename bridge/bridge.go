@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/logger"
-	"rockerboo/mcp-lsp-bridge/types"
 	"rockerboo/mcp-lsp-bridge/lsp"
-		"rockerboo/mcp-lsp-bridge/security"
+	"rockerboo/mcp-lsp-bridge/security"
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/server"
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -68,7 +68,7 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 	// }
 	dirs := b.AllowedDirectories()
 	dir := dirs[0] // Get first directory (for now)
-	
+
 	logger.Debug(fmt.Sprintf("validateAndConnectClient: Using directory: %s from allowed dirs: %v", dir, dirs))
 
 	absPath, err := b.IsAllowedDirectory(dir)
@@ -104,7 +104,7 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 
 		rootPath := "file://" + absPath
 		// root_uri := protocol.DocumentUri(root_path)
-		
+
 		logger.Debug("validateAndConnectClient: Root path for LSP: " + rootPath)
 		// Process IDs are typically small positive integers, safe to convert
 		// But we'll add bounds checking for completeness
@@ -149,7 +149,7 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 		logger.Debug(fmt.Sprintf("STATUS: Before Initialize - Client connected: %v, ctx.Err(): %v", metrics.IsConnected(), client.Context().Err()))
 
 		logger.Debug(fmt.Sprintf("STATUS: client %+v", client))
-		
+
 		// Send initialize request
 		result, err := client.Initialize(params)
 		if err != nil {
@@ -1120,4 +1120,3 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 
 	return allReports, nil
 }
-

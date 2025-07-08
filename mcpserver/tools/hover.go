@@ -14,6 +14,7 @@ import (
 func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("hover",
 			mcp.WithDescription("Get detailed symbol information (signatures, documentation, types)."),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to the file"), mcp.Required()),
 			mcp.WithNumber("line", mcp.Description("Line number (0-based)"), mcp.Required(), mcp.Min(0)),
 			mcp.WithNumber("character", mcp.Description("Character position (0-based)"), mcp.Required(), mcp.Min(0)),
@@ -54,7 +55,7 @@ func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerF
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
 			}
-			
+
 			result, err := bridge.GetHoverInformation(uri, lineUint32, characterUint32)
 			if err != nil {
 				logger.Error("hover: Request failed", fmt.Sprintf("URI: %s, Line: %d, Character: %d, Error: %v", uri, line, character, err))

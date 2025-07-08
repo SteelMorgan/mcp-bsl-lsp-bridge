@@ -39,21 +39,21 @@ func (m *MockEnvProvider) Getenv(key string) string {
 
 func TestNewDefaultEnvProvider(t *testing.T) {
 	provider := NewDefaultEnvProvider()
-	
+
 	require.NotNil(t, provider)
 	assert.IsType(t, DefaultEnvProvider{}, provider)
 }
 
 func TestDefaultEnvProvider_Getenv(t *testing.T) {
 	provider := DefaultEnvProvider{}
-	
+
 	// Test with a known environment variable that should exist
 	// Use PATH which exists on all systems
 	result := provider.Getenv("PATH")
 	// PATH should exist and not be empty on most systems
 	// Note: We can't assert the exact value since it varies by system
 	assert.IsType(t, "", result)
-	
+
 	// Test with a non-existent environment variable
 	result = provider.Getenv("NONEXISTENT_TEST_VAR_12345")
 	assert.Equal(t, "", result)
@@ -61,9 +61,9 @@ func TestDefaultEnvProvider_Getenv(t *testing.T) {
 
 func TestDefaultUserProvider_Current(t *testing.T) {
 	provider := DefaultUserProvider{}
-	
+
 	user, err := provider.Current()
-	
+
 	// This should work on most systems
 	require.NoError(t, err)
 	require.NotNil(t, user)

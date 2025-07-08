@@ -1782,9 +1782,9 @@ func TestIsAllowedDirectory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bridge := createTestBridge(tt.allowedDirs)
-			
+
 			result, err := bridge.IsAllowedDirectory(tt.testPath)
-			
+
 			if tt.expectAllowed {
 				require.NoError(t, err, "Expected path to be allowed")
 				assert.NotEmpty(t, result, "Expected non-empty absolute path")
@@ -1823,9 +1823,9 @@ func TestAllowedDirectories(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			bridge := createTestBridge(tt.allowedDirs)
-			
+
 			result := bridge.AllowedDirectories()
-			
+
 			assert.Equal(t, tt.allowedDirs, result)
 			// Note: Currently returns reference to original slice (not a copy)
 			// This test verifies the current behavior
@@ -1844,7 +1844,7 @@ func TestAllowedDirectories(t *testing.T) {
 func TestDetectPrimaryProjectLanguage(t *testing.T) {
 	// Create temporary test directory structure
 	tempDir := t.TempDir()
-	
+
 	tests := []struct {
 		name         string
 		files        []string
@@ -1867,10 +1867,10 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 			expectedLang: func() *types.Language { l := types.Language("go"); return &l }(),
 		},
 		{
-			name:        "empty directory",
-			files:       []string{},
+			name:         "empty directory",
+			files:        []string{},
 			expectedLang: nil,
-			expectError: true,
+			expectError:  true,
 		},
 	}
 
@@ -1889,9 +1889,9 @@ func TestDetectPrimaryProjectLanguage(t *testing.T) {
 			}
 
 			bridge := createTestBridge([]string{testDir})
-			
+
 			result, err := bridge.DetectPrimaryProjectLanguage(testDir)
-			
+
 			if tt.expectError {
 				require.Error(t, err)
 				assert.Nil(t, result)

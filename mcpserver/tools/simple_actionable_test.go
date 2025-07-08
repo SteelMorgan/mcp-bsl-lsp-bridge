@@ -115,8 +115,8 @@ func applyTextEditsToContent(content string, edits []protocol.TextEdit) (string,
 	// Sort edits in reverse order to prevent index shifts
 	sort.Slice(edits, func(i, j int) bool {
 		return edits[i].Range.Start.Line > edits[j].Range.Start.Line ||
-			(edits[i].Range.Start.Line == edits[j].Range.Start.Line && 
-			 edits[i].Range.Start.Character > edits[j].Range.Start.Character)
+			(edits[i].Range.Start.Line == edits[j].Range.Start.Line &&
+				edits[i].Range.Start.Character > edits[j].Range.Start.Character)
 	})
 
 	// Apply each edit

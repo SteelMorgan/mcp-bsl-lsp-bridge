@@ -14,6 +14,7 @@ import (
 func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("format_document",
 		mcp.WithDescription("ACTIONABLE: Format a document according to language conventions with dual-mode operation. PREVIEW MODE (apply='false', default): Shows detailed formatting changes without modifying files - displays line-by-line changes, whitespace adjustments, and content modifications. APPLY MODE (apply='true'): Actually applies all formatting changes to the file. Supports customizable indentation and language-specific formatting rules. Always preview first for safety."),
+		mcp.WithDestructiveHintAnnotation(true),
 		mcp.WithString("uri", mcp.Description("URI to the file to format (file:// scheme required, e.g., 'file:///path/to/file.go')")),
 		mcp.WithNumber("tab_size", mcp.Description("Tab size for formatting (default: 4, affects indentation width)")),
 		mcp.WithString("apply", mcp.Description("CRITICAL: Whether to apply formatting changes. 'false' (default) = preview only, 'true' = actually format file. ALWAYS preview first!")),
@@ -44,7 +45,7 @@ func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeIn
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Invalid tab size: %v", err)), nil
 		}
-		
+
 		edits, err := bridge.FormatDocument(uri, tabSizeUint32, insertSpaces)
 		if err != nil {
 			logger.Error("format_document: Request failed", err)

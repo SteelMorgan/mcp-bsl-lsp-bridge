@@ -22,7 +22,7 @@ func TestFormatDocumentActionable(t *testing.T) {
 	}
 
 	result := formatTextEdits(mockEdits)
-	
+
 	if !strings.Contains(result, "DOCUMENT FORMATTING") {
 		t.Errorf("Expected formatting header, got: %s", result)
 	}
@@ -58,13 +58,13 @@ func TestRenameSymbolActionable(t *testing.T) {
 			},
 		},
 	}
-	
+
 	mockWorkspaceEdit := protocol.WorkspaceEdit{
 		Changes: changes,
 	}
 
 	result := formatWorkspaceEdit(&mockWorkspaceEdit)
-	
+
 	if !strings.Contains(result, "Files to be modified: 2") {
 		t.Errorf("Expected file count in output, got: %s", result)
 	}
@@ -109,7 +109,7 @@ func TestFormatWorkspaceEditOutput(t *testing.T) {
 	}
 
 	result = formatWorkspaceEdit(&mockWorkspaceEdit)
-	
+
 	// Check for expected content
 	if !strings.Contains(result, "File: test.go") {
 		t.Errorf("Expected filename in output, got: %s", result)

@@ -23,7 +23,7 @@ func (lc *LanguageClient) Initialize(params protocol.InitializeParams) (*protoco
 	default:
 		logger.Debug("STATUS: Initialize - Connection appears healthy")
 	}
-	
+
 	var result protocol.InitializeResult
 
 	err := lc.SendRequest("initialize", params, &result, 5*time.Second)

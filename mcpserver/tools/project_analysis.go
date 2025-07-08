@@ -25,6 +25,7 @@ func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.To
 	return mcp.NewTool(
 			"project_analysis",
 			mcp.WithDescription("Multi-purpose code analysis. 'definitions': Precise symbol location (URI, line, char); use this output for 'hover', 'signature_help', 'rename', or 'get_range_content'. 'references': All symbol usages. 'workspace_symbols': Project-wide symbol search. 'document_symbols': File symbol outline. 'text_search': Workspace content search."),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("workspace_uri", mcp.Description("URI to project root (e.g., 'file:///home/user/my_project').")),
 			mcp.WithString("query", mcp.Description("Symbol name (definitions/references/workspace_symbols), file URI (document_symbols), or text pattern (text_search)."), mcp.Required()),
 			mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search)."), mcp.Required()),

@@ -5,7 +5,6 @@ import (
 	"rockerboo/mcp-lsp-bridge/mcpserver/tools"
 )
 
-
 // RegisterAllTools registers all MCP tools with the server
 func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterface) {
 	// Core analysis tools

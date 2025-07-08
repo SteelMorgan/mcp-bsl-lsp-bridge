@@ -16,6 +16,7 @@ import (
 func MCPLSPDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("mcp_lsp_diagnostics",
 			mcp.WithDescription("Provides diagnostic information about the MCP-LSP bridge, including registered language servers, configuration details, connected servers, and detected project languages."),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("report_type", mcp.Description("Type of diagnostic report to generate: 'summary', 'config', 'connected_clients', 'project_languages', or 'all'. Default: 'summary'")),
 			mcp.WithString("summary", mcp.Description("config, connected_clients, project_languages, all")),
 			mcp.WithString("project_path", mcp.Description("Optional: Path to the project directory for project_languages report. Defaults to current working directory.")),
@@ -42,7 +43,6 @@ func MCPLSPDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.
 
 			globalConfig := config.GetGlobalConfig()
 			languageServers := config.GetLanguageServers()
-		
 
 			if reportType == "summary" || reportType == "all" {
 				sb.WriteString("\n### Summary\n")

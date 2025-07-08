@@ -20,6 +20,7 @@ func RegisterCallHierarchyTool(mcpServer ToolServer, bridge interfaces.BridgeInt
 func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("call_hierarchy",
 			mcp.WithDescription("Show call hierarchy (callers and callees) for a symbol"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to the file")),
 			mcp.WithNumber("line", mcp.Description("Line number (0-based)")),
 			mcp.WithNumber("character", mcp.Description("Character position (0-based)")),
@@ -60,7 +61,7 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
 			}
-			
+
 			items, err := bridge.PrepareCallHierarchy(uri, lineUint32, characterUint32)
 			if err != nil {
 				logger.Error("call_hierarchy: Prepare failed", err)
@@ -68,12 +69,11 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			}
 
 			if len(items) == 0 {
-				return mcp.NewToolResultText("=== CALL HIERARCHY ===\nNo call hierarchy items found for this symbol"), nil
+				return mcp.NewToolResultText(fmt.Sprintf("No call hierarchy items found on line %d, character %d", line, character)), nil
 			}
 
 			var result strings.Builder
 
-			result.WriteString("=== CALL HIERARCHY ===\n")
 			result.WriteString(fmt.Sprintf("Prepared %d call hierarchy items\n\n", len(items)))
 
 			// For now, just show the prepared items since incoming/outgoing calls need proper implementation

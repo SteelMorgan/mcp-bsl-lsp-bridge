@@ -19,6 +19,7 @@ func RegisterLSPConnectTool(mcpServer ToolServer, bridge interfaces.BridgeInterf
 func LSPConnectTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("lsp_connect",
 			mcp.WithDescription("Connect to a language server for a specific language"),
+			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("language", mcp.Description("Programming language to connect")),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			language, err := request.RequireString("language")

@@ -18,6 +18,7 @@ func RegisterLSPDisconnectTool(mcpServer ToolServer, bridge interfaces.BridgeInt
 func LSPDisconnectTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("lsp_disconnect",
 			mcp.WithDescription("Disconnect all active language server clients"),
+			mcp.WithDestructiveHintAnnotation(false),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			// Close all active clients
 			bridge.CloseAllClients()

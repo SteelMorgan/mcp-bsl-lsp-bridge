@@ -15,6 +15,7 @@ import (
 func RegisterWorkspaceDiagnosticsTool(mcpServer ToolServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("workspace_diagnostics",
 		mcp.WithDescription("Get comprehensive diagnostics for entire workspace"),
+		mcp.WithDestructiveHintAnnotation(false),
 		mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
 		mcp.WithString("identifier", mcp.Description("Optional identifier for diagnostic session")), // TODO: Add optional when supported
 	), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {

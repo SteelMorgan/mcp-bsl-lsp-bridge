@@ -19,6 +19,7 @@ func RegisterRenameTool(mcpServer ToolServer, bridge interfaces.BridgeInterface)
 func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("rename",
 			mcp.WithDescription("ACTIONABLE: Rename a symbol across the entire codebase with LSP precision and cross-file support. PREVIEW MODE (apply='false', default): Shows all files and exact locations that would be modified, with line numbers and replacement text. APPLY MODE (apply='true'): Actually performs the rename across all affected files in the codebase. Requires precise coordinates from definitions or hover for accurate targeting. Supports functions, variables, types, and other symbols. Always preview first to verify scope."),
+			mcp.WithDestructiveHintAnnotation(true),
 			mcp.WithString("uri", mcp.Description("URI to the file containing the symbol (file:// scheme required, e.g., 'file:///path/to/file.go')")),
 			mcp.WithNumber("line", mcp.Description("Line number (0-based) where the symbol is located - use coordinates from project_analysis definitions for precision")),
 			mcp.WithNumber("character", mcp.Description("Character position (0-based) within the line - use coordinates from project_analysis definitions for precision")),
@@ -56,7 +57,7 @@ func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandler
 				applyChanges = (val == "true" || val == "True" || val == "TRUE")
 			}
 
-			// Safe conversions for line and character  
+			// Safe conversions for line and character
 			lineUint32, err := safeUint32(line)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid line number: %v", err)), nil

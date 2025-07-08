@@ -19,6 +19,7 @@ func RegisterCodeActionsTool(mcpServer ToolServer, bridge interfaces.BridgeInter
 func CodeActionTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("code_actions",
 			mcp.WithDescription("Get intelligent code actions including quick fixes, refactoring suggestions, and automated improvements for a code range. Returns language server suggested actions like import fixes, error corrections, extract method, add missing imports, implement interfaces, and other context-aware improvements. Use at error locations for fixes or at any code location for refactoring suggestions."),
+			mcp.WithDestructiveHintAnnotation(true),
 			mcp.WithString("uri", mcp.Description("URI to the file (file:// scheme required, e.g., 'file:///path/to/file.go')")),
 			mcp.WithNumber("line", mcp.Description("Start line number (0-based) - target specific code location or error")),
 			mcp.WithNumber("character", mcp.Description("Start character position (0-based) - target specific code location or error")),
@@ -72,7 +73,7 @@ func CodeActionTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid end character position: %v", err)), nil
 			}
-			
+
 			actions, err := bridge.GetCodeActions(uri, lineUint32, characterUint32, endLineUint32, endCharacterUint32)
 			if err != nil {
 				logger.Error("code_actions: Request failed", err)

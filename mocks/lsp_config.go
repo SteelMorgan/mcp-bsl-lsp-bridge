@@ -25,7 +25,6 @@ func (m *MockLSPServerConfig) FindServerConfig(language string) (types.LanguageS
 	return args.Get(0).(types.LanguageServerConfigProvider), args.Error(1)
 }
 
-
 func (m *MockLSPServerConfig) GetGlobalConfig() types.GlobalConfig {
 	args := m.Called()
 	return args.Get(0).(types.GlobalConfig)

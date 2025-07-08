@@ -90,7 +90,7 @@ func TestLogLevels(t *testing.T) {
 			shouldLog:  true,
 		},
 		{
-			name:       "Warn Log at Error Level", 
+			name:       "Warn Log at Error Level",
 			logLevel:   "error",
 			logFunc:    Warn,
 			logMessage: "Test warn message",
@@ -301,9 +301,9 @@ func TestWarnFunction(t *testing.T) {
 
 	// Test Warn function at different log levels
 	testCases := []struct {
-		name       string
-		logLevel   string
-		shouldLog  bool
+		name      string
+		logLevel  string
+		shouldLog bool
 	}{
 		{"Warn at info level", "info", true},
 		{"Warn at warn level", "warn", true},
@@ -321,7 +321,7 @@ func TestWarnFunction(t *testing.T) {
 
 			// Use unique log file path for each test case
 			logPath := filepath.Join(logDir, fmt.Sprintf("warn_test_%s.log", tc.name))
-			
+
 			cfg := LoggerConfig{
 				LogPath:     logPath,
 				LogLevel:    tc.logLevel,
@@ -346,7 +346,7 @@ func TestWarnFunction(t *testing.T) {
 
 			logged := strings.Contains(string(content), testMessage)
 			if logged != tc.shouldLog {
-				t.Errorf("Unexpected logging behavior for level %s. Expected log: %v, Actual log: %v", 
+				t.Errorf("Unexpected logging behavior for level %s. Expected log: %v, Actual log: %v",
 					tc.logLevel, tc.shouldLog, logged)
 			}
 		})
@@ -379,16 +379,15 @@ func TestRotateLogFilesCoverage(t *testing.T) {
 		}
 
 		filesBefore, _ := filepath.Glob(baseLogPath + "*")
-		
+
 		// Call rotate - should do nothing
 		rotateLogFiles(cfg)
-		
+
 		filesAfter, _ := filepath.Glob(baseLogPath + "*")
-		
+
 		if len(filesAfter) != len(filesBefore) {
-			t.Errorf("Files should not be rotated when MaxLogFiles is 0. Before: %d, After: %d", 
+			t.Errorf("Files should not be rotated when MaxLogFiles is 0. Before: %d, After: %d",
 				len(filesBefore), len(filesAfter))
 		}
 	})
 }
-
