@@ -27,13 +27,33 @@ func RegisterProjectAnalysisTool(mcpServer ToolServer, bridge interfaces.BridgeI
 func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool(
 			"project_analysis",
-			mcp.WithDescription("Multi-purpose code analysis. 'definitions': Precise symbol location (URI, line, char); use this output for 'hover', 'signature_help', 'rename', or 'get_range_content'. 'references': All symbol usages. 'workspace_symbols': Project-wide symbol search. 'document_symbols': File symbol outline. 'text_search': Workspace content search."),
+			mcp.WithDescription(`Multi-purpose code analysis tool.
+
+COMMON EXAMPLES:
+• Find functions/classes: analysis_type="workspace_symbols", query="calculateTotal"
+• Explore file structure: analysis_type="document_symbols", query="src/utils.py"  
+• Find symbol usage: analysis_type="references", query="UserModel"
+• Find definition: analysis_type="definitions", query="processPayment"
+• Search text: analysis_type="text_search", query="TODO: fix"
+
+ANALYSIS TYPES:
+• workspace_symbols: Find symbols across project
+• document_symbols: List symbols in specific file
+• references: Find all symbol usages
+• definitions: Locate symbol definitions  
+• text_search: Search project text
+
+QUERY GUIDANCE:
+• For symbols: Use exact symbol names
+• For files: Use relative paths like "src/file.py"
+• workspace_uri defaults to project root
+• offset/limit optional (defaults: 0, 20)`),
 			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithString("workspace_uri", mcp.Description("URI to project root (e.g., 'file:///home/user/my_project').")),
-			mcp.WithString("query", mcp.Description("Symbol name (definitions/references/workspace_symbols), file URI (document_symbols), or text pattern (text_search)."), mcp.Required()),
-			mcp.WithString("analysis_type", mcp.Description("Analysis type: 'definitions' (exact symbol location), 'references' (all usages), 'workspace_symbols' (symbol search), 'document_symbols' (file contents), 'text_search' (content search)."), mcp.Required()),
-			mcp.WithNumber("offset", mcp.Description("Result offset (default: 0)."), mcp.DefaultNumber(0), mcp.Min(0)),
-			mcp.WithNumber("limit", mcp.Description("Max results (default: 20, max: 100)."), mcp.Min(0), mcp.Max(100), mcp.DefaultNumber(20)),
+			mcp.WithString("workspace_uri", mcp.Description("Project root URI (optional, defaults to detected project root).")),
+			mcp.WithString("query", mcp.Description("Symbol name OR file path OR text pattern (see examples above)."), mcp.Required()),
+			mcp.WithString("analysis_type", mcp.Description("Choose: workspace_symbols, document_symbols, references, definitions, text_search."), mcp.Required()),
+			mcp.WithNumber("offset", mcp.Description("Skip N results (default: 0)."), mcp.DefaultNumber(0), mcp.Min(0)),
+			mcp.WithNumber("limit", mcp.Description("Max results (default: 20)."), mcp.Min(0), mcp.Max(100), mcp.DefaultNumber(20)),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			workspaceUri := request.GetString("workspace_uri", "")
 

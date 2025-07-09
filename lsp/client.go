@@ -370,9 +370,6 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 		logger.Info("LSP client status reset from error to connected")
 	}
 
-	// Debug the parent context state
-	logger.Debug(fmt.Sprintf("SendRequest: Parent context error: %v", lc.ctx.Err()))
-
 	p, e := json.Marshal(params)
 	if e != nil {
 		return fmt.Errorf("failed to marshal initialize params: %w", e)
@@ -383,19 +380,14 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	// Check connection state before call
 	select {
 	case <-lc.conn.DisconnectNotify():
-		logger.Error("DISCONNECT: Connection already disconnected before Call")
 		return errors.New("connection already disconnected")
 	default:
-		logger.Debug("DISCONNECT: Connection appears healthy before Call")
 	}
 
 	reqCtx, cancel := context.WithTimeout(lc.ctx, timeout)
 	defer cancel()
 
-	logger.Debug("DISCONNECT: About to make jsonrpc2.Call")
-	// Call WITHOUT holding any locks to avoid deadlock
 	err := lc.conn.Call(reqCtx, method, params, result)
-	logger.Debug(fmt.Sprintf("DISCONNECT: jsonrpc2.Call completed with error: %v", err))
 
 	// Update status and metrics with brief locks
 	if err != nil {

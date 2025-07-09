@@ -170,9 +170,7 @@ func (lc *LanguageClient) References(uri string, line, character uint32, include
 
 // Hover provides hover information at a given position
 func (lc *LanguageClient) Hover(uri string, line, character uint32) (*protocol.Hover, error) {
-	var result protocol.Hover
-
-	err := lc.SendRequest("textDocument/hover", protocol.HoverParams{
+	params := protocol.HoverParams{
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
 		},
@@ -180,9 +178,25 @@ func (lc *LanguageClient) Hover(uri string, line, character uint32) (*protocol.H
 			Line:      line,
 			Character: character,
 		},
-	}, &result, 5*time.Second)
+	}
+
+	var rawResponse json.RawMessage
+
+	err := lc.SendRequest("textDocument/hover", params, &rawResponse, 5*time.Second)
 	if err != nil {
 		return nil, err
+	}
+
+	// Handle null response - server has no hover information
+	if len(rawResponse) == 4 && string(rawResponse) == "null" {
+		return nil, nil
+	}
+
+	var result protocol.Hover
+
+	err = json.Unmarshal(rawResponse, &result)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal hover response: %w", err)
 	}
 
 	return &result, nil

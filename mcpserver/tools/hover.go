@@ -51,12 +51,17 @@ func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerF
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid line number: %v", err)), nil
 			}
+
+			// Precise character positioning
 			characterUint32, err := safeUint32(character)
 			if err != nil {
+				logger.Error(fmt.Sprintf("Invalid character position: %v", err))
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
 			}
 
+			// Attempt hover at specified position
 			result, err := bridge.GetHoverInformation(uri, lineUint32, characterUint32)
+
 			if err != nil {
 				logger.Error("hover: Request failed", fmt.Sprintf("URI: %s, Line: %d, Character: %d, Error: %v", uri, line, character, err))
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to get hover information: %v", err)), nil
@@ -64,8 +69,14 @@ func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerF
 
 			// Detailed logging of result
 			if result == nil {
-				logger.Info("Hover Tool: No hover information available")
-				return mcp.NewToolResultText("No hover information available"), nil
+				logger.Info(fmt.Sprintf("Hover Tool: No hover information available for %s at line %d, character %d", uri, line, character))
+				return mcp.NewToolResultText(fmt.Sprintf("No hover information available for this symbol at line %d, character %d", line, character)), nil
+			}
+
+			// Validate Contents to prevent potential panics
+			if result.Contents.Value == nil {
+				logger.Warn(fmt.Sprintf("Hover result with nil Contents at %s:%d:%d", uri, line, character))
+				return mcp.NewToolResultText(fmt.Sprintf("No meaningful hover information found at line %d, character %d", line, character)), nil
 			}
 
 			content := formatHoverContent(result.Contents)

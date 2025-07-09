@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/mocks"
@@ -229,25 +230,73 @@ func TestDefinition(t *testing.T) {
 }
 
 func TestHover(t *testing.T) {
-	mockConn := new(mocks.MockLSPConnectionInterface)
-
-	// Prepare a context
-	ctx := t.Context()
-
-	// Successful hover request
-	mockConn.On("Call", mock.Anything, "textDocument/hover", mock.AnythingOfType("protocol.HoverParams"), mock.AnythingOfType("*protocol.Hover"), mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil)
-	mockConn.On("DisconnectNotify").Return(ctx.Done())
-
-	client := &LanguageClient{
-		conn: mockConn,
-		ctx:  ctx,
+	testCases := []struct {
+		name           string
+		mockResponse   []byte
+		expectedResult bool
+		expectError    bool
+	}{
+		{
+			name:           "Successful hover with markdown content",
+			mockResponse:   []byte(`{"contents": {"kind": "markdown", "value": "Sample hover content"}}`),
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name:           "Successful hover with string content",
+			mockResponse:   []byte(`{"contents": "Simple hover text"}`),
+			expectedResult: true,
+			expectError:    false,
+		},
+		{
+			name:           "Hover with null response",
+			mockResponse:   []byte(`null`),
+			expectedResult: false,
+			expectError:    false,
+		},
+		{
+			name:           "Hover with empty contents",
+			mockResponse:   []byte(`{"contents": {}}`),
+			expectedResult: false,
+			expectError:    true,
+		},
 	}
 
-	hoverInfo, err := client.Hover("file:///test.go", 10, 5)
-	require.NoError(t, err)
-	assert.NotNil(t, hoverInfo)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockConn := new(mocks.MockLSPConnectionInterface)
 
-	mockConn.AssertExpectations(t)
+			ctx := t.Context()
+			mockConn.On("Call", mock.Anything, "textDocument/hover", 
+				mock.AnythingOfType("protocol.HoverParams"), 
+				mock.AnythingOfType("*json.RawMessage"), 
+				mock.AnythingOfType("[]jsonrpc2.CallOption")).Return(nil).Run(func(args mock.Arguments) {
+				rawMessage := args.Get(3).(*json.RawMessage)
+				*rawMessage = tc.mockResponse
+			})
+			mockConn.On("DisconnectNotify").Return(ctx.Done())
+
+			client := &LanguageClient{
+				conn: mockConn,
+				ctx:  t.Context(),
+			}
+
+			hoverInfo, err := client.Hover("file:///test.go", 10, 5)
+			
+			if tc.expectError {
+				require.Error(t, err, "Expected error but got none")
+			} else {
+				require.NoError(t, err)
+				if tc.expectedResult {
+					assert.NotNil(t, hoverInfo, "Expected hover info to be non-nil")
+				} else {
+					assert.Nil(t, hoverInfo, "Expected hover info to be nil")
+				}
+			}
+
+			mockConn.AssertExpectations(t)
+		})
+	}
 }
 
 func TestWorkspaceSymbols(t *testing.T) {

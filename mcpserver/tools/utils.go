@@ -99,11 +99,27 @@ func symbolKindToString(kind protocol.SymbolKind) string {
 
 // Helper function to format hover content
 func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]) string {
+	// Handle nil or zero-value contents
+	if contents.Value == nil {
+		return "No hover information available"
+	}
+
 	switch v := contents.Value.(type) {
 	case protocol.MarkupContent:
-		return v.Value
+		// Prefer value with non-empty content
+		if v.Value != "" {
+			return v.Value
+		}
+	case protocol.MarkedString:
+		// Handle MarkedString value
+		if strVal, ok := v.Value.(string); ok && strVal != "" {
+			return strVal
+		}
 	case string:
-		return v
+		// Return non-empty string
+		if v != "" {
+			return v
+		}
 	case []any:
 		var result strings.Builder
 
@@ -111,20 +127,39 @@ func formatHoverContent(contents protocol.Or3[protocol.MarkupContent, protocol.M
 			if i > 0 {
 				result.WriteString("\n---\n")
 			}
-			// Try to handle different content types
-			if str, ok := item.(string); ok {
-				result.WriteString(str)
-			} else if markup, ok := item.(protocol.MarkupContent); ok {
-				result.WriteString(markup.Value)
-			} else {
-				result.WriteString(fmt.Sprintf("%v", item))
+			
+			// Comprehensive type handling with fallback
+			switch typed := item.(type) {
+			case string:
+				result.WriteString(typed)
+			case protocol.MarkupContent:
+				if typed.Value != "" {
+					result.WriteString(typed.Value)
+				}
+			case protocol.MarkedString:
+				markedVal, ok := typed.Value.(string)
+				if ok && markedVal != "" {
+					result.WriteString(markedVal)
+				}
+			default:
+				// Fallback for unknown types
+				strVal := fmt.Sprintf("%v", typed)
+				if strVal != "" {
+					result.WriteString(strVal)
+				}
 			}
 		}
 
-		return result.String()
+		// Return result if not empty
+		if result.Len() > 0 {
+			return result.String()
+		}
 	default:
-		return fmt.Sprintf("%v", contents)
+		// Final fallback for unhandled cases
+		return "No meaningful hover information found"
 	}
+
+	return "No meaningful hover information found"
 }
 
 // Helper function to format diagnostics
