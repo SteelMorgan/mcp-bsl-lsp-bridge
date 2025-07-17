@@ -51,20 +51,20 @@ release:
   # If set to true, will not auto-publish the release.
   # Note: all GitHub releases start as drafts while artifacts are uploaded.
   # Available only for GitHub and Gitea.
-  draft: true
+  # draft: true
 
   # Whether to remove existing draft releases with the same name before creating
   # a new one.
   #
   # Only effective if `draft` is set to true.
   # Available only for GitHub.
-  replace_existing_draft: true
+  # replace_existing_draft: true
 
   # Whether to use an existing draft release as the target release.
   #
   # Available only for GitHub.
   # Since: v2.5.
-  use_existing_draft: true
+  # use_existing_draft: true
 
   # Whether to remove an artifact that already exists.
   #
@@ -93,7 +93,7 @@ release:
   #  Check https://github.com/goreleaser/goreleaser/issues/2304 for more info.
   #
   # Default: ''.
-  discussion_category_name: General
+  # discussion_category_name: General
 
   # If set to auto, will mark the release as not ready for production
   # in case there is an indicator for this in the tag e.g. v1.0.0-rc1
@@ -109,7 +109,7 @@ release:
   #
   # Default: true.
   # Templates: allowed. (Since v2.6)
-  make_latest: true
+  # make_latest: true
 
   # What to do with the release notes in case there the release already exists.
   #
@@ -142,7 +142,7 @@ release:
   #
   # Default: '{{.Tag}}' ('{{.PrefixedTag}}' on Pro).
   # Templates: allowed.
-  name_template: "{{.ProjectName}}-v{{.Version}} {{.Env.USER}}"
+  name_template: "{{.ProjectName}}-v{{.Version}}"
 
   # You can disable this pipe in order to not create the release on any SCM.
   # Keep in mind that this might also break things that depend on the release
