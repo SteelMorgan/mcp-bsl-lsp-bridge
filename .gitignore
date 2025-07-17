@@ -22,6 +22,8 @@
 !*.sh
 
 !.github/workflows/*
+!docs/*
+!docs/**/*
 
 # ...even if they are in subdirectories
 !*/
