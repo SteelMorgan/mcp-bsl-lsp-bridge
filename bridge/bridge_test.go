@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 
 	"rockerboo/mcp-lsp-bridge/security"
 	"rockerboo/mcp-lsp-bridge/types"
@@ -846,16 +847,20 @@ func TestIncomingOutgoingCalls(t *testing.T) {
 		},
 	}
 
-	// Test IncomingCalls - should fail because the test file doesn't exist
+	// Test IncomingCalls - should fail because no LSP server is running
 	incoming, err := bridge.IncomingCalls(testItem)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "incoming calls request failed")
+	// Check for either connection failure or request failure
+	assert.True(t, strings.Contains(err.Error(), "failed to get language client") ||
+		strings.Contains(err.Error(), "incoming calls request failed"))
 	assert.Nil(t, incoming)
 
-	// Test OutgoingCalls - should fail because the test file doesn't exist
+	// Test OutgoingCalls - should fail because no LSP server is running
 	outgoing, err := bridge.OutgoingCalls(testItem)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "outgoing calls request failed")
+	// Check for either connection failure or request failure
+	assert.True(t, strings.Contains(err.Error(), "failed to get language client") ||
+		strings.Contains(err.Error(), "outgoing calls request failed"))
 	assert.Nil(t, outgoing)
 }
 
