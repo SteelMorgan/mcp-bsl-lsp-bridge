@@ -1,5 +1,9 @@
 # Configuration Guide
 
+An example lsp_config.json with major popular language servers configured:
+
+[lsp_config.example.json](/lsp_config.example.json)
+
 ## Requirements
 
 A valid `lsp_config.json` file is required for the bridge to function. The bridge needs:
