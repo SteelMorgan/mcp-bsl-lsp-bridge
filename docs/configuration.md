@@ -68,7 +68,7 @@ The bridge attempts to load configuration from multiple locations in order:
 2. Platform-appropriate config directory
 3. Current directory (`lsp_config.json`)
 4. Alternative config name (`config.json`)
-5. Example config (`example.lsp_config.json`)
+5. Example config (`lsp_config.example.json`)
 
 ## Configuration Priority
 
