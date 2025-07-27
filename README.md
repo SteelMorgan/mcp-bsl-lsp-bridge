@@ -6,6 +6,13 @@ Brings Language Server Protocol capabilities to MCP-compatible agents like Claud
 
 **Under active development** - Core functionality works today, but expect rapid improvements and interface changes.
 
+## Roadmap
+
+- Improve performance for smaller models, Qwen3-4B, quantized models
+- Improve detection and usage for LSP tools
+- Add functionality to reduce the number of tools we expose (rename, formatting may be low priority and optional)
+- Make onboarding easier with default configuration options and separate configuration options that can be scripted (maybe like Lua to allow scripting the LSP configuration)
+
 ## Quick Start
 
 1. **Install**: Download from releases or build with `go build`
