@@ -236,7 +236,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description='Test MCP tools with optional custom server startup',
-        epilog='''Examples:\n\n  # Run with default MCP server (Go main.go)\n  %(prog)s "lsp:project_analysis (MCP)(analysis_type=\"document_symbols\", query=\"mcpserver/tools.go\")"\n\n  # Run with a custom MCP server startup command\n  %(prog)s "lsp:hover (MCP)(uri=\"file:///project/tools.go\", line=10, character=5)" --cmd "python3 alternative_server.py"\n''')
+        epilog='''Examples:\n\n  # Run with default MCP server (Go main.go)\n  %(prog)s "project_analysis (MCP)(analysis_type=\"document_symbols\", query=\"mcpserver/tools.go\")"\n\n  # Run with a custom MCP server startup command\n  %(prog)s "lsp:hover (MCP)(uri=\"file:///project/tools.go\", line=10, character=5)" --cmd "python3 alternative_server.py"\n''')
     parser.add_argument('command', help='MCP tool command to run (in the format: "lsp:tool_name (MCP)(param1=value1, param2=value2)")')
     parser.add_argument('--cmd', help='Custom command to start the MCP server. If not provided, defaults to running main.go with Go', default=None)
 
