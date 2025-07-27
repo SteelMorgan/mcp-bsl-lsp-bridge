@@ -87,3 +87,9 @@ docker pull ghcr.io/rockerboo/mcp-lsp-bridge:latest
 ```
 
 Extend the image to add your needed LSP servers. See [docs/configuration.md](docs/configuration.md) for examples.
+
+## Contribute
+
+Open for contributions. Will help get changes merged in while I develop a contributors document about the key details. 
+
+Open issues for any problems you have or ideas for improvement.
