@@ -13,7 +13,14 @@ import (
 // RegisterFormatDocumentTool registers the document formatting tool
 func RegisterFormatDocumentTool(mcpServer ToolServer, bridge interfaces.BridgeInterface) {
 	mcpServer.AddTool(mcp.NewTool("format_document",
-		mcp.WithDescription("ACTIONABLE: Format a document according to language conventions with dual-mode operation. PREVIEW MODE (apply='false', default): Shows detailed formatting changes without modifying files - displays line-by-line changes, whitespace adjustments, and content modifications. APPLY MODE (apply='true'): Actually applies all formatting changes to the file. Supports customizable indentation and language-specific formatting rules. Always preview first for safety."),
+		mcp.WithDescription(`Format documents according to language conventions with dual-mode operation. HIGHLY EFFICIENT for code standardization - ensures consistent style automatically rather than manual formatting.
+
+USAGE:
+- Preview changes: uri="file://path", apply="false" (default)
+- Apply formatting: uri="file://path", apply="true"
+
+PARAMETERS: uri (required), tab_size (default: 4), apply (default: false)
+OUTPUT: Preview shows exact changes, apply mode confirms completion`),
 		mcp.WithDestructiveHintAnnotation(true),
 		mcp.WithString("uri", mcp.Description("URI to the file to format (file:// scheme required, e.g., 'file:///path/to/file.go')")),
 		mcp.WithNumber("tab_size", mcp.Description("Tab size for formatting (default: 4, affects indentation width)")),

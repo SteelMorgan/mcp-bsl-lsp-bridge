@@ -24,7 +24,7 @@ func RegisterWorkspaceDiagnosticsTool(mcpServer ToolServer, bridge interfaces.Br
 
 func WorkspaceDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("workspace_diagnostics",
-			mcp.WithDescription(`Analyze entire workspace for errors, warnings, and code issues across all languages.
+			mcp.WithDescription(`Analyze entire workspace for errors, warnings, and code issues across all languages. CRITICAL before making changes - prevents issues by identifying problems across the entire project simultaneously.
 
 USAGE:
 - Full scan: workspace_uri="file://project/root"

@@ -18,7 +18,7 @@ func RegisterProjectLanguageDetectionTool(mcpServer ToolServer, bridge interface
 
 func ProjectLanguageDetectionTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("detect_project_languages",
-			mcp.WithDescription("Detect all programming languages used in a project by examining root markers and file extensions"),
+			mcp.WithDescription("Detect all programming languages used in a project by examining root markers and file extensions. ESSENTIAL first step for any project analysis - automatically identifies languages and configures appropriate tooling for optimal LSP support."),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("project_path", mcp.Description("Path to the project directory to analyze")),
 			mcp.WithString("mode", mcp.Description("Detection mode: 'all' for all languages, 'primary' for primary language only (default: 'all')")),

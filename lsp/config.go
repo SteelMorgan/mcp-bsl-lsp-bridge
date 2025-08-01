@@ -82,6 +82,31 @@ func (c LSPServerConfig) FindServerConfig(language string) (types.LanguageServer
 	return nil, fmt.Errorf("no server found for language '%s'", language)
 }
 
+// FindAllServerConfigs returns all server configurations that support the given language
+func (c LSPServerConfig) FindAllServerConfigs(language string) ([]types.LanguageServerConfigProvider, []types.LanguageServer, error) {
+	var configs []types.LanguageServerConfigProvider
+	var servers []types.LanguageServer
+
+	// Find all servers that handle this language
+	for serverName, languages := range c.LanguageServerMap {
+		for _, lang := range languages {
+			if string(lang) == language {
+				// Found a server, get its config
+				if serverConfig, exists := c.LanguageServers[serverName]; exists {
+					configs = append(configs, &serverConfig)
+					servers = append(servers, serverName)
+				}
+			}
+		}
+	}
+
+	if len(configs) == 0 {
+		return nil, nil, fmt.Errorf("no servers found for language '%s'", language)
+	}
+
+	return configs, servers, nil
+}
+
 // ProjectRootMarker represents a project root identifier
 type ProjectRootMarker struct {
 	Filename string

@@ -15,7 +15,7 @@ import (
 
 func SemanticTokensTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("semantic_tokens",
-			mcp.WithDescription("Get semantic tokens for a specific range of a file."),
+			mcp.WithDescription("Get semantic tokens for a specific range of a file. POWERFUL for code analysis - provides precise token classification that enables advanced syntax highlighting and symbol identification."),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to the file")),
 			mcp.WithNumber("start_line", mcp.Description("Start Line number (0-based)")),

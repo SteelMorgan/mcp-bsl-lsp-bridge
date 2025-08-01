@@ -107,6 +107,7 @@ type LanguageClientInterface interface {
 	SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error)
 	SemanticTokens(uri string) (*protocol.SemanticTokens, error)
 	SemanticTokensRange(uri string, startLine, startCharacter, endLine, endCharacter uint32) (*protocol.SemanticTokens, error)
+	DocumentDiagnostics(uri string, identifier string, previousResultId string) (*protocol.DocumentDiagnosticReport, error)
 }
 
 type LSPConnectionInterface interface {
@@ -137,6 +138,7 @@ type GlobalConfig struct {
 
 type LSPServerConfigProvider interface {
 	FindServerConfig(language string) (LanguageServerConfigProvider, error)
+	FindAllServerConfigs(language string) ([]LanguageServerConfigProvider, []LanguageServer, error)
 	GetGlobalConfig() GlobalConfig
 	GetLanguageServers() map[LanguageServer]LanguageServerConfigProvider
 	GetServerNameFromLanguage(language Language) LanguageServer

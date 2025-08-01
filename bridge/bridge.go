@@ -296,6 +296,59 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (types.LanguageClie
 	return client, nil
 }
 
+// GetAllClientsForLanguage retrieves or creates all language server clients for a specific language
+func (b *MCPLSPBridge) GetAllClientsForLanguage(language string) ([]types.LanguageClientInterface, []types.LanguageServer, error) {
+	// Find all server configurations for this language
+	serverConfigs, serverNames, err := b.config.FindAllServerConfigs(language)
+	if err != nil {
+		return nil, nil, fmt.Errorf("no server configurations found for language %s: %w", language, err)
+	}
+
+	var clients []types.LanguageClientInterface
+	var validServerNames []types.LanguageServer
+
+	for i, serverName := range serverNames {
+		serverConfig := serverConfigs[i]
+
+		// Check if client already exists
+		if existingClient, exists := b.clients[serverName]; exists {
+			// Check if client context is still valid (not cancelled)
+			if existingClient.Context().Err() == nil {
+				clients = append(clients, existingClient)
+				validServerNames = append(validServerNames, serverName)
+				continue
+			}
+			// Client context is cancelled, remove it and create a new one
+			logger.Warn("Removing client with cancelled context for language " + language + " server " + string(serverName))
+
+			err := existingClient.Close()
+			if err != nil {
+				logger.Error(fmt.Sprintf("Error closing cancelled client for %s: %v", serverName, err))
+			}
+
+			delete(b.clients, serverName)
+		}
+
+		// Attempt to connect with default configuration
+		client, err := b.validateAndConnectClient(language, serverConfig, DefaultConnectionConfig())
+		if err != nil {
+			logger.Warn(fmt.Sprintf("Failed to connect to server %s for language %s: %v", serverName, language, err))
+			continue // Skip this server, try others
+		}
+
+		// Store the new client
+		b.clients[serverName] = client
+		clients = append(clients, client)
+		validServerNames = append(validServerNames, serverName)
+	}
+
+	if len(clients) == 0 {
+		return nil, nil, fmt.Errorf("failed to connect to any language servers for language %s", language)
+	}
+
+	return clients, validServerNames, nil
+}
+
 // CloseAllClients closes all active language server clients
 func (b *MCPLSPBridge) CloseAllClients() {
 	for serverName, client := range b.clients {
@@ -1156,4 +1209,37 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 	}
 
 	return allReports, nil
+}
+
+// GetDocumentDiagnostics gets diagnostics for a single document using LSP 3.17+ textDocument/diagnostic method
+func (b *MCPLSPBridge) GetDocumentDiagnostics(uri string, identifier string, previousResultId string) (*protocol.DocumentDiagnosticReport, error) {
+	// Normalize URI
+	normalizedURI := utils.NormalizeURI(uri)
+
+	// Determine language from file extension
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine language for URI %s: %w", normalizedURI, err)
+	}
+
+	// Get client for the language
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	// Ensure document is open in the language server
+	err = b.ensureDocumentOpen(client, normalizedURI, string(*language))
+	if err != nil {
+		// Continue anyway, as some servers might still work without explicit didOpen
+		logger.Warn(fmt.Sprintf("GetDocumentDiagnostics: Failed to open document %s: %v", normalizedURI, err))
+	}
+
+	// Request document diagnostics
+	report, err := client.DocumentDiagnostics(normalizedURI, identifier, previousResultId)
+	if err != nil {
+		return nil, fmt.Errorf("document diagnostics request failed: %w", err)
+	}
+
+	return report, nil
 }

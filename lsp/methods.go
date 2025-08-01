@@ -492,3 +492,29 @@ func (lc *LanguageClient) OutgoingCalls(item protocol.CallHierarchyItem) ([]prot
 
 	return result, nil
 }
+
+// DocumentDiagnostics gets diagnostics for a specific document using LSP 3.17+ textDocument/diagnostic method
+func (lc *LanguageClient) DocumentDiagnostics(uri string, identifier string, previousResultId string) (*protocol.DocumentDiagnosticReport, error) {
+	params := protocol.DocumentDiagnosticParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+	}
+
+	// Add optional parameters if provided
+	if identifier != "" {
+		params.Identifier = identifier
+	}
+	if previousResultId != "" {
+		params.PreviousResultId = previousResultId
+	}
+
+	var result protocol.DocumentDiagnosticReport
+
+	err := lc.SendRequest("textDocument/diagnostic", params, &result, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("document diagnostic request failed: %w", err)
+	}
+
+	return &result, nil
+}

@@ -14,7 +14,7 @@ import (
 // GetRangeContentTool defines the lsp__get_range_content tool.
 func RangeContentTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("get_range_content",
-			mcp.WithDescription("Get text content from file range. Efficient for specific code blocks. Range parameters (uri, start/end line/char) should be precise, typically from 'lsp__project_analysis' ('definitions' or 'document_symbols' modes). Use 'strict' parameter to control bounds checking behavior."),
+			mcp.WithDescription("Get text content from file range. HIGHLY EFFICIENT for extracting specific code blocks - much faster than reading entire files when you need targeted content from precise locations."),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to file (file:// scheme required)."), mcp.Required()),
 			mcp.WithNumber("start_line", mcp.Description("Start line (0-based)."), mcp.Required(), mcp.Min(0)),

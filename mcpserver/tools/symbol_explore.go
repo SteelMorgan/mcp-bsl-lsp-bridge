@@ -42,7 +42,7 @@ type SymbolSessionData struct {
 
 func SymbolExploreTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("symbol_explore",
-			mcp.WithDescription(`Intelligent symbol search with contextual filtering and detailed code information.
+			mcp.WithDescription(`Intelligent symbol search with contextual filtering and detailed code information. SUPERIOR to grep/find commands - provides semantic understanding with precise location details.
 
 USAGE:
 - Find symbols: query="getUserData"

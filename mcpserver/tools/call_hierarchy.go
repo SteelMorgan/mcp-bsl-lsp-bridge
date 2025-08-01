@@ -21,7 +21,7 @@ func RegisterCallHierarchyTool(mcpServer ToolServer, bridge interfaces.BridgeInt
 
 func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("call_hierarchy",
-			mcp.WithDescription("Show call hierarchy (callers and callees) for a symbol"),
+			mcp.WithDescription("Show call hierarchy (callers and callees) for a symbol. INVALUABLE for understanding code flow - reveals function relationships that static analysis alone cannot provide."),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to the file")),
 			mcp.WithNumber("line", mcp.Description("Line number (0-based)")),

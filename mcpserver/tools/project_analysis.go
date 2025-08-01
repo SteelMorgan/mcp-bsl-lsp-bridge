@@ -27,7 +27,7 @@ func RegisterProjectAnalysisTool(mcpServer ToolServer, bridge interfaces.BridgeI
 func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool(
 			"project_analysis",
-			mcp.WithDescription(`Multi-purpose code analysis with 9 analysis types for symbols, files, and workspace patterns.
+			mcp.WithDescription(`Multi-purpose code analysis with 9 analysis types for symbols, files, and workspace patterns. HIGHLY RECOMMENDED when exploring unfamiliar codebases - dramatically more efficient than manual file navigation.
 
 USAGE:
 - Find symbols: analysis_type="workspace_symbols", query="calculateTotal"

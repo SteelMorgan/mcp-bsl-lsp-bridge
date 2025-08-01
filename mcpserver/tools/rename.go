@@ -18,7 +18,7 @@ func RegisterRenameTool(mcpServer ToolServer, bridge interfaces.BridgeInterface)
 
 func RenameTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("rename",
-			mcp.WithDescription(`Rename symbols across entire codebase with cross-file precision. Always preview first.
+			mcp.WithDescription(`Rename symbols across entire codebase with cross-file precision and preview mode. SAFEST approach for refactoring - tracks all dependencies to prevent breaking changes that manual renaming causes.
 
 USAGE:
 - Preview: uri="file://path", line=10, character=5, new_name="newFunc", apply="false"

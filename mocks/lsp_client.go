@@ -212,3 +212,8 @@ func (m *MockLanguageClient) SemanticTokensRange(uri string, startLine, startCha
 	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter)
 	return args.Get(0).(*protocol.SemanticTokens), args.Error(1)
 }
+
+func (m *MockLanguageClient) DocumentDiagnostics(uri string, identifier string, previousResultId string) (*protocol.DocumentDiagnosticReport, error) {
+	args := m.Called(uri, identifier, previousResultId)
+	return args.Get(0).(*protocol.DocumentDiagnosticReport), args.Error(1)
+}

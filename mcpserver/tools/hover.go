@@ -13,7 +13,7 @@ import (
 
 func HoverTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("hover",
-			mcp.WithDescription(`Get detailed symbol information including signatures, documentation, and type details.
+			mcp.WithDescription(`Get detailed symbol information including signatures, documentation, and type details at any cursor position. ESSENTIAL for understanding code without opening definition files - saves significant navigation time.
 
 USAGE:
 - Symbol info: uri="file://path", line=15, character=10

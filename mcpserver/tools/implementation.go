@@ -25,7 +25,7 @@ func RegisterImplementationTool(mcpServer ToolServer, bridge interfaces.BridgeIn
 
 func ImplementationTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("implementation",
-			mcp.WithDescription("Find implementations of a symbol (interfaces, abstract methods)"),
+			mcp.WithDescription("Find implementations of a symbol (interfaces, abstract methods). EXCELLENT for understanding inheritance hierarchies - reveals concrete implementations that manual searching often misses."),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("uri", mcp.Description("URI to the file")),
 			mcp.WithNumber("line", mcp.Description("Line number (0-based)")),

@@ -18,7 +18,7 @@ func RegisterCodeActionsTool(mcpServer ToolServer, bridge interfaces.BridgeInter
 
 func CodeActionTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("code_actions",
-			mcp.WithDescription("Get intelligent code actions including quick fixes, refactoring suggestions, and automated improvements for a code range. Returns language server suggested actions like import fixes, error corrections, extract method, add missing imports, implement interfaces, and other context-aware improvements. Use at error locations for fixes or at any code location for refactoring suggestions."),
+			mcp.WithDescription("Get intelligent code actions including quick fixes, refactoring suggestions, and automated improvements for code ranges. EXCELLENT for error resolution - language servers provide more reliable fixes than manual editing. Use at error locations for fixes or at any code location for refactoring suggestions."),
 			mcp.WithDestructiveHintAnnotation(true),
 			mcp.WithString("uri", mcp.Description("URI to the file (file:// scheme required, e.g., 'file:///path/to/file.go')")),
 			mcp.WithNumber("line", mcp.Description("Start line number (0-based) - target specific code location or error")),
