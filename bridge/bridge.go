@@ -28,6 +28,16 @@ func NewMCPLSPBridge(config types.LSPServerConfigProvider, allowedDirectories []
 		allowedDirectories: allowedDirectories,
 	}
 
+	// Попытаться создать path mapper из переменных окружения
+	pathMapper, err := utils.NewDockerPathMapperFromEnv()
+	if err != nil {
+		logger.Warn(fmt.Sprintf("Path mapper initialization failed, using local mode: %v", err))
+	} else if pathMapper.IsEnabled() {
+		logger.Info(fmt.Sprintf("Docker path mapping enabled: %s -> %s", 
+			pathMapper.HostRoot(), pathMapper.ContainerRoot()))
+	}
+	bridge.pathMapper = pathMapper
+
 	return bridge
 }
 
@@ -1288,4 +1298,14 @@ func (b *MCPLSPBridge) GetDocumentDiagnostics(uri string, identifier string, pre
 	}
 
 	return report, nil
+}
+
+// HasPathMapper returns true if the path mapper is enabled
+func (b *MCPLSPBridge) HasPathMapper() bool {
+	return b.pathMapper != nil && b.pathMapper.IsEnabled()
+}
+
+// GetPathMapper returns the path mapper instance
+func (b *MCPLSPBridge) GetPathMapper() *utils.DockerPathMapper {
+	return b.pathMapper
 }

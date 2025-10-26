@@ -2,6 +2,7 @@ package interfaces
 
 import (
 	"rockerboo/mcp-lsp-bridge/types"
+	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
@@ -18,6 +19,7 @@ type BridgeInterface interface {
 	EditProvider
 	CodeInspector
 	CallHierarchyProvider
+	PathMapperProvider
 }
 
 type InformationProvider interface {
@@ -82,3 +84,8 @@ type LanguageDetector interface {
 // 	ProjectRoots() ([]string, error)
 // 	SetProjectRoots(paths []string)
 // }
+
+type PathMapperProvider interface {
+	HasPathMapper() bool
+	GetPathMapper() *utils.DockerPathMapper
+}

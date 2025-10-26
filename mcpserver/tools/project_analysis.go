@@ -47,6 +47,15 @@ PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			workspaceUri := request.GetString("workspace_uri", "")
 
+			// Преобразовать workspace_uri из хост-пути в контейнер-путь
+			if bridge.HasPathMapper() {
+				convertedUri, err := bridge.GetPathMapper().HostToContainer(workspaceUri)
+				if err != nil {
+					return mcp.NewToolResultError(fmt.Sprintf("invalid workspace path: %v", err)), nil
+				}
+				workspaceUri = convertedUri
+			}
+
 			query, err := request.RequireString("query")
 			if err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
