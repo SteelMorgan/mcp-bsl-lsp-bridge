@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "processId": 12345,
+    "rootUri": "file:///D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace",
+    "capabilities": {
+      "workspace": {
+        "symbol": {
+          "dynamicRegistration": true
+        }
+      }
+    }
+  }
+}
