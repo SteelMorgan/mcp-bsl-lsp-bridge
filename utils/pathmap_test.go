@@ -297,6 +297,12 @@ func TestDockerPathMapperNormalizeURI(t *testing.T) {
 			expectError: false,
 		},
 		{
+			name:        "file URI with Windows path format",
+			uri:         "file:///D:/My Projects/Projects 1C/temp",
+			expected:    "file:///projects/temp",
+			expectError: false,
+		},
+		{
 			name:        "path without file:// prefix",
 			uri:         "D:/My Projects/Projects 1C/temp",
 			expected:    "file:///projects/temp",

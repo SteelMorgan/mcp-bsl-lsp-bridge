@@ -93,10 +93,23 @@ func (dpm *DockerPathMapper) HostToContainer(hostPath string) (string, error) {
 		return "", errors.New("host path cannot be empty")
 	}
 
+	// Handle file:// URI
+	isURI := strings.HasPrefix(hostPath, "file://")
+	var filePath string
+	if isURI {
+		filePath = strings.TrimPrefix(hostPath, "file://")
+		// Handle Windows file:// URI format (file:///C:/path)
+		if strings.HasPrefix(filePath, "/") && len(filePath) > 3 && filePath[2] == ':' {
+			filePath = filePath[1:] // Remove leading slash for Windows paths
+		}
+	} else {
+		filePath = hostPath
+	}
+
 	// Clean and normalize the input path
 	// Don't use filepath.Abs for cross-platform paths (Windows path on Linux)
 	// First replace backslashes with forward slashes for cross-platform compatibility
-	cleanPath := strings.ReplaceAll(hostPath, "\\", "/")
+	cleanPath := strings.ReplaceAll(filePath, "\\", "/")
 	cleanPath = filepath.Clean(cleanPath)
 	
 	// Normalize host root path separators
@@ -122,6 +135,10 @@ func (dpm *DockerPathMapper) HostToContainer(hostPath string) (string, error) {
 	// Normalize the final path
 	containerPath = filepath.Clean(containerPath)
 
+	// Return as URI if input was URI
+	if isURI {
+		return "file://" + strings.ReplaceAll(containerPath, "\\", "/"), nil
+	}
 	return containerPath, nil
 }
 
