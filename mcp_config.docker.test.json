@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "lsp-bsl-bridge": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "exec",
+        "-i",
+        "mcp-lsp-bridge-universal",
+        "mcp-lsp-bridge"
+      ],
+      "env": {
+        "LSP_BRIDGE_LOG_LEVEL": "debug",
+        "WORKSPACE_ROOT": "/projects",
+        "PROJECTS_ROOT": "/projects",
+        "JAVA_OPTS": "-Xmx6g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+      }
+    }
+  },
+  "global": {
+    "logLevel": "debug",
+    "timeouts": {
+      "workspace_diagnostics": 180000,
+      "document_diagnostics": 90000,
+      "connection": 60000,
+      "initialization": 180000
+    },
+    "workspace": {
+      "root": "/projects",
+      "allowed_directories": [
+        "/projects",
+        "/workspace", 
+        "/home/user/projects",
+        "/home/user/workspace"
+      ],
+      "file_watching": {
+        "enabled": true,
+        "debounce_ms": 1000
+      }
+    }
+  }
+}
