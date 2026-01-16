@@ -934,7 +934,8 @@ func (b *MCPLSPBridge) FormatDocument(uri string, tabSize uint32, insertSpaces b
 
 	var result []protocol.TextEdit
 
-	err = client.SendRequest("textDocument/formatting", params, &result, 10*time.Second)
+	// Formatting can be slow on large BSL modules (10k LOC).
+	err = client.SendRequest("textDocument/formatting", params, &result, 5*time.Minute)
 	if err != nil {
 		return nil, fmt.Errorf("document formatting request failed: %w", err)
 	}

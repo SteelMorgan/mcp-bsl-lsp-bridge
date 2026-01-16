@@ -42,7 +42,7 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 
 	// Code improvement tools
 	tools.RegisterCodeActionsTool(mcpServer, bridge)
-	tools.RegisterFormatDocumentTool(mcpServer, bridge)
+	// tools.RegisterFormatDocumentTool(mcpServer, bridge) // BSL LS formatting подвисает/неполезно для агента
 	// Hide IDE/UI-oriented tool:
 	// - range_formatting
 	tools.RegisterPrepareRenameTool(mcpServer, bridge)

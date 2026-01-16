@@ -256,15 +256,82 @@ func (sc *SessionClient) DidClose(ctx context.Context, uri string) error {
 }
 
 // Diagnostic sends textDocument/diagnostic request
-func (sc *SessionClient) Diagnostic(ctx context.Context, uri string) (json.RawMessage, error) {
+func (sc *SessionClient) Diagnostic(ctx context.Context, uri string, identifier string, previousResultId string) (json.RawMessage, error) {
 	params := map[string]interface{}{
 		"textDocument": map[string]interface{}{
 			"uri": uri,
 		},
 	}
+	if identifier != "" {
+		params["identifier"] = identifier
+	}
+	if previousResultId != "" {
+		params["previousResultId"] = previousResultId
+	}
 
 	var result json.RawMessage
 	err := sc.Call(ctx, "textDocument/diagnostic", params, &result)
+	return result, err
+}
+
+// Formatting sends textDocument/formatting request
+func (sc *SessionClient) Formatting(ctx context.Context, uri string, tabSize uint32, insertSpaces bool) (json.RawMessage, error) {
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{
+			"uri": uri,
+		},
+		"options": map[string]interface{}{
+			"tabSize":      tabSize,
+			"insertSpaces": insertSpaces,
+		},
+	}
+	var result json.RawMessage
+	err := sc.Call(ctx, "textDocument/formatting", params, &result)
+	return result, err
+}
+
+// PrepareRename sends textDocument/prepareRename request
+func (sc *SessionClient) PrepareRename(ctx context.Context, uri string, line, character uint32) (json.RawMessage, error) {
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{
+			"uri": uri,
+		},
+		"position": map[string]interface{}{
+			"line":      line,
+			"character": character,
+		},
+	}
+	var result json.RawMessage
+	err := sc.Call(ctx, "textDocument/prepareRename", params, &result)
+	return result, err
+}
+
+// Rename sends textDocument/rename request
+func (sc *SessionClient) Rename(ctx context.Context, uri string, line, character uint32, newName string) (json.RawMessage, error) {
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{
+			"uri": uri,
+		},
+		"position": map[string]interface{}{
+			"line":      line,
+			"character": character,
+		},
+		"newName": newName,
+	}
+	var result json.RawMessage
+	err := sc.Call(ctx, "textDocument/rename", params, &result)
+	return result, err
+}
+
+// WorkspaceDiagnostic sends workspace/diagnostic request
+func (sc *SessionClient) WorkspaceDiagnostic(ctx context.Context, identifier string) (json.RawMessage, error) {
+	params := map[string]interface{}{}
+	// LSP 3.17 supports identifier; keep it optional
+	if identifier != "" {
+		params["identifier"] = identifier
+	}
+	var result json.RawMessage
+	err := sc.Call(ctx, "workspace/diagnostic", params, &result)
 	return result, err
 }
 

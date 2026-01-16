@@ -105,12 +105,20 @@ type SessionManager struct {
 	
 	// Request/response handling
 	requestID    int64
-	pending      map[int64]chan json.RawMessage
+	pending      map[int64]chan lspResponse
 	pendingMu    sync.Mutex
 	
 	// Document tracking
 	openDocs     map[string]bool
 	openDocsMu   sync.Mutex
+}
+
+type lspResponse struct {
+	Result json.RawMessage
+	Err    *struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
 }
 
 // NewSessionManager creates a new session manager
@@ -119,7 +127,7 @@ func NewSessionManager(command string, args []string, workspaceDir string) *Sess
 		command:      command,
 		args:         args,
 		workspaceDir: workspaceDir,
-		pending:      make(map[int64]chan json.RawMessage),
+		pending:      make(map[int64]chan lspResponse),
 		openDocs:     make(map[string]bool),
 	}
 }
@@ -244,7 +252,7 @@ func (sm *SessionManager) sendRequest(ctx context.Context, method string, params
 	sm.pendingMu.Lock()
 	sm.requestID++
 	id := sm.requestID
-	respCh := make(chan json.RawMessage, 1)
+	respCh := make(chan lspResponse, 1)
 	sm.pending[id] = respCh
 	sm.pendingMu.Unlock()
 
@@ -267,7 +275,10 @@ func (sm *SessionManager) sendRequest(ctx context.Context, method string, params
 
 	select {
 	case resp := <-respCh:
-		return resp, nil
+		if resp.Err != nil {
+			return nil, fmt.Errorf("lsp error %d: %s", resp.Err.Code, resp.Err.Message)
+		}
+		return resp.Result, nil
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -335,12 +346,9 @@ func (sm *SessionManager) readResponses() {
 		if baseMsg.ID != nil && baseMsg.Method == "" {
 			sm.pendingMu.Lock()
 			if ch, ok := sm.pending[*baseMsg.ID]; ok {
-				if baseMsg.Error != nil {
-					// Send error as JSON
-					errJSON, _ := json.Marshal(baseMsg.Error)
-					ch <- errJSON
-				} else {
-					ch <- baseMsg.Result
+				ch <- lspResponse{
+					Result: baseMsg.Result,
+					Err:    baseMsg.Error,
 				}
 			}
 			sm.pendingMu.Unlock()
@@ -477,7 +485,18 @@ func (sm *SessionManager) sendAPIError(conn net.Conn, id int64, code int, messag
 
 // handleAPIRequest handles an API request from mcp-lsp-bridge
 func (sm *SessionManager) handleAPIRequest(method string, params json.RawMessage) (interface{}, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	timeout := 90 * time.Second
+	switch method {
+	// Long operations
+	case "workspace/diagnostic":
+		timeout = 10 * time.Minute
+	case "textDocument/diagnostic", "textDocument/formatting":
+		timeout = 5 * time.Minute
+	case "textDocument/rename", "textDocument/prepareRename":
+		timeout = 2 * time.Minute
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	switch method {
@@ -501,6 +520,8 @@ func (sm *SessionManager) handleAPIRequest(method string, params json.RawMessage
 		"textDocument/references",
 		"textDocument/documentSymbol",
 		"textDocument/diagnostic",
+		// NOTE: BSL LS doesn't provide meaningful implementations/signatureHelp for our use cases,
+		// but we keep forwarding for compatibility if requested.
 		"textDocument/implementation",
 		"textDocument/codeAction",
 		"textDocument/formatting",
@@ -510,7 +531,10 @@ func (sm *SessionManager) handleAPIRequest(method string, params json.RawMessage
 		// Forward directly to LSP server
 		var p interface{}
 		json.Unmarshal(params, &p)
-		return sm.sendRequest(ctx, method, p)
+		start := time.Now()
+		res, err := sm.sendRequest(ctx, method, p)
+		log.Printf("Method %s finished in %s (err=%v)", method, time.Since(start), err)
+		return res, err
 
 	case "callHierarchy/incomingCalls",
 		"callHierarchy/outgoingCalls":
@@ -521,7 +545,18 @@ func (sm *SessionManager) handleAPIRequest(method string, params json.RawMessage
 	case "workspace/symbol":
 		var p interface{}
 		json.Unmarshal(params, &p)
-		return sm.sendRequest(ctx, method, p)
+		start := time.Now()
+		res, err := sm.sendRequest(ctx, method, p)
+		log.Printf("Method %s finished in %s (err=%v)", method, time.Since(start), err)
+		return res, err
+
+	case "workspace/diagnostic":
+		var p interface{}
+		json.Unmarshal(params, &p)
+		start := time.Now()
+		res, err := sm.sendRequest(ctx, method, p)
+		log.Printf("Method %s finished in %s (err=%v)", method, time.Since(start), err)
+		return res, err
 
 	default:
 		return nil, fmt.Errorf("unknown method: %s", method)

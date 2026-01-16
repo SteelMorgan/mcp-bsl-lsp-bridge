@@ -363,12 +363,42 @@ func (sa *SessionAdapter) CodeActions(uri string, line, character, endLine, endC
 
 // Rename - not implemented yet
 func (sa *SessionAdapter) Rename(uri string, line, character uint32, newName string) (*protocol.WorkspaceEdit, error) {
-	return nil, fmt.Errorf("rename not implemented in session mode")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	result, err := sa.client.Rename(ctx, uri, line, character, newName)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || string(result) == "null" {
+		return nil, nil
+	}
+
+	var edit protocol.WorkspaceEdit
+	if err := json.Unmarshal(result, &edit); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal rename result: %w", err)
+	}
+	return &edit, nil
 }
 
 // Formatting - not implemented yet
 func (sa *SessionAdapter) Formatting(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
-	return nil, fmt.Errorf("formatting not implemented in session mode")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	result, err := sa.client.Formatting(ctx, uri, tabSize, insertSpaces)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || string(result) == "null" {
+		return nil, nil
+	}
+
+	var edits []protocol.TextEdit
+	if err := json.Unmarshal(result, &edits); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal formatting edits: %w", err)
+	}
+	return edits, nil
 }
 
 // RangeFormatting - not implemented yet
@@ -378,15 +408,32 @@ func (sa *SessionAdapter) RangeFormatting(uri string, startLine, startCharacter,
 
 // WorkspaceDiagnostic - not implemented yet
 func (sa *SessionAdapter) WorkspaceDiagnostic(identifier string) (*protocol.WorkspaceDiagnosticReport, error) {
-	return nil, fmt.Errorf("workspace diagnostic not implemented in session mode")
+	// Workspace diagnostics can be extremely heavy on BSL projects (10k LOC modules, 20k+ files).
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	result, err := sa.client.WorkspaceDiagnostic(ctx, identifier)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || string(result) == "null" {
+		return nil, nil
+	}
+
+	var report protocol.WorkspaceDiagnosticReport
+	if err := json.Unmarshal(result, &report); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal workspace diagnostic report: %w", err)
+	}
+	return &report, nil
 }
 
 // DocumentDiagnostics gets diagnostics for a document
 func (sa *SessionAdapter) DocumentDiagnostics(uri string, identifier string, previousResultId string) (*protocol.DocumentDiagnosticReport, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	// Document diagnostics can be slow on large BSL workspaces.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	
-	result, err := sa.client.Diagnostic(ctx, uri)
+	result, err := sa.client.Diagnostic(ctx, uri, identifier, previousResultId)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +462,22 @@ func (sa *SessionAdapter) SemanticTokensRange(uri string, startLine, startCharac
 
 // PrepareRename - not implemented yet
 func (sa *SessionAdapter) PrepareRename(uri string, line, character uint32) (*protocol.PrepareRenameResult, error) {
-	return nil, fmt.Errorf("prepare rename not implemented in session mode")
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	result, err := sa.client.PrepareRename(ctx, uri, line, character)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil || string(result) == "null" {
+		return nil, nil
+	}
+
+	var pr protocol.PrepareRenameResult
+	if err := json.Unmarshal(result, &pr); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal prepareRename result: %w", err)
+	}
+	return &pr, nil
 }
 
 // FoldingRange - not implemented yet

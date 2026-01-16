@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"rockerboo/mcp-lsp-bridge/async"
 	"rockerboo/mcp-lsp-bridge/collections"
@@ -27,6 +28,7 @@ func WorkspaceDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, serv
 			mcp.WithDescription(`Analyze entire workspace for errors, warnings, and code issues across all languages.
 
 WARNING: On large projects this can be VERY heavy (slow + huge output). Use only when truly necessary; prefer document_diagnostics for a specific file when possible.
+NOTE: In session mode the underlying LSP request timeout is set to ~10 minutes.
 
 USAGE:
 - Full scan: workspace_uri="file://project/root"
@@ -38,6 +40,11 @@ OUTPUT: Categorized diagnostics by language with error explanations and suggesti
 			mcp.WithString("workspace_uri", mcp.Description("URI to the workspace/project root")),
 			mcp.WithString("identifier", mcp.Description("Optional identifier for diagnostic session")), // TODO: Add optional when supported
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+			// This tool is intentionally long-running on large BSL workspaces.
+			// Clamp execution to 10 minutes to avoid runaway scans.
+			ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+			defer cancel()
+
 			// Parameter parsing
 			workspaceUri, err := request.RequireString("workspace_uri")
 			if err != nil {
@@ -45,11 +52,10 @@ OUTPUT: Categorized diagnostics by language with error explanations and suggesti
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
-			// Strip file:// prefix if present
-			if after, ok := strings.CutPrefix(workspaceUri, "file://"); ok {
-				workspaceUri = after
-				logger.Info("workspace_diagnostics: stripped file:// prefix",
-					"Processed URI: "+workspaceUri)
+			// Normalize workspace URI/path (supports host paths via path-mapper and container paths)
+			normalized := bridge.NormalizeURIForLSP(workspaceUri)
+			if after, ok := strings.CutPrefix(normalized, "file://"); ok {
+				normalized = after
 			}
 
 			// Optional identifier
@@ -63,7 +69,7 @@ OUTPUT: Categorized diagnostics by language with error explanations and suggesti
 			}
 
 			// Detect project languages
-			languages, err := bridge.DetectProjectLanguages(workspaceUri)
+			languages, err := bridge.DetectProjectLanguages(normalized)
 			if err != nil {
 				logger.Error("workspace_diagnostics: language detection failed", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to detect project languages: %v", err)), nil

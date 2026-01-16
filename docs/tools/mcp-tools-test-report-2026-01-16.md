@@ -42,8 +42,6 @@
 | 5 | `project_analysis` | ✅ PASS | grep ✅ | workspace_symbols, document_symbols, definitions |
 | 6 | `get_range_content` | ✅ PASS | read_file ✅ | strict mode работает |
 | 7 | `document_diagnostics` | ❌ FAIL | — | Timeout |
-| 8 | `implementation` | ⚠️ PARTIAL | — | Timeout + не применимо к BSL |
-| 9 | `signature_help` | ❌ FAIL | — | BSL LS не поддерживает |
 | 10 | `code_actions` | ✅ PASS | — | Tool работает, нет доступных actions |
 | 11 | `prepare_rename` | ❌ FAIL | — | Не реализовано в session mode |
 | 12 | `rename` | ❌ FAIL | — | Не работает |
