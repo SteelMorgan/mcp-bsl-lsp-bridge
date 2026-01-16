@@ -130,12 +130,18 @@ PARAMETERS: query (required), file_context (optional), detail_level (auto/basic/
 // 3. Aggregates results into a unified list of SymbolMatch objects
 // The async approach significantly improves performance for multi-language projects
 func performSymbolSearch(ctx context.Context, bridge interfaces.BridgeInterface, query string) ([]SymbolMatch, error) {
-	// TODO: Fix architecture - project directory should be stored in bridge at startup
-	// rather than calling os.Getwd() here. This is a workaround.
-	projectDir, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current working directory: %w", err)
+	// Use WORKSPACE_ROOT from environment (set in container mode)
+	// Fallback to current working directory if not set
+	projectDir := os.Getenv("WORKSPACE_ROOT")
+	if projectDir == "" {
+		var err error
+		projectDir, err = os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current working directory: %w", err)
+		}
 	}
+	
+	logger.Info(fmt.Sprintf("symbol_explore: using project directory: %s", projectDir))
 
 	// First detect all project languages from the project directory
 	languages, err := bridge.DetectProjectLanguages(projectDir)

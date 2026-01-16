@@ -30,7 +30,7 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 
 	// Code intelligence tools
 	tools.RegisterHoverTool(mcpServer, bridge)
-	tools.RegisterSignatureHelpTool(mcpServer, bridge)
+	// tools.RegisterSignatureHelpTool(mcpServer, bridge)  // BSL LS не поддерживает signature help
 	// tools.RegisterDiagnosticsTool(mcpServer, bridge)
 	// Hide IDE/UI-oriented tools that don't help an AI agent much:
 	// - semantic_tokens
@@ -50,7 +50,7 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 
 	// Advanced navigation tools
 	tools.RegisterRenameTool(mcpServer, bridge)
-	tools.RegisterImplementationTool(mcpServer, bridge)
+	// tools.RegisterImplementationTool(mcpServer, bridge)  // BSL LS не поддерживает implementation
 
 	// Call hierarchy tool
 	tools.RegisterCallHierarchyTool(mcpServer, bridge)
