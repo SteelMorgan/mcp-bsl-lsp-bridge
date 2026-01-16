@@ -40,6 +40,10 @@ OUTPUT: Full document diagnostic report with items, related documents, and resul
 			identifier := request.GetString("identifier", "")
 			previousResultId := request.GetString("previous_result_id", "")
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			// Infer language for debugging
 			language, langErr := bridge.InferLanguage(uri)
 			if langErr != nil {

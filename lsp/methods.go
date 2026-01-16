@@ -26,7 +26,7 @@ func (lc *LanguageClient) Initialize(params protocol.InitializeParams) (*protoco
 
 	var result protocol.InitializeResult
 
-	err := lc.SendRequest("initialize", params, &result, 5*time.Second)
+	err := lc.SendRequest("initialize", params, &result, 15*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (lc *LanguageClient) WorkspaceSymbols(query string) ([]protocol.WorkspaceSy
 
 	err := lc.SendRequest("workspace/symbol", protocol.WorkspaceSymbolParams{
 		Query: query,
-	}, &result, 5*time.Second)
+	}, &result, 60*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (lc *LanguageClient) Definition(uri string, line, character uint32) ([]prot
 			Line:      line,
 			Character: character,
 		},
-	}, &rawResult, 5*time.Second)
+	}, &rawResult, 30*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (lc *LanguageClient) References(uri string, line, character uint32, include
 		Context: protocol.ReferenceContext{
 			IncludeDeclaration: includeDeclaration,
 		},
-	}, &result, 5*time.Second)
+	}, &result, 60*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (lc *LanguageClient) Hover(uri string, line, character uint32) (*protocol.H
 
 	var rawResponse json.RawMessage
 
-	err := lc.SendRequest("textDocument/hover", params, &rawResponse, 5*time.Second)
+	err := lc.SendRequest("textDocument/hover", params, &rawResponse, 10*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (lc *LanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSymbol
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
 		},
-	}, &symbolResult, 5*time.Second)
+	}, &symbolResult, 60*time.Second)
 
 	if err == nil && len(symbolResult) > 0 {
 		return symbolResult, nil
@@ -222,7 +222,7 @@ func (lc *LanguageClient) DocumentSymbols(uri string) ([]protocol.DocumentSymbol
 		TextDocument: protocol.TextDocumentIdentifier{
 			Uri: protocol.DocumentUri(uri),
 		},
-	}, &infoResult, 5*time.Second)
+	}, &infoResult, 60*time.Second)
 
 	if err != nil {
 		return nil, err
@@ -255,7 +255,7 @@ func (lc *LanguageClient) Implementation(uri string, line, character uint32) ([]
 			Line:      line,
 			Character: character,
 		},
-	}, &result, 5*time.Second)
+	}, &result, 30*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +312,7 @@ func (lc *LanguageClient) CodeActions(uri string, line, character, endLine, endC
 
 	var result []protocol.CodeAction
 
-	err := lc.SendRequest("textDocument/codeAction", params, &result, 5*time.Second)
+	err := lc.SendRequest("textDocument/codeAction", params, &result, 15*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("code action request failed: %w", err)
 	}
@@ -332,7 +332,7 @@ func (lc *LanguageClient) Rename(uri string, line, character uint32, newName str
 
 	var result protocol.WorkspaceEdit
 
-	err := lc.SendRequest("textDocument/rename", params, &result, 10*time.Second)
+	err := lc.SendRequest("textDocument/rename", params, &result, 60*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("rename request failed: %w", err)
 	}
@@ -348,7 +348,7 @@ func (lc *LanguageClient) WorkspaceDiagnostic(identifier string) (*protocol.Work
 
 	var result protocol.WorkspaceDiagnosticReport
 
-	err := lc.SendRequest("workspace/diagnostic", params, &result, 30*time.Second) // Longer timeout for workspace operations
+	err := lc.SendRequest("workspace/diagnostic", params, &result, 120*time.Second) // Extended timeout for large projects
 	if err != nil {
 		return nil, fmt.Errorf("workspace diagnostic request failed: %w", err)
 	}
@@ -367,12 +367,164 @@ func (lc *LanguageClient) Formatting(uri string, tabSize uint32, insertSpaces bo
 
 	var result []protocol.TextEdit
 
-	err := lc.SendRequest("textDocument/formatting", params, &result, 30*time.Second)
+	err := lc.SendRequest("textDocument/formatting", params, &result, 90*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("workspace diagnostic request failed: %w", err)
 	}
 
 	return result, nil
+}
+
+func (lc *LanguageClient) RangeFormatting(uri string, startLine, startCharacter, endLine, endCharacter uint32, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
+	params := protocol.DocumentRangeFormattingParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: startLine, Character: startCharacter},
+			End:   protocol.Position{Line: endLine, Character: endCharacter},
+		},
+		Options: protocol.FormattingOptions{
+			TabSize:      tabSize,
+			InsertSpaces: insertSpaces,
+		},
+	}
+
+	var result []protocol.TextEdit
+
+	err := lc.SendRequest("textDocument/rangeFormatting", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("range formatting request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) PrepareRename(uri string, line, character uint32) (*protocol.PrepareRenameResult, error) {
+	params := protocol.PrepareRenameParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position: protocol.Position{
+			Line:      line,
+			Character: character,
+		},
+	}
+
+	var result protocol.PrepareRenameResult
+
+	err := lc.SendRequest("textDocument/prepareRename", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("prepare rename request failed: %w", err)
+	}
+
+	return &result, nil
+}
+
+func (lc *LanguageClient) FoldingRange(uri string) ([]protocol.FoldingRange, error) {
+	params := protocol.FoldingRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+	}
+
+	var result []protocol.FoldingRange
+
+	err := lc.SendRequest("textDocument/foldingRange", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("folding range request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) SelectionRange(uri string, positions []protocol.Position) ([]protocol.SelectionRange, error) {
+	params := protocol.SelectionRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Positions:    positions,
+	}
+
+	var result []protocol.SelectionRange
+
+	err := lc.SendRequest("textDocument/selectionRange", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("selection range request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) DocumentLink(uri string) ([]protocol.DocumentLink, error) {
+	params := protocol.DocumentLinkParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+	}
+
+	var result []protocol.DocumentLink
+
+	err := lc.SendRequest("textDocument/documentLink", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("document link request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) DocumentColor(uri string) ([]protocol.ColorInformation, error) {
+	params := protocol.DocumentColorParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+	}
+
+	var result []protocol.ColorInformation
+
+	err := lc.SendRequest("textDocument/documentColor", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("document color request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) ColorPresentation(uri string, color protocol.Color, rng protocol.Range) ([]protocol.ColorPresentation, error) {
+	params := protocol.ColorPresentationParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Color:        color,
+		Range:        rng,
+	}
+
+	var result []protocol.ColorPresentation
+
+	err := lc.SendRequest("textDocument/colorPresentation", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("color presentation request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) ExecuteCommand(command string, args []any) (json.RawMessage, error) {
+	params := protocol.ExecuteCommandParams{
+		Command:   command,
+		Arguments: args,
+	}
+
+	var result json.RawMessage
+
+	err := lc.SendRequest("workspace/executeCommand", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("execute command request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+func (lc *LanguageClient) DidChangeWatchedFiles(changes []protocol.FileEvent) error {
+	params := protocol.DidChangeWatchedFilesParams{
+		Changes: changes,
+	}
+
+	return lc.SendNotification("workspace/didChangeWatchedFiles", params)
+}
+
+func (lc *LanguageClient) DidChangeConfiguration(settings any) error {
+	params := protocol.DidChangeConfigurationParams{
+		Settings: settings,
+	}
+
+	return lc.SendNotification("workspace/didChangeConfiguration", params)
 }
 
 func (lc *LanguageClient) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
@@ -386,7 +538,8 @@ func (lc *LanguageClient) PrepareCallHierarchy(uri string, line, character uint3
 
 	var result []protocol.CallHierarchyItem
 
-	err := lc.SendRequest("textDocument/prepareCallHierarchy", params, &result, 5*time.Second)
+	// BSL LS может долго индексировать проект; call hierarchy часто требует больше времени.
+	err := lc.SendRequest("textDocument/prepareCallHierarchy", params, &result, 60*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("prepare call hierarchy request failed: %w", err)
 	}
@@ -469,7 +622,7 @@ func (lc *LanguageClient) IncomingCalls(item protocol.CallHierarchyItem) ([]prot
 
 	var result []protocol.CallHierarchyIncomingCall
 
-	err := lc.SendRequest("callHierarchy/incomingCalls", params, &result, 5*time.Second)
+	err := lc.SendRequest("callHierarchy/incomingCalls", params, &result, 60*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("incoming calls request failed: %w", err)
 	}
@@ -485,7 +638,7 @@ func (lc *LanguageClient) OutgoingCalls(item protocol.CallHierarchyItem) ([]prot
 
 	var result []protocol.CallHierarchyOutgoingCall
 
-	err := lc.SendRequest("callHierarchy/outgoingCalls", params, &result, 5*time.Second)
+	err := lc.SendRequest("callHierarchy/outgoingCalls", params, &result, 60*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("outgoing calls request failed: %w", err)
 	}
@@ -511,7 +664,7 @@ func (lc *LanguageClient) DocumentDiagnostics(uri string, identifier string, pre
 
 	var result protocol.DocumentDiagnosticReport
 
-	err := lc.SendRequest("textDocument/diagnostic", params, &result, 10*time.Second)
+	err := lc.SendRequest("textDocument/diagnostic", params, &result, 90*time.Second)
 	if err != nil {
 		return nil, fmt.Errorf("document diagnostic request failed: %w", err)
 	}

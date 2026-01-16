@@ -2,7 +2,6 @@ package utils
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -215,40 +214,40 @@ func TestContainerToHost(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
+		name          string
 		containerPath string
-		expected    string
-		expectError bool
+		expected      string
+		expectError   bool
 	}{
 		{
-			name:        "root directory",
+			name:          "root directory",
 			containerPath: "/projects",
-			expected:    filepath.Join("D:", "My Projects", "Projects 1C"),
-			expectError: false,
+			expected:      "D:/My Projects/Projects 1C",
+			expectError:   false,
 		},
 		{
-			name:        "subdirectory",
+			name:          "subdirectory",
 			containerPath: "/projects/temp",
-			expected:    filepath.Join("D:", "My Projects", "Projects 1C", "temp"),
-			expectError: false,
+			expected:      "D:/My Projects/Projects 1C/temp",
+			expectError:   false,
 		},
 		{
-			name:        "file path",
+			name:          "file path",
 			containerPath: "/projects/temp/file.bsl",
-			expected:    filepath.Join("D:", "My Projects", "Projects 1C", "temp", "file.bsl"),
-			expectError: false,
+			expected:      "D:/My Projects/Projects 1C/temp/file.bsl",
+			expectError:   false,
 		},
 		{
-			name:        "path outside root",
+			name:          "path outside root",
 			containerPath: "/other/projects",
-			expected:    "",
-			expectError: true,
+			expected:      "",
+			expectError:   true,
 		},
 		{
-			name:        "empty path",
+			name:          "empty path",
 			containerPath: "",
-			expected:    "",
-			expectError: true,
+			expected:      "",
+			expectError:   true,
 		},
 	}
 
@@ -458,7 +457,7 @@ func TestCrossPlatformPaths(t *testing.T) {
 		},
 		{
 			name:     "backslashes",
-			hostPath: "D:/My Projects/Projects 1C/temp",
+			hostPath: "D:\\My Projects\\Projects 1C\\temp",
 			expected: "/projects/temp",
 		},
 		{
@@ -471,6 +470,215 @@ func TestCrossPlatformPaths(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result, err := mapper.HostToContainer(tt.hostPath)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+			if result != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestIsWindowsAbsPath tests the IsWindowsAbsPath helper function
+func TestIsWindowsAbsPath(t *testing.T) {
+	tests := []struct {
+		path     string
+		expected bool
+	}{
+		{"D:/path", true},
+		{"D:\\path", true},
+		{"D:", true},
+		{"d:/path", true},
+		{"d:\\path", true},
+		{"C:/", true},
+		{"/path", false},
+		{"path", false},
+		{"./path", false},
+		{"", false},
+		{"1:/path", false}, // number is not a valid drive letter
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			result := IsWindowsAbsPath(tt.path)
+			if result != tt.expected {
+				t.Errorf("IsWindowsAbsPath(%q) = %v, expected %v", tt.path, result, tt.expected)
+			}
+		})
+	}
+}
+
+// TestCaseInsensitiveMatching tests that path matching is case-insensitive for Windows paths
+func TestCaseInsensitiveMatching(t *testing.T) {
+	// Create mapper with mixed case host root
+	mapper, err := NewDockerPathMapper("D:/My Projects/Projects 1C", "/projects")
+	if err != nil {
+		t.Fatalf("Failed to create mapper: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		hostPath    string
+		expected    string
+		expectError bool
+	}{
+		{
+			name:        "exact case match",
+			hostPath:    "D:/My Projects/Projects 1C/test",
+			expected:    "/projects/test",
+			expectError: false,
+		},
+		{
+			name:        "lowercase drive letter",
+			hostPath:    "d:/My Projects/Projects 1C/test",
+			expected:    "/projects/test",
+			expectError: false,
+		},
+		{
+			name:        "uppercase path",
+			hostPath:    "D:/MY PROJECTS/PROJECTS 1C/test",
+			expected:    "/projects/test",
+			expectError: false,
+		},
+		{
+			name:        "mixed case",
+			hostPath:    "d:/my projects/projects 1c/Test",
+			expected:    "/projects/Test",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := mapper.HostToContainer(tt.hostPath)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+			if result != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestWindowsBackslashHostRoot tests that mapper works when host root has backslashes
+func TestWindowsBackslashHostRoot(t *testing.T) {
+	// Create mapper with Windows-style backslash host root
+	mapper, err := NewDockerPathMapper("D:\\My Projects\\Projects 1C", "/projects")
+	if err != nil {
+		t.Fatalf("Failed to create mapper: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		hostPath    string
+		expected    string
+		expectError bool
+	}{
+		{
+			name:        "backslash input",
+			hostPath:    "D:\\My Projects\\Projects 1C\\test",
+			expected:    "/projects/test",
+			expectError: false,
+		},
+		{
+			name:        "forward slash input",
+			hostPath:    "D:/My Projects/Projects 1C/test",
+			expected:    "/projects/test",
+			expectError: false,
+		},
+		{
+			name:        "file URI input",
+			hostPath:    "file:///D:/My Projects/Projects 1C/test.bsl",
+			expected:    "file:///projects/test.bsl",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := mapper.HostToContainer(tt.hostPath)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				return
+			}
+			if result != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestRealWorldPaths tests paths that would actually be used by Cursor/Claude
+func TestRealWorldPaths(t *testing.T) {
+	// This is the exact scenario from the user's setup
+	mapper, err := NewDockerPathMapper("D:\\My Projects\\FrameWork 1C\\mcp-lsp-bridge", "/projects")
+	if err != nil {
+		t.Fatalf("Failed to create mapper: %v", err)
+	}
+
+	tests := []struct {
+		name        string
+		hostPath    string
+		expected    string
+		expectError bool
+	}{
+		{
+			name:        "test-workspace with backslashes",
+			hostPath:    "D:\\My Projects\\FrameWork 1C\\mcp-lsp-bridge\\test-workspace",
+			expected:    "/projects/test-workspace",
+			expectError: false,
+		},
+		{
+			name:        "test-workspace with forward slashes",
+			hostPath:    "D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace",
+			expected:    "/projects/test-workspace",
+			expectError: false,
+		},
+		{
+			name:        "BSL file with backslashes",
+			hostPath:    "D:\\My Projects\\FrameWork 1C\\mcp-lsp-bridge\\test-workspace\\Catalogs\\Test\\Module.bsl",
+			expected:    "/projects/test-workspace/Catalogs/Test/Module.bsl",
+			expectError: false,
+		},
+		{
+			name:        "file URI format",
+			hostPath:    "file:///D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace/test.bsl",
+			expected:    "file:///projects/test-workspace/test.bsl",
+			expectError: false,
+		},
+		{
+			name:        "lowercase drive in file URI",
+			hostPath:    "file:///d:/My Projects/FrameWork 1C/mcp-lsp-bridge/test.bsl",
+			expected:    "file:///projects/test.bsl",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := mapper.HostToContainer(tt.hostPath)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
+				}
+				return
+			}
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return

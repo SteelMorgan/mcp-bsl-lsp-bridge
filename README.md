@@ -101,6 +101,24 @@ docker pull ghcr.io/rockerboo/mcp-lsp-bridge:latest
 
 Extend the image to add your needed LSP servers. See [docs/configuration.md](docs/configuration.md) for examples.
 
+## Project-per-container workflow (recommended for 1C/BSL)
+
+This repo includes a **Dockerfile + docker-compose.yml** intended for a "one container per project" workflow.
+
+- Copy `env.example` → `.env` and set at least:
+  - `MCP_PROJECT_NAME`
+  - `HOST_PROJECTS_ROOT`
+  - `WORKSPACE_ROOT`
+  - `MCP_LSP_BSL_JAVA_XMX` (heap size per project)
+- Build & run:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+The container name becomes: `mcp-lsp-${MCP_PROJECT_NAME}` (prefix controlled by `MCP_CONTAINER_PREFIX`).
+
 ## Contribute
 
 Open for contributions. Will help get changes merged in while I develop a contributors document about the key details. 

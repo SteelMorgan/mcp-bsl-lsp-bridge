@@ -2,8 +2,10 @@ package mocks
 
 import (
 	"context"
-	"rockerboo/mcp-lsp-bridge/types"
+	"encoding/json"
 	"time"
+
+	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 	"github.com/stretchr/testify/mock"
@@ -168,9 +170,59 @@ func (m *MockLanguageClient) Formatting(uri string, tabSize uint32, insertSpaces
 	return args.Get(0).([]protocol.TextEdit), args.Error(1)
 }
 
+func (m *MockLanguageClient) RangeFormatting(uri string, startLine, startCharacter, endLine, endCharacter uint32, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
+	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter, tabSize, insertSpaces)
+	return args.Get(0).([]protocol.TextEdit), args.Error(1)
+}
+
 func (m *MockLanguageClient) Rename(uri string, line, character uint32, newName string) (*protocol.WorkspaceEdit, error) {
 	args := m.Called(uri, line, character, newName)
 	return args.Get(0).(*protocol.WorkspaceEdit), args.Error(1)
+}
+
+func (m *MockLanguageClient) PrepareRename(uri string, line, character uint32) (*protocol.PrepareRenameResult, error) {
+	args := m.Called(uri, line, character)
+	return args.Get(0).(*protocol.PrepareRenameResult), args.Error(1)
+}
+
+func (m *MockLanguageClient) FoldingRange(uri string) ([]protocol.FoldingRange, error) {
+	args := m.Called(uri)
+	return args.Get(0).([]protocol.FoldingRange), args.Error(1)
+}
+
+func (m *MockLanguageClient) SelectionRange(uri string, positions []protocol.Position) ([]protocol.SelectionRange, error) {
+	args := m.Called(uri, positions)
+	return args.Get(0).([]protocol.SelectionRange), args.Error(1)
+}
+
+func (m *MockLanguageClient) DocumentLink(uri string) ([]protocol.DocumentLink, error) {
+	args := m.Called(uri)
+	return args.Get(0).([]protocol.DocumentLink), args.Error(1)
+}
+
+func (m *MockLanguageClient) DocumentColor(uri string) ([]protocol.ColorInformation, error) {
+	args := m.Called(uri)
+	return args.Get(0).([]protocol.ColorInformation), args.Error(1)
+}
+
+func (m *MockLanguageClient) ColorPresentation(uri string, color protocol.Color, rng protocol.Range) ([]protocol.ColorPresentation, error) {
+	args := m.Called(uri, color, rng)
+	return args.Get(0).([]protocol.ColorPresentation), args.Error(1)
+}
+
+func (m *MockLanguageClient) ExecuteCommand(command string, argsIn []any) (json.RawMessage, error) {
+	args := m.Called(command, argsIn)
+	return args.Get(0).(json.RawMessage), args.Error(1)
+}
+
+func (m *MockLanguageClient) DidChangeWatchedFiles(changes []protocol.FileEvent) error {
+	args := m.Called(changes)
+	return args.Error(0)
+}
+
+func (m *MockLanguageClient) DidChangeConfiguration(settings any) error {
+	args := m.Called(settings)
+	return args.Error(0)
 }
 
 func (m *MockLanguageClient) CodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error) {

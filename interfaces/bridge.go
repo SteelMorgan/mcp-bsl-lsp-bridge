@@ -1,6 +1,8 @@
 package interfaces
 
 import (
+	"encoding/json"
+
 	"rockerboo/mcp-lsp-bridge/types"
 	"rockerboo/mcp-lsp-bridge/utils"
 
@@ -17,6 +19,8 @@ type BridgeInterface interface {
 	SymbolNavigator
 	DiagnosticsProvider
 	EditProvider
+	DocumentFeaturesProvider
+	WorkspaceCommandProvider
 	CodeInspector
 	CallHierarchyProvider
 	PathMapperProvider
@@ -39,9 +43,25 @@ type CodeInspector interface {
 
 type EditProvider interface {
 	FormatDocument(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error)
+	RangeFormatting(uri string, startLine, startCharacter, endLine, endCharacter uint32, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error)
 	ApplyTextEdits(uri string, edits []protocol.TextEdit) error
 	RenameSymbol(uri string, line, character uint32, newName string, preview bool) (*protocol.WorkspaceEdit, error)
+	PrepareRename(uri string, line, character uint32) (*protocol.PrepareRenameResult, error)
 	ApplyWorkspaceEdit(edit *protocol.WorkspaceEdit) error
+}
+
+type DocumentFeaturesProvider interface {
+	FoldingRange(uri string) ([]protocol.FoldingRange, error)
+	SelectionRange(uri string, positions []protocol.Position) ([]protocol.SelectionRange, error)
+	DocumentLink(uri string) ([]protocol.DocumentLink, error)
+	DocumentColor(uri string) ([]protocol.ColorInformation, error)
+	ColorPresentation(uri string, color protocol.Color, rng protocol.Range) ([]protocol.ColorPresentation, error)
+}
+
+type WorkspaceCommandProvider interface {
+	ExecuteCommand(language string, command string, arguments []any) (json.RawMessage, error)
+	DidChangeWatchedFiles(language string, changes []protocol.FileEvent) error
+	DidChangeConfiguration(language string, settings any) error
 }
 
 type DiagnosticsProvider interface {
@@ -88,4 +108,5 @@ type LanguageDetector interface {
 type PathMapperProvider interface {
 	HasPathMapper() bool
 	GetPathMapper() *utils.DockerPathMapper
+	NormalizeURIForLSP(uri string) string
 }

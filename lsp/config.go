@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -36,6 +37,13 @@ func LoadLSPConfig(path string, allowedDirectories []string) (config *LSPServerC
 	decoder := json.NewDecoder(file)
 	if err := decoder.Decode(&config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+	// Reject any trailing non-whitespace content (e.g. accidental concatenation of multiple JSON objects).
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		if err == nil {
+			return nil, errors.New("failed to parse config file: trailing content after JSON object")
+		}
+		return nil, fmt.Errorf("failed to parse config file: trailing content after JSON object: %w", err)
 	}
 
 	// Validate that we have the required mappings

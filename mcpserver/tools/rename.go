@@ -64,6 +64,10 @@ OUTPUT: All affected files with exact change locations`),
 				applyChanges = (val == "true" || val == "True" || val == "TRUE")
 			}
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			// Safe conversions for line and character
 			lineUint32, err := safeUint32(line)
 			if err != nil {

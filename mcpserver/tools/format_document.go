@@ -47,6 +47,10 @@ OUTPUT: Preview shows exact changes, apply mode confirms completion`),
 
 		insertSpaces := true
 
+		if result, ok := CheckReadyOrReturn(bridge); !ok {
+			return result, nil
+		}
+
 		// Execute bridge method to get formatting edits
 		tabSizeUint32, err := safeUint32(tabSize)
 		if err != nil {

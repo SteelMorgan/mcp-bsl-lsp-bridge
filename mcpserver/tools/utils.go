@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
+	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -689,8 +691,29 @@ func getRangeContent(
 ) (string, error) {
 
 	// 1. Turn the URI into a clean absolute path.
-	filePath := strings.TrimPrefix(uri, "file://")
-	filePath = strings.TrimPrefix(filePath, "file://")
+	// Accept both file URIs and raw local paths (Windows/POSIX).
+	filePath := utils.URIToFilePath(uri)
+	// If bridge runs in Docker/container mode, map host paths to container paths before validation/read.
+	if bridge.HasPathMapper() && bridge.GetPathMapper() != nil {
+		mapper := bridge.GetPathMapper()
+		// Normalize path separators for cross-platform compatibility
+		normalizedPath := strings.ReplaceAll(filePath, "\\", "/")
+		// Check if path is relative (not starting with / and not a Windows absolute path like D:/)
+		isRelative := !strings.HasPrefix(normalizedPath, "/") && !utils.IsWindowsAbsPath(normalizedPath)
+		// Relative paths are treated as container-root relative (e.g. "test-workspace/..." -> "/projects/test-workspace/...").
+		if isRelative {
+			filePath = path.Join(mapper.ContainerRoot(), normalizedPath)
+		}
+		slash := strings.ReplaceAll(filePath, "\\", "/")
+		cr := strings.TrimSuffix(mapper.ContainerRoot(), "/")
+		if !(slash == cr || strings.HasPrefix(slash, cr+"/")) {
+			if mapped, mapErr := mapper.HostToContainer(filePath); mapErr == nil {
+				filePath = mapped
+			} else {
+				return "", fmt.Errorf("path mapping failed: %w", mapErr)
+			}
+		}
+	}
 
 	absPath, err := bridge.IsAllowedDirectory(filePath)
 	if err != nil {

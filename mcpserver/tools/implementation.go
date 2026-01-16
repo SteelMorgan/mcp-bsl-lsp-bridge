@@ -50,6 +50,10 @@ func ImplementationTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			// Validate parameters
 			lineUint32, err := safeUint32(line)
 			if err != nil {
@@ -60,8 +64,8 @@ func ImplementationTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
 			}
 
-			// Normalize URI to ensure proper file:// scheme
-			normalizedURI := utils.NormalizeURI(uri)
+			// Normalize URI - handles both host paths and container paths for Docker mode
+			normalizedURI := bridge.NormalizeURIForLSP(uri)
 
 			// For implementations, we want to search across multiple languages
 			// since interfaces can be implemented in different languages

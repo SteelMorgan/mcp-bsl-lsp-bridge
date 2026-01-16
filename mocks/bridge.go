@@ -1,7 +1,10 @@
 package mocks
 
 import (
+	"encoding/json"
+
 	"rockerboo/mcp-lsp-bridge/types"
+	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 	"github.com/stretchr/testify/mock"
@@ -9,6 +12,21 @@ import (
 
 type MockBridge struct {
 	mock.Mock
+}
+
+func (m *MockBridge) HasPathMapper() bool {
+	// Default behavior for tests: no path mapping unless explicitly needed.
+	return false
+}
+
+func (m *MockBridge) GetPathMapper() *utils.DockerPathMapper {
+	// Default behavior for tests: no mapper.
+	return nil
+}
+
+func (m *MockBridge) NormalizeURIForLSP(uri string) string {
+	// Default behavior for tests: return URI as-is (no path mapping)
+	return uri
 }
 
 func (m *MockBridge) GetClientForLanguage(language string) (types.LanguageClientInterface, error) {
@@ -134,6 +152,11 @@ func (m *MockBridge) FormatDocument(uri string, tabSize uint32, insertSpaces boo
 	return args.Get(0).([]protocol.TextEdit), args.Error(1)
 }
 
+func (m *MockBridge) RangeFormatting(uri string, startLine, startCharacter, endLine, endCharacter uint32, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
+	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter, tabSize, insertSpaces)
+	return args.Get(0).([]protocol.TextEdit), args.Error(1)
+}
+
 func (m *MockBridge) ApplyTextEdits(uri string, edits []protocol.TextEdit) error {
 	args := m.Called(uri, edits)
 	return args.Error(0)
@@ -142,6 +165,11 @@ func (m *MockBridge) ApplyTextEdits(uri string, edits []protocol.TextEdit) error
 func (m *MockBridge) RenameSymbol(uri string, line, character uint32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
 	args := m.Called(uri, line, character, newName, preview)
 	return args.Get(0).(*protocol.WorkspaceEdit), args.Error(1)
+}
+
+func (m *MockBridge) PrepareRename(uri string, line, character uint32) (*protocol.PrepareRenameResult, error) {
+	args := m.Called(uri, line, character)
+	return args.Get(0).(*protocol.PrepareRenameResult), args.Error(1)
 }
 
 func (m *MockBridge) ApplyWorkspaceEdit(edit *protocol.WorkspaceEdit) error {
@@ -157,6 +185,46 @@ func (m *MockBridge) FindImplementations(uri string, line, character uint32) ([]
 func (m *MockBridge) SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]types.TokenPosition, error) {
 	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter)
 	return args.Get(0).([]types.TokenPosition), args.Error(1)
+}
+
+func (m *MockBridge) FoldingRange(uri string) ([]protocol.FoldingRange, error) {
+	args := m.Called(uri)
+	return args.Get(0).([]protocol.FoldingRange), args.Error(1)
+}
+
+func (m *MockBridge) SelectionRange(uri string, positions []protocol.Position) ([]protocol.SelectionRange, error) {
+	args := m.Called(uri, positions)
+	return args.Get(0).([]protocol.SelectionRange), args.Error(1)
+}
+
+func (m *MockBridge) DocumentLink(uri string) ([]protocol.DocumentLink, error) {
+	args := m.Called(uri)
+	return args.Get(0).([]protocol.DocumentLink), args.Error(1)
+}
+
+func (m *MockBridge) DocumentColor(uri string) ([]protocol.ColorInformation, error) {
+	args := m.Called(uri)
+	return args.Get(0).([]protocol.ColorInformation), args.Error(1)
+}
+
+func (m *MockBridge) ColorPresentation(uri string, color protocol.Color, rng protocol.Range) ([]protocol.ColorPresentation, error) {
+	args := m.Called(uri, color, rng)
+	return args.Get(0).([]protocol.ColorPresentation), args.Error(1)
+}
+
+func (m *MockBridge) ExecuteCommand(language string, command string, arguments []any) (json.RawMessage, error) {
+	args := m.Called(language, command, arguments)
+	return args.Get(0).(json.RawMessage), args.Error(1)
+}
+
+func (m *MockBridge) DidChangeWatchedFiles(language string, changes []protocol.FileEvent) error {
+	args := m.Called(language, changes)
+	return args.Error(0)
+}
+
+func (m *MockBridge) DidChangeConfiguration(language string, settings any) error {
+	args := m.Called(language, settings)
+	return args.Error(0)
 }
 
 func (m *MockBridge) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {

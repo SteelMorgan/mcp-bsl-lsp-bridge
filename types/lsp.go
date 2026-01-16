@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
@@ -54,6 +55,14 @@ type LanguageServerConfigProvider interface {
 	GetCommand() string
 	GetArgs() []string
 	GetInitializationOptions() map[string]interface{}
+	
+	// Connection mode support
+	GetMode() string // "stdio" (default), "tcp", "websocket", or "session"
+	GetHost() string // Host for TCP/WebSocket/Session (e.g., "localhost")
+	GetPort() int    // Port for TCP/WebSocket/Session (e.g., 9999)
+	IsWebSocketMode() bool
+	IsTCPMode() bool
+	IsSessionMode() bool
 }
 
 // LanguageClientInterface defines the methods required for a language client.
@@ -94,7 +103,17 @@ type LanguageClientInterface interface {
 	WorkspaceSymbols(query string) ([]protocol.WorkspaceSymbol, error)
 	CodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error)
 	Formatting(uri string, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error)
+	RangeFormatting(uri string, startLine, startCharacter, endLine, endCharacter uint32, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error)
 	Rename(uri string, line, character uint32, newName string) (*protocol.WorkspaceEdit, error)
+	PrepareRename(uri string, line, character uint32) (*protocol.PrepareRenameResult, error)
+	FoldingRange(uri string) ([]protocol.FoldingRange, error)
+	SelectionRange(uri string, positions []protocol.Position) ([]protocol.SelectionRange, error)
+	DocumentLink(uri string) ([]protocol.DocumentLink, error)
+	DocumentColor(uri string) ([]protocol.ColorInformation, error)
+	ColorPresentation(uri string, color protocol.Color, rng protocol.Range) ([]protocol.ColorPresentation, error)
+	ExecuteCommand(command string, args []any) (json.RawMessage, error)
+	DidChangeWatchedFiles(changes []protocol.FileEvent) error
+	DidChangeConfiguration(settings any) error
 	Definition(uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error)
 	WorkspaceDiagnostic(identifier string) (*protocol.WorkspaceDiagnosticReport, error)
 	PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error)

@@ -55,6 +55,10 @@ func SemanticTokensTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Too
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			targetTypes := []string{
 				"namespace", "type", "class", "enum", "interface", "struct",
 				"typeParameter", "parameter", "variable", "property", "enumMember",

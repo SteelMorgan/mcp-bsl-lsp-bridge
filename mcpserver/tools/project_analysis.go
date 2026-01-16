@@ -47,13 +47,9 @@ PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			workspaceUri := request.GetString("workspace_uri", "")
 
-			// Преобразовать workspace_uri из хост-пути в контейнер-путь
-			if bridge.HasPathMapper() {
-				convertedUri, err := bridge.GetPathMapper().HostToContainer(workspaceUri)
-				if err != nil {
-					return mcp.NewToolResultError(fmt.Sprintf("invalid workspace path: %v", err)), nil
-				}
-				workspaceUri = convertedUri
+			// Normalize workspace_uri - handles both host paths and container paths
+			if workspaceUri != "" {
+				workspaceUri = bridge.NormalizeURIForLSP(workspaceUri)
 			}
 
 			query, err := request.RequireString("query")
@@ -68,6 +64,10 @@ PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 
 			offset := request.GetInt("offset", 0)
 			limit := request.GetInt("limit", 20)
+
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
 
 			// Handle options parameter - since GetObject might not be available, create empty map for now
 			options := make(map[string]interface{})
@@ -255,11 +255,8 @@ func handleWorkspaceSymbols(lspClient types.LanguageClientInterface, query strin
 // handleDocumentSymbols handles the 'document_symbols' analysis type
 func handleDocumentSymbols(bridge interfaces.BridgeInterface, query string, offset, limit int, response *strings.Builder) (*mcp.CallToolResult, error) {
 	// For document symbols, the query should be a file URI
-	docUri := query
-	if !strings.HasPrefix(query, "file://") {
-		// If query is not a URI, treat it as a file path and normalize it
-		docUri = utils.NormalizeURI(query)
-	}
+	// NormalizeURIForLSP handles both host paths and container paths for Docker mode
+	docUri := bridge.NormalizeURIForLSP(query)
 
 	symbols, err := bridge.GetDocumentSymbols(docUri)
 	if err != nil {
@@ -590,13 +587,13 @@ func handleFileAnalysis(bridge interfaces.BridgeInterface, clients map[types.Lan
 
 		// If we found a specific file, use it
 		if resolved.ResolvedPath != "" {
-			fileUri = "file://" + resolved.ResolvedPath
+			fileUri = bridge.NormalizeURIForLSP(resolved.ResolvedPath)
 		} else if resolved.ErrorMessage != "" {
 			// File not found - provide helpful error with suggestions
 			return mcp.NewToolResultError(resolved.ErrorMessage), nil
 		} else {
-			// Fallback to original behavior
-			fileUri = utils.NormalizeURI(query)
+			// Fallback to original behavior - NormalizeURIForLSP handles Docker path mapping
+			fileUri = bridge.NormalizeURIForLSP(query)
 		}
 	}
 

@@ -1,12 +1,20 @@
 package utils
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestNormalizeURI(t *testing.T) {
+	tmp := t.TempDir()
+	absFile := filepath.Join(tmp, "file.go")
+	absURI, err := PathToFileURI(absFile)
+	if err != nil {
+		t.Fatalf("PathToFileURI failed: %v", err)
+	}
+
 	tests := []struct {
 		name     string
 		input    string
@@ -14,8 +22,8 @@ func TestNormalizeURI(t *testing.T) {
 	}{
 		{
 			name:     "already normalized file URI",
-			input:    "file:///home/user/file.go",
-			expected: "file:///home/user/file.go",
+			input:    absURI,
+			expected: absURI,
 		},
 		{
 			name:     "http URI unchanged",
@@ -24,13 +32,13 @@ func TestNormalizeURI(t *testing.T) {
 		},
 		{
 			name:     "absolute path",
-			input:    "/home/user/file.go",
-			expected: "file:///home/user/file.go",
+			input:    absFile,
+			expected: absURI,
 		},
 		{
 			name:     "relative path becomes absolute",
 			input:    "file.go",
-			expected: "file://" + mustAbs("file.go"),
+			expected: mustFileURI("file.go"),
 		},
 	}
 
@@ -45,6 +53,13 @@ func TestNormalizeURI(t *testing.T) {
 }
 
 func TestURIToFilePath(t *testing.T) {
+	tmp := t.TempDir()
+	absFile := filepath.Join(tmp, "file.go")
+	absURI, err := PathToFileURI(absFile)
+	if err != nil {
+		t.Fatalf("PathToFileURI failed: %v", err)
+	}
+
 	tests := []struct {
 		name     string
 		input    string
@@ -52,13 +67,13 @@ func TestURIToFilePath(t *testing.T) {
 	}{
 		{
 			name:     "file URI",
-			input:    "file:///home/user/file.go",
-			expected: "/home/user/file.go",
+			input:    absURI,
+			expected: absFile,
 		},
 		{
 			name:     "already a file path",
-			input:    "/home/user/file.go",
-			expected: "/home/user/file.go",
+			input:    absFile,
+			expected: absFile,
 		},
 		{
 			name:     "http URI unchanged",
@@ -78,6 +93,13 @@ func TestURIToFilePath(t *testing.T) {
 }
 
 func TestFilePathToURI(t *testing.T) {
+	tmp := t.TempDir()
+	absFile := filepath.Join(tmp, "file.go")
+	absURI, err := PathToFileURI(absFile)
+	if err != nil {
+		t.Fatalf("PathToFileURI failed: %v", err)
+	}
+
 	tests := []struct {
 		name     string
 		input    string
@@ -85,18 +107,18 @@ func TestFilePathToURI(t *testing.T) {
 	}{
 		{
 			name:     "absolute path",
-			input:    "/home/user/file.go",
-			expected: "file:///home/user/file.go",
+			input:    absFile,
+			expected: absURI,
 		},
 		{
 			name:     "already a URI",
-			input:    "file:///home/user/file.go",
-			expected: "file:///home/user/file.go",
+			input:    absURI,
+			expected: absURI,
 		},
 		{
 			name:     "relative path becomes absolute",
 			input:    "file.go",
-			expected: "file://" + mustAbs("file.go"),
+			expected: mustFileURI("file.go"),
 		},
 	}
 
@@ -111,10 +133,11 @@ func TestFilePathToURI(t *testing.T) {
 }
 
 func TestRoundTrip(t *testing.T) {
+	tmp := t.TempDir()
 	testPaths := []string{
-		"/home/user/file.go",
-		"/tmp/test.txt",
-		"/var/log/app.log",
+		filepath.Join(tmp, "file.go"),
+		filepath.Join(tmp, "test.txt"),
+		filepath.Join(tmp, "app.log"),
 	}
 
 	for _, path := range testPaths {
@@ -123,8 +146,13 @@ func TestRoundTrip(t *testing.T) {
 			uri := FilePathToURI(path)
 			resultPath := URIToFilePath(uri)
 
-			if resultPath != path {
-				t.Errorf("Round trip failed: %s -> %s -> %s", path, uri, resultPath)
+			// Compare absolute cleaned paths to avoid platform differences.
+			wantAbs, _ := filepath.Abs(path)
+			gotAbs, _ := filepath.Abs(resultPath)
+			wantAbs = filepath.Clean(wantAbs)
+			gotAbs = filepath.Clean(gotAbs)
+			if gotAbs != wantAbs {
+				t.Errorf("Round trip failed: %s -> %s -> %s (want %s)", path, uri, resultPath, wantAbs)
 			}
 
 			// Normalize the URI
@@ -143,4 +171,39 @@ func mustAbs(path string) string {
 		panic(err)
 	}
 	return abs
+}
+
+func mustFileURI(path string) string {
+	abs := mustAbs(path)
+	u, err := PathToFileURI(abs)
+	if err != nil {
+		panic(err)
+	}
+	return u
+}
+
+func TestFileURIToPath_WithSpaces(t *testing.T) {
+	// Ensures percent-encoded spaces are decoded properly.
+	tmp := t.TempDir()
+	p := filepath.Join(tmp, "dir with space", "file.go")
+	requireDir := filepath.Dir(p)
+	if err := os.MkdirAll(requireDir, 0750); err != nil {
+		t.Fatalf("MkdirAll failed: %v", err)
+	}
+
+	u, err := PathToFileURI(p)
+	if err != nil {
+		t.Fatalf("PathToFileURI failed: %v", err)
+	}
+
+	got, err := FileURIToPath(u)
+	if err != nil {
+		t.Fatalf("FileURIToPath failed: %v", err)
+	}
+
+	want := filepath.Clean(p)
+	got = filepath.Clean(got)
+	if got != want {
+		t.Fatalf("FileURIToPath(%q) = %q, want %q", u, got, want)
+	}
 }

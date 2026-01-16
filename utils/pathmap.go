@@ -4,15 +4,55 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
+	"path"
 	"strings"
 )
 
 // DockerPathMapper handles path conversion between host system and Docker container
 type DockerPathMapper struct {
-	hostRoot      string // D:\My Projects\Projects 1C
+	hostRoot      string // D:/My Projects/Projects 1C (normalized with forward slashes)
 	containerRoot string // /projects
 	enabled       bool   // true if working in Docker mode
+}
+
+// IsWindowsAbsPath checks if a path is a Windows absolute path (e.g., C:\... or C:/...)
+// This works correctly regardless of the runtime OS (Linux or Windows)
+func IsWindowsAbsPath(p string) bool {
+	if len(p) < 2 {
+		return false
+	}
+	// Check for drive letter pattern: X: or X:/ or X:\
+	letter := p[0]
+	if (letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z') {
+		if p[1] == ':' {
+			return true
+		}
+	}
+	return false
+}
+
+// normalizePathSeparators converts all backslashes to forward slashes
+// and cleans the path (removes redundant slashes, resolves . and ..)
+func normalizePathSeparators(p string) string {
+	// Convert all backslashes to forward slashes
+	normalized := strings.ReplaceAll(p, "\\", "/")
+	// Use path.Clean which always uses forward slashes
+	return path.Clean(normalized)
+}
+
+// pathsEqualFold compares two paths case-insensitively (for Windows path compatibility)
+// Both paths should already be normalized with forward slashes
+func pathsEqualFold(a, b string) bool {
+	return strings.EqualFold(a, b)
+}
+
+// hasPrefixFold checks if path has prefix using case-insensitive comparison
+// Both paths should already be normalized with forward slashes
+func hasPrefixFold(p, prefix string) bool {
+	if len(p) < len(prefix) {
+		return false
+	}
+	return strings.EqualFold(p[:len(prefix)], prefix)
 }
 
 // NewDockerPathMapper creates a new DockerPathMapper instance
@@ -24,11 +64,9 @@ func NewDockerPathMapper(hostRoot, containerRoot string) (*DockerPathMapper, err
 		return nil, errors.New("container root path cannot be empty")
 	}
 
-	// Clean and normalize paths
-	// For Docker mode, don't use filepath.Abs as it may be cross-platform (Windows path on Linux)
-	cleanHostRoot := filepath.Clean(hostRoot)
-	// Convert to forward slashes for consistency
-	cleanHostRoot = filepath.ToSlash(cleanHostRoot)
+	// Normalize host root path - convert backslashes to forward slashes
+	// This works correctly on both Linux and Windows
+	cleanHostRoot := normalizePathSeparators(hostRoot)
 
 	// For container paths, use simple string cleaning to avoid Windows path issues
 	cleanContainerRoot := strings.TrimSuffix(containerRoot, "/")
@@ -84,6 +122,7 @@ func (dpm *DockerPathMapper) ContainerRoot() string {
 }
 
 // HostToContainer converts a host path to container path
+// Handles Windows paths (D:\..., D:/...) correctly even when running on Linux
 func (dpm *DockerPathMapper) HostToContainer(hostPath string) (string, error) {
 	if !dpm.enabled {
 		return hostPath, nil // Return as-is if disabled
@@ -97,31 +136,28 @@ func (dpm *DockerPathMapper) HostToContainer(hostPath string) (string, error) {
 	isURI := strings.HasPrefix(hostPath, "file://")
 	var filePath string
 	if isURI {
-		filePath = strings.TrimPrefix(hostPath, "file://")
-		// Handle Windows file:// URI format (file:///C:/path)
-		if strings.HasPrefix(filePath, "/") && len(filePath) > 3 && filePath[2] == ':' {
-			filePath = filePath[1:] // Remove leading slash for Windows paths
+		p, err := FileURIToPath(hostPath)
+		if err != nil {
+			return "", err
 		}
+		filePath = p
 	} else {
 		filePath = hostPath
 	}
 
-	// Clean and normalize the input path
-	// Don't use filepath.Abs for cross-platform paths (Windows path on Linux)
-	// First replace backslashes with forward slashes for cross-platform compatibility
-	cleanPath := strings.ReplaceAll(filePath, "\\", "/")
-	cleanPath = filepath.Clean(cleanPath)
-	
-	// Normalize host root path separators
-	normalizedHostRoot := strings.ReplaceAll(dpm.hostRoot, "\\", "/")
+	// Normalize the input path - convert backslashes to forward slashes
+	cleanPath := normalizePathSeparators(filePath)
 
-	// Check if path is within the host root directory
-	if !strings.HasPrefix(cleanPath, normalizedHostRoot) {
+	// hostRoot is already normalized in NewDockerPathMapper
+	normalizedHostRoot := dpm.hostRoot
+
+	// Check if path is within the host root directory (case-insensitive for Windows paths)
+	if !hasPrefixFold(cleanPath, normalizedHostRoot) {
 		return "", fmt.Errorf("path %s is outside mounted directory %s", cleanPath, normalizedHostRoot)
 	}
 
-	// Replace host root with container root
-	relativePath := strings.TrimPrefix(cleanPath, normalizedHostRoot)
+	// Extract relative path (preserve original case for the relative portion)
+	relativePath := cleanPath[len(normalizedHostRoot):]
 	relativePath = strings.TrimPrefix(relativePath, "/")
 
 	// Build container path
@@ -129,15 +165,15 @@ func (dpm *DockerPathMapper) HostToContainer(hostPath string) (string, error) {
 	if relativePath == "" {
 		containerPath = dpm.containerRoot
 	} else {
-		containerPath = filepath.Join(dpm.containerRoot, relativePath)
+		containerPath = path.Join(dpm.containerRoot, relativePath)
 	}
 
 	// Normalize the final path
-	containerPath = filepath.Clean(containerPath)
+	containerPath = path.Clean(containerPath)
 
 	// Return as URI if input was URI
 	if isURI {
-		return "file://" + strings.ReplaceAll(containerPath, "\\", "/"), nil
+		return "file://" + containerPath, nil
 	}
 	return containerPath, nil
 }
@@ -152,8 +188,8 @@ func (dpm *DockerPathMapper) ContainerToHost(containerPath string) (string, erro
 		return "", errors.New("container path cannot be empty")
 	}
 
-	// Clean and normalize the input path
-	cleanPath := filepath.Clean(containerPath)
+	// Clean and normalize the input path (container is always slash-based)
+	cleanPath := normalizePathSeparators(containerPath)
 
 	// Check if path is within the container root directory
 	if !strings.HasPrefix(cleanPath, dpm.containerRoot) {
@@ -164,16 +200,16 @@ func (dpm *DockerPathMapper) ContainerToHost(containerPath string) (string, erro
 	relativePath := strings.TrimPrefix(cleanPath, dpm.containerRoot)
 	relativePath = strings.TrimPrefix(relativePath, "/")
 
-	// Build host path
+	// Build host path (keep forward slashes - the caller can convert if needed)
 	var hostPath string
 	if relativePath == "" {
 		hostPath = dpm.hostRoot
 	} else {
-		hostPath = filepath.Join(dpm.hostRoot, relativePath)
+		hostPath = path.Join(dpm.hostRoot, relativePath)
 	}
 
 	// Normalize the final path
-	hostPath = filepath.Clean(hostPath)
+	hostPath = path.Clean(hostPath)
 
 	return hostPath, nil
 }
@@ -184,16 +220,20 @@ func (dpm *DockerPathMapper) ValidatePath(hostPath string) error {
 		return nil // No validation if disabled
 	}
 
-	cleanPath, err := filepath.Abs(hostPath)
-	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
+	// Normalize the path first
+	cleanPath := normalizePathSeparators(hostPath)
+
+	// Check if path is absolute (works for both Windows and Unix paths)
+	isAbsolute := strings.HasPrefix(cleanPath, "/") || IsWindowsAbsPath(cleanPath)
+
+	// In Docker mode, treat relative paths as relative to hostRoot
+	if !isAbsolute {
+		cleanPath = path.Join(dpm.hostRoot, cleanPath)
+		cleanPath = path.Clean(cleanPath)
 	}
 
-	// Check if path is within host root
-	cleanPath = filepath.ToSlash(cleanPath)
-	normalizedHostRoot := filepath.ToSlash(dpm.hostRoot)
-
-	if !strings.HasPrefix(cleanPath, normalizedHostRoot) {
+	// Check if path is within host root (case-insensitive for Windows paths)
+	if !hasPrefixFold(cleanPath, dpm.hostRoot) {
 		return fmt.Errorf("path is outside mounted directory: %s", hostPath)
 	}
 
@@ -209,11 +249,11 @@ func (dpm *DockerPathMapper) NormalizeURI(uri string) (string, error) {
 	// Extract path from file:// URI
 	var filePath string
 	if strings.HasPrefix(uri, "file://") {
-		filePath = strings.TrimPrefix(uri, "file://")
-		// Handle Windows file:// URI format (file:///C:/path)
-		if strings.HasPrefix(filePath, "/") && len(filePath) > 3 && filePath[2] == ':' {
-			filePath = filePath[1:] // Remove leading slash for Windows paths
+		p, err := FileURIToPath(uri)
+		if err != nil {
+			return "", err
 		}
+		filePath = p
 	} else {
 		filePath = uri
 	}
@@ -224,8 +264,13 @@ func (dpm *DockerPathMapper) NormalizeURI(uri string) (string, error) {
 		return "", err
 	}
 
+	// If HostToContainer already returned a URI, return it
+	if strings.HasPrefix(containerPath, "file://") {
+		return containerPath, nil
+	}
+
 	// Return as file:// URI with proper Unix path separators
-	return "file://" + strings.ReplaceAll(containerPath, "\\", "/"), nil
+	return "file://" + containerPath, nil
 }
 
 // ConvertURI converts a file:// URI from host to container format

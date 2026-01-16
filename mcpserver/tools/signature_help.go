@@ -44,6 +44,10 @@ func SignatureHelpTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			// Safe conversions for line and character
 			lineUint32, err := safeUint32(line)
 			if err != nil {

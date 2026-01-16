@@ -22,7 +22,9 @@ import (
 type JSONRPCLogger struct{}
 
 func (l *JSONRPCLogger) Printf(format string, args ...any) {
-	logger.Debug(fmt.Sprintf("JSONRPC: "+format, args...))
+	msg := fmt.Sprintf("JSONRPC: "+format, args...)
+	logger.Debug(msg)
+	fmt.Fprintf(os.Stderr, "%s\n", msg)
 }
 
 // NewLanguageClient creates a new Language Server Protocol client
@@ -157,7 +159,12 @@ func (lc *LanguageClient) Connect() (types.LanguageClientInterface, error) {
 	}
 
 	// Create handler
-	handler := &ClientHandler{}
+	if lc.progress == nil {
+		lc.progress = NewProgressTracker()
+	}
+	handler := &ClientHandler{
+		progress: lc.progress,
+	}
 
 	// Create JSON-RPC connection using VSCode Object Codec for LSP headers
 	stream := jsonrpc2.NewBufferedStream(readWriteCloser, jsonrpc2.VSCodeObjectCodec{})
@@ -248,7 +255,10 @@ func (lc *LanguageClient) Connect() (types.LanguageClientInterface, error) {
 }
 
 func (ls *LanguageClient) IsConnected() bool {
-	return ls.status == StatusConnected
+	// StatusError can be a transient "last request failed" marker (e.g. timeout)
+	// while the underlying JSON-RPC connection is still alive.
+	// Treat the client as connected as long as the context isn't cancelled and we still have a conn.
+	return ls.ctx.Err() == nil && ls.conn != nil && ls.status != StatusDisconnected
 }
 
 func (ls *LanguageClient) Status() int {
@@ -351,11 +361,15 @@ func (lc *LanguageClient) SetServerCapabilities(capabilities protocol.ServerCapa
 
 // SendRequest sends a request with timeout
 func (lc *LanguageClient) SendRequest(method string, params any, result any, timeout time.Duration) error {
+	fmt.Fprintf(os.Stderr, "DEBUG SendRequest: ENTER method=%s lc=%p\n", method, lc)
+	
 	// Increment total requests
 	atomic.AddInt64(&lc.totalRequests, 1)
 
 	// Ensure connection is still valid by checking context and connection
+	fmt.Fprintf(os.Stderr, "DEBUG SendRequest: checking ctx.Err=%v conn=%p\n", lc.ctx.Err(), lc.conn)
 	if lc.ctx.Err() != nil || lc.conn == nil {
+		fmt.Fprintf(os.Stderr, "DEBUG SendRequest: connection closed!\n")
 		return errors.New("language server connection is closed")
 	}
 
@@ -376,14 +390,18 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	// Check connection state before call
 	select {
 	case <-lc.conn.DisconnectNotify():
+		fmt.Fprintf(os.Stderr, "DEBUG SendRequest: Connection already disconnected before Call\n")
 		return errors.New("connection already disconnected")
 	default:
+		fmt.Fprintf(os.Stderr, "DEBUG SendRequest: Connection OK, making Call for method=%s\n", method)
 	}
 
 	reqCtx, cancel := context.WithTimeout(lc.ctx, timeout)
 	defer cancel()
 
+	fmt.Fprintf(os.Stderr, "DEBUG SendRequest: Calling lc.conn.Call...\n")
 	err := lc.conn.Call(reqCtx, method, params, result)
+	fmt.Fprintf(os.Stderr, "DEBUG SendRequest: lc.conn.Call returned err=%v\n", err)
 
 	// Update status and metrics with brief locks
 	if err != nil {
@@ -433,6 +451,11 @@ func (lc *LanguageClient) GetMetrics() types.ClientMetricsProvider {
 	lc.mu.RLock()
 	defer lc.mu.RUnlock()
 
+	lastError := ""
+	if lc.lastError != nil {
+		lastError = fmt.Sprintf("%v", lc.lastError)
+	}
+
 	return &ClientMetrics{
 		Command:            lc.command,
 		Status:             lc.status.Status(),
@@ -441,7 +464,7 @@ func (lc *LanguageClient) GetMetrics() types.ClientMetricsProvider {
 		FailedRequests:     atomic.LoadInt64(&lc.failedRequests),
 		LastInitialized:    lc.lastInitialized,
 		LastErrorTime:      lc.lastErrorTime,
-		LastError:          fmt.Sprintf("%v", lc.lastError),
+		LastError:          lastError,
 		Connected:          lc.IsConnected(),
 		ProcessID:          lc.processID,
 	}
@@ -463,4 +486,14 @@ func (lc *LanguageClient) SetupSemanticTokens() error {
 
 func (lc *LanguageClient) TokenParser() types.SemanticTokensParserProvider {
 	return lc.tokenParser
+}
+
+// ProgressSnapshot returns the latest server-initiated progress status.
+// This is intentionally NOT part of the public interface to avoid breaking mocks;
+// use type assertions when needed.
+func (lc *LanguageClient) ProgressSnapshot() ProgressSnapshot {
+	if lc.progress == nil {
+		return ProgressSnapshot{}
+	}
+	return lc.progress.Snapshot()
 }

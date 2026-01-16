@@ -12,6 +12,7 @@ import (
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/types"
+	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -75,6 +76,10 @@ PARAMETERS: query (required), file_context (optional), detail_level (auto/basic/
 			detailLevel := request.GetString("detail_level", "auto")
 			limit := request.GetInt("limit", 3)
 			offset := request.GetInt("offset", 0)
+
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
 
 			logger.Info(fmt.Sprintf("Symbol Explore: query=%s, file_context=%s, detail_level=%s, limit=%d, offset=%d", query, fileContext, detailLevel, limit, offset))
 
@@ -247,10 +252,10 @@ func filterSymbolsByFileContext(bridge interfaces.BridgeInterface, symbols []Sym
 // filterSymbolsByExactFile filters symbols to only those in the specified file path
 func filterSymbolsByExactFile(symbols []SymbolMatch, filePath string) []SymbolMatch {
 	filtered := make([]SymbolMatch, 0)
-	targetURI := "file://" + filePath
+	targetURI := utils.NormalizeURI(filePath)
 
 	for _, symbol := range symbols {
-		if string(symbol.Location.Uri) == targetURI {
+		if utils.NormalizeURI(string(symbol.Location.Uri)) == targetURI {
 			filtered = append(filtered, symbol)
 		}
 	}

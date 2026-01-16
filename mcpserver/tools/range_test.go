@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
@@ -29,6 +30,8 @@ line 4: fifth line`
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
+	rawPath := testFile
+	fileURI := utils.FilePathToURI(testFile)
 
 	testCases := []struct {
 		name         string
@@ -45,7 +48,7 @@ line 4: fifth line`
 	}{
 		{
 			name:         "single line exact range",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    0,
 			startChar:    0,
 			endLine:      0,
@@ -56,7 +59,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "single line mid-range",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    1,
 			startChar:    8,
 			endLine:      1,
@@ -67,7 +70,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "multi-line range",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    1,
 			startChar:    8,
 			endLine:      2,
@@ -78,7 +81,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "full line range",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    2,
 			startChar:    0,
 			endLine:      2,
@@ -89,7 +92,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "out of bounds end char - non-strict default",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    0,
 			startChar:    0,
 			endLine:      0,
@@ -101,7 +104,7 @@ line 4: fifth line`
 		},
 		{
 			name:        "out of bounds end char - strict mode",
-			uri:         "file://" + testFile,
+			uri:         rawPath,
 			startLine:   0,
 			startChar:   0,
 			endLine:     0,
@@ -112,7 +115,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "out of bounds start char - non-strict",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    0,
 			startChar:    100,
 			endLine:      0,
@@ -124,7 +127,7 @@ line 4: fifth line`
 		},
 		{
 			name:        "out of bounds start char - strict mode",
-			uri:         "file://" + testFile,
+			uri:         rawPath,
 			startLine:   0,
 			startChar:   100,
 			endLine:     0,
@@ -135,7 +138,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "multi-line with out of bounds end char - non-strict",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    1,
 			startChar:    0,
 			endLine:      2,
@@ -147,7 +150,7 @@ line 4: fifth line`
 		},
 		{
 			name:        "multi-line with out of bounds end char - strict",
-			uri:         "file://" + testFile,
+			uri:         rawPath,
 			startLine:   1,
 			startChar:   0,
 			endLine:     2,
@@ -158,7 +161,7 @@ line 4: fifth line`
 		},
 		{
 			name:        "invalid line range - start line out of bounds",
-			uri:         "file://" + testFile,
+			uri:         rawPath,
 			startLine:   10,
 			startChar:   0,
 			endLine:     10,
@@ -168,7 +171,7 @@ line 4: fifth line`
 		},
 		{
 			name:        "invalid line range - end line out of bounds",
-			uri:         "file://" + testFile,
+			uri:         rawPath,
 			startLine:   0,
 			startChar:   0,
 			endLine:     10,
@@ -178,7 +181,7 @@ line 4: fifth line`
 		},
 		{
 			name:        "invalid range order - lines",
-			uri:         "file://" + testFile,
+			uri:         rawPath,
 			startLine:   2,
 			startChar:   0,
 			endLine:     1,
@@ -188,7 +191,7 @@ line 4: fifth line`
 		},
 		{
 			name:        "invalid range order - characters on same line",
-			uri:         "file://" + testFile,
+			uri:         rawPath,
 			startLine:   1,
 			startChar:   10,
 			endLine:     1,
@@ -218,7 +221,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "range at exact line boundary",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    0,
 			startChar:    0,
 			endLine:      0,
@@ -229,7 +232,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "empty range - same position",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    1,
 			startChar:    5,
 			endLine:      1,
@@ -240,7 +243,7 @@ line 4: fifth line`
 		},
 		{
 			name:         "explicit non-strict mode",
-			uri:          "file://" + testFile,
+			uri:          rawPath,
 			startLine:    0,
 			startChar:    0,
 			endLine:      0,
@@ -250,6 +253,17 @@ line 4: fifth line`
 			expectedText: "line 0: first line",
 			description:  "Should clamp to line end when explicitly non-strict",
 			shouldAdjust: true,
+		},
+		{
+			name:         "file URI input is accepted",
+			uri:          fileURI,
+			startLine:    0,
+			startChar:    0,
+			endLine:      0,
+			endChar:      6,
+			expectError:  false,
+			expectedText: "line 0",
+			description:  "Should also work with canonical file:// URI",
 		},
 	}
 
@@ -262,7 +276,8 @@ line 4: fifth line`
 				bridge.On("IsAllowedDirectory", testFile).Return(testFile, nil)
 			} else if tc.uri == "file:///nonexistent/file.txt" {
 				// Mock file path resolution for non-existent file
-				bridge.On("IsAllowedDirectory", "/nonexistent/file.txt").Return("/nonexistent/file.txt", nil)
+				nonexistent := filepath.FromSlash("/nonexistent/file.txt")
+				bridge.On("IsAllowedDirectory", nonexistent).Return(nonexistent, nil)
 			} else if tc.uri == "" {
 				// For empty URI, the normalized path will be the current working directory or empty
 				// We need to mock this call since the code will still try to resolve the path

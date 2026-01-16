@@ -56,6 +56,10 @@ func CodeActionTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHan
 				endCharacter = val
 			}
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			// Execute bridge method
 			lineUint32, err := safeUint32(line)
 			if err != nil {

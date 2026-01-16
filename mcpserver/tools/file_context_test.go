@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"rockerboo/mcp-lsp-bridge/mocks"
+	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/myleshyson/lsprotocol-go/protocol"
 	"github.com/stretchr/testify/assert"
@@ -91,7 +92,7 @@ func TestFilterSymbolsByFileContext(t *testing.T) {
 	require.NoError(t, os.WriteFile(testFile, []byte("// test"), 0600))
 
 	symbols := []SymbolMatch{
-		{Name: "TestFunction", Location: protocol.Location{Uri: protocol.DocumentUri("file://" + testFile)}},
+		{Name: "TestFunction", Location: protocol.Location{Uri: protocol.DocumentUri(utils.FilePathToURI(testFile))}},
 		{Name: "OtherFunction", Location: protocol.Location{Uri: protocol.DocumentUri("file:///other/other.go")}},
 	}
 

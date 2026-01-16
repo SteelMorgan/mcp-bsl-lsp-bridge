@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	bridgepkg "rockerboo/mcp-lsp-bridge/bridge"
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
 
@@ -52,6 +53,12 @@ func SetupMCPServer(bridge interfaces.BridgeInterface) *server.MCPServer {
 	})
 	hooks.AddAfterInitialize(func(ctx context.Context, id any, message *mcp.InitializeRequest, result *mcp.InitializeResult) {
 		logger.Debug("afterInitialize:", id, message, result)
+
+		// Auto-connect default language client(s) so tools can be used immediately
+		// without requiring explicit lsp_connect. Safe no-op for non-bridge implementations.
+		if b, ok := bridge.(*bridgepkg.MCPLSPBridge); ok {
+			b.StartAutoConnect()
+		}
 	})
 	hooks.AddAfterCallTool(func(ctx context.Context, id any, message *mcp.CallToolRequest, result *mcp.CallToolResult) {
 		logger.Debug("afterCallTool:", id, message, result)

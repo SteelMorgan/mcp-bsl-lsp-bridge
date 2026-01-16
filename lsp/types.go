@@ -2,6 +2,7 @@ package lsp
 
 import (
 	"context"
+	"net"
 	"os/exec"
 	"sync"
 	"time"
@@ -30,6 +31,11 @@ type LanguageServerConfig struct {
 	Languages             []string               `json:"languages,omitempty"`
 	Filetypes             []string               `json:"filetypes"`
 	InitializationOptions map[string]interface{} `json:"initialization_options,omitempty"`
+	
+	// WebSocket mode configuration (alternative to command/args)
+	Mode string `json:"mode,omitempty"` // "stdio" (default) or "websocket"
+	Host string `json:"host,omitempty"` // WebSocket host (e.g., "bsl-ls" or "localhost")
+	Port int    `json:"port,omitempty"` // WebSocket port (e.g., 9999)
 }
 
 // GetCommand implements types.LanguageServerConfigProvider
@@ -45,6 +51,39 @@ func (c *LanguageServerConfig) GetArgs() []string {
 // GetInitializationOptions implements types.LanguageServerConfigProvider
 func (c *LanguageServerConfig) GetInitializationOptions() map[string]interface{} {
 	return c.InitializationOptions
+}
+
+// GetMode implements types.LanguageServerConfigProvider
+func (c *LanguageServerConfig) GetMode() string {
+	if c.Mode == "" {
+		return "stdio"
+	}
+	return c.Mode
+}
+
+// GetHost implements types.LanguageServerConfigProvider
+func (c *LanguageServerConfig) GetHost() string {
+	return c.Host
+}
+
+// GetPort implements types.LanguageServerConfigProvider
+func (c *LanguageServerConfig) GetPort() int {
+	return c.Port
+}
+
+// IsWebSocketMode implements types.LanguageServerConfigProvider
+func (c *LanguageServerConfig) IsWebSocketMode() bool {
+	return c.Mode == "websocket"
+}
+
+// IsTCPMode implements types.LanguageServerConfigProvider
+func (c *LanguageServerConfig) IsTCPMode() bool {
+	return c.Mode == "tcp"
+}
+
+// IsSessionMode returns true if mode is "session" (LSP Session Manager)
+func (c *LanguageServerConfig) IsSessionMode() bool {
+	return c.Mode == "session"
 }
 
 // LSPServerConfig represents the complete LSP server configuration
@@ -66,6 +105,7 @@ type LanguageClient struct {
 	serverCapabilities protocol.ServerCapabilities
 
 	tokenParser types.SemanticTokensParserProvider
+	progress    *ProgressTracker
 
 	workspacePaths []string
 
@@ -76,6 +116,10 @@ type LanguageClient struct {
 	lastInitialized time.Time
 	status          ClientStatus
 	lastError       error
+
+	// TCP/Socket mode
+	tcpAddress string   // For TCP mode: "host:port"
+	tcpConn    net.Conn // Active TCP connection
 
 	// Metrics
 	totalRequests      int64

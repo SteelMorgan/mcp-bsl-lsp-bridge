@@ -45,6 +45,10 @@ OUTPUT: Formatted documentation with code examples and pkg.go.dev links`),
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			// Infer language for debugging
 			language, langErr := bridge.InferLanguage(uri)
 			if langErr != nil {

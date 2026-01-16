@@ -190,6 +190,11 @@ func TestCloseAllClients(t *testing.T) {
 
 // Test normalizeURI
 func TestNormalizeURI(t *testing.T) {
+	tmp := t.TempDir()
+	absPath := filepath.Join(tmp, "file.go")
+	absURI := utils.FilePathToURI(absPath)
+	relWant := utils.FilePathToURI(func() string { abs, _ := filepath.Abs("file.go"); return abs }())
+
 	tests := []struct {
 		name string
 		uri  string
@@ -197,8 +202,8 @@ func TestNormalizeURI(t *testing.T) {
 	}{
 		{
 			name: "Already has file scheme",
-			uri:  "file:///path/to/file.go",
-			want: "file:///path/to/file.go",
+			uri:  absURI,
+			want: absURI,
 		},
 		{
 			name: "Has other scheme",
@@ -207,13 +212,13 @@ func TestNormalizeURI(t *testing.T) {
 		},
 		{
 			name: "Absolute path",
-			uri:  "/path/to/file.go",
-			want: "file:///path/to/file.go",
+			uri:  absPath,
+			want: absURI,
 		},
 		{
 			name: "Relative path",
 			uri:  "file.go",
-			want: "file://" + func() string { abs, _ := filepath.Abs("file.go"); return abs }(),
+			want: relWant,
 		},
 	}
 
@@ -233,7 +238,7 @@ func TestFindSymbolReferences(t *testing.T) {
 	// Mock the client creation and connection
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 
 	bridge.clients["gopls"] = mockClient
 
@@ -263,7 +268,7 @@ func TestFindSymbolDefinitions(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 
 	bridge.clients["gopls"] = mockClient
 
@@ -294,7 +299,7 @@ func TestFindSymbolDefinitionsWithError(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 
 	bridge.clients["gopls"] = mockClient
 
@@ -314,7 +319,7 @@ func TestSearchTextInWorkspace(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 
 	bridge.clients["gopls"] = mockClient
 
@@ -348,7 +353,7 @@ func TestGetDocumentSymbols(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 	mockClient.On("ProjectRoots").Return([]string{"."})
 	mockClient.On("SetProjectRoots", []string{"."})
 
@@ -358,7 +363,7 @@ func TestGetDocumentSymbols(t *testing.T) {
 
 	// Create temp file for the test
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-	testURI := "file://" + testFile
+	testURI := utils.NormalizeURI(testFile)
 
 	expectedSymbols := []protocol.DocumentSymbol{
 		{
@@ -391,13 +396,13 @@ func TestGetSignatureHelp(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 
 	bridge.clients["gopls"] = mockClient
 
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-	testURI := "file://" + testFile
+	mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+	testURI := utils.NormalizeURI(testFile)
 
 	activeParameter := uint32(0)
 
@@ -430,11 +435,11 @@ func TestGetHoverInformation(t *testing.T) {
 	mockClient := &mocks.MockLanguageClient{}
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 	bridge.clients["gopls"] = mockClient
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-	testURI := "file://" + testFile
+	mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+	testURI := utils.NormalizeURI(testFile)
 
 	expectedHover := &protocol.Hover{
 		Contents: protocol.Or3[protocol.MarkupContent, protocol.MarkedString, []protocol.MarkedString]{
@@ -511,12 +516,12 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient := &mocks.MockLanguageClient{}
 		ctx := context.Background()
 		mockClient.On("Context").Return(ctx)
-		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-		testURI := "file://" + testFile
+		mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+		testURI := utils.NormalizeURI(testFile)
 
 		expectedWorkspaceEdit := protocol.WorkspaceEdit{
 			Changes: map[protocol.DocumentUri][]protocol.TextEdit{
@@ -572,12 +577,12 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient := &mocks.MockLanguageClient{}
 		ctx := context.Background()
 		mockClient.On("Context").Return(ctx)
-		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-		testURI := "file://" + testFile
+		mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+		testURI := utils.NormalizeURI(testFile)
 
 		expectedWorkspaceEdit := protocol.WorkspaceEdit{
 			Changes: map[protocol.DocumentUri][]protocol.TextEdit{
@@ -611,12 +616,12 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient := &mocks.MockLanguageClient{}
 		ctx := context.Background()
 		mockClient.On("Context").Return(ctx)
-		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-		testURI := "file://" + testFile
+		mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+		testURI := utils.NormalizeURI(testFile)
 
 		mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
 		// Simulate rename failure
@@ -636,12 +641,12 @@ func TestRenameSymbol(t *testing.T) {
 		mockClient := &mocks.MockLanguageClient{}
 		ctx := context.Background()
 		mockClient.On("Context").Return(ctx)
-		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-		mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+		mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-		testURI := "file://" + testFile
+		mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+		testURI := utils.NormalizeURI(testFile)
 
 		mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
 		// Return nil result but no error (valid scenario)
@@ -660,16 +665,17 @@ func TestRenameSymbol(t *testing.T) {
 		bridge.clients["gopls"] = mockClient
 
 		testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
+		normalized := utils.NormalizeURI(testFile)
 
 		// Test with various URI formats
 		testCases := []string{
-			testFile,             // Regular path
-			"file://" + testFile, // Already normalized
+			testFile,    // Regular path
+			normalized,  // Already normalized
 		}
 
 		expectedWorkspaceEdit := protocol.WorkspaceEdit{
 			Changes: map[protocol.DocumentUri][]protocol.TextEdit{
-				protocol.DocumentUri("file://" + testFile): {
+				protocol.DocumentUri(normalized): {
 					{
 						Range: protocol.Range{
 							Start: protocol.Position{Line: 2, Character: 5},
@@ -689,10 +695,10 @@ func TestRenameSymbol(t *testing.T) {
 
 				ctx := context.Background()
 				mockClient.On("Context").Return(ctx)
-				mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-				mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+				mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
+				mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
 				mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
-				mockClient.On("Rename", "file://"+testFile, uint32(2), uint32(7), "newMain").Return(&expectedWorkspaceEdit, nil)
+				mockClient.On("Rename", normalized, uint32(2), uint32(7), "newMain").Return(&expectedWorkspaceEdit, nil)
 
 				result, err := bridge.RenameSymbol(uriInput, 2, 7, "newMain", false)
 
@@ -725,8 +731,7 @@ func TestRenameSymbol(t *testing.T) {
 					mockClient := &mocks.MockLanguageClient{}
 					ctx := context.Background()
 					mockClient.On("Context").Return(ctx)
-					mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-					mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+					mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 					// Use the real server name for this language
 					var serverName types.LanguageServer
 					switch tc.language {
@@ -742,7 +747,8 @@ func TestRenameSymbol(t *testing.T) {
 					bridge.clients[serverName] = mockClient
 
 					testFile := createTempFile(t, tc.filename, tc.content)
-					testURI := "file://" + testFile
+					mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+					testURI := utils.NormalizeURI(testFile)
 
 					expectedWorkspaceEdit := protocol.WorkspaceEdit{
 						Changes: map[protocol.DocumentUri][]protocol.TextEdit{
@@ -787,13 +793,13 @@ func TestFindImplementations(t *testing.T) {
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 
 	bridge.clients["gopls"] = mockClient
 
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-	testURI := "file://" + testFile
+	mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+	testURI := utils.NormalizeURI(testFile)
 
 	expectedImpls := []protocol.Location{
 		{
@@ -821,10 +827,10 @@ func TestPrepareCallHierarchy(t *testing.T) {
 	mockClient := &mocks.MockLanguageClient{}
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 	bridge.clients["gopls"] = mockClient
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
-	testURI := "file://" + testFile
+	testURI := utils.NormalizeURI(testFile)
 	expectedItems := []protocol.CallHierarchyItem{
 		{
 			Name: "main",
@@ -888,11 +894,12 @@ func TestIncomingOutgoingCalls(t *testing.T) {
 func TestGetClientForLanguageInterface(t *testing.T) {
 	bridge := createTestBridge([]string{"/"})
 	mockClient := &mocks.MockLanguageClient{}
+	tmp := t.TempDir()
 
 	ctx := context.Background()
 	mockClient.On("Context").Return(ctx)
-	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
-	mockClient.On("ProjectRoots").Return([]string{"/tmp"})
+	mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
+	mockClient.On("ProjectRoots").Return([]string{tmp})
 
 	bridge.clients["gopls"] = mockClient
 
@@ -1376,7 +1383,7 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				b.clients["gopls"] = mockClient
 
 				// Set up mock expectations
-				mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
+				mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 				mockClient.On("CodeActions", tt.uri, tt.line, tt.character, tt.endLine, tt.endCharacter).Return(tt.mockCodeActions, tt.mockError)
 				ctx := context.Background()
 				mockClient.On("Context").Return(ctx)
@@ -1770,7 +1777,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					b.clients[serverName] = mockClient
 
 					// Set up mock expectations
-					mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3})
+					mockClient.On("GetMetrics").Return(&lsp.ClientMetrics{Status: 3, Connected: true})
 					ctx := context.Background()
 					mockClient.On("Context").Return(ctx)
 
@@ -1814,80 +1821,68 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 // Tests for bridge utility functions with 0% coverage
 
 func TestIsAllowedDirectory(t *testing.T) {
-	tests := []struct {
-		name          string
-		allowedDirs   []string
-		testPath      string
-		expectAllowed bool
-		expectError   string
-	}{
-		{
-			name:          "allowed directory exact match",
-			allowedDirs:   []string{"/home/user/project"},
-			testPath:      "/home/user/project",
-			expectAllowed: true,
-		},
-		{
-			name:          "allowed subdirectory",
-			allowedDirs:   []string{"/home/user/project"},
-			testPath:      "/home/user/project/src",
-			expectAllowed: true,
-		},
-		{
-			name:          "disallowed directory",
-			allowedDirs:   []string{"/home/user/project"},
-			testPath:      "/home/user/other",
-			expectAllowed: false,
-			expectError:   "file path is not allowed",
-		},
-		{
-			name:          "path traversal attempt",
-			allowedDirs:   []string{"/home/user/project"},
-			testPath:      "/home/user/project/../other",
-			expectAllowed: false,
-			expectError:   "file path is not allowed",
-		},
-		{
-			name:          "multiple allowed directories - first match",
-			allowedDirs:   []string{"/home/user/project1", "/home/user/project2"},
-			testPath:      "/home/user/project1/file.go",
-			expectAllowed: true,
-		},
-		{
-			name:          "multiple allowed directories - second match",
-			allowedDirs:   []string{"/home/user/project1", "/home/user/project2"},
-			testPath:      "/home/user/project2/file.go",
-			expectAllowed: true,
-		},
-		{
-			name:          "relative path outside allowed dirs",
-			allowedDirs:   []string{"/home/user/project"},
-			testPath:      "../../../etc/passwd",
-			expectAllowed: false, // Should be blocked as it goes outside allowed dirs
-			expectError:   "file path is not allowed",
-		},
-	}
+	base := t.TempDir()
+	project := filepath.Join(base, "project")
+	project1 := filepath.Join(base, "project1")
+	project2 := filepath.Join(base, "project2")
+	other := filepath.Join(base, "other")
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			bridge := createTestBridge(tt.allowedDirs)
+	t.Run("allowed directory exact match", func(t *testing.T) {
+		bridge := createTestBridge([]string{project})
+		result, err := bridge.IsAllowedDirectory(project)
+		require.NoError(t, err)
+		assert.True(t, filepath.IsAbs(result))
+	})
 
-			result, err := bridge.IsAllowedDirectory(tt.testPath)
+	t.Run("allowed subdirectory", func(t *testing.T) {
+		bridge := createTestBridge([]string{project})
+		result, err := bridge.IsAllowedDirectory(filepath.Join(project, "src"))
+		require.NoError(t, err)
+		assert.True(t, filepath.IsAbs(result))
+	})
 
-			if tt.expectAllowed {
-				require.NoError(t, err, "Expected path to be allowed")
-				assert.NotEmpty(t, result, "Expected non-empty absolute path")
-				// Result should be an absolute path
-				assert.True(t, filepath.IsAbs(result), "Result should be absolute path")
-			} else {
-				require.Error(t, err, "Expected path to be disallowed")
-				if tt.expectError != "" {
-					assert.Contains(t, err.Error(), tt.expectError)
-				}
-				assert.Empty(t, result, "Result should be empty on error")
-			}
-		})
-	}
+	t.Run("disallowed directory", func(t *testing.T) {
+		bridge := createTestBridge([]string{project})
+		result, err := bridge.IsAllowedDirectory(other)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file path is not allowed")
+		assert.Empty(t, result)
+	})
+
+	t.Run("path traversal attempt", func(t *testing.T) {
+		bridge := createTestBridge([]string{project})
+		result, err := bridge.IsAllowedDirectory(filepath.Join(project, "..", "other"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file path is not allowed")
+		assert.Empty(t, result)
+	})
+
+	t.Run("multiple allowed directories - first match", func(t *testing.T) {
+		bridge := createTestBridge([]string{project1, project2})
+		result, err := bridge.IsAllowedDirectory(filepath.Join(project1, "file.go"))
+		require.NoError(t, err)
+		assert.True(t, filepath.IsAbs(result))
+	})
+
+	t.Run("multiple allowed directories - second match", func(t *testing.T) {
+		bridge := createTestBridge([]string{project1, project2})
+		result, err := bridge.IsAllowedDirectory(filepath.Join(project2, "file.go"))
+		require.NoError(t, err)
+		assert.True(t, filepath.IsAbs(result))
+	})
+
+	t.Run("relative path outside allowed dirs (deterministic via chdir)", func(t *testing.T) {
+		oldWD, err := os.Getwd()
+		require.NoError(t, err)
+		require.NoError(t, os.Chdir(project))
+		t.Cleanup(func() { _ = os.Chdir(oldWD) })
+
+		bridge := createTestBridge([]string{project})
+		result, err := bridge.IsAllowedDirectory(filepath.Join("..", "other"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "file path is not allowed")
+		assert.Empty(t, result)
+	})
 }
 
 func TestAllowedDirectories(t *testing.T) {

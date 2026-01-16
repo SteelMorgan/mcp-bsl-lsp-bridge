@@ -24,7 +24,9 @@ func RegisterWorkspaceDiagnosticsTool(mcpServer ToolServer, bridge interfaces.Br
 
 func WorkspaceDiagnosticsTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("workspace_diagnostics",
-			mcp.WithDescription(`Analyze entire workspace for errors, warnings, and code issues across all languages. CRITICAL before making changes - prevents issues by identifying problems across the entire project simultaneously.
+			mcp.WithDescription(`Analyze entire workspace for errors, warnings, and code issues across all languages.
+
+WARNING: On large projects this can be VERY heavy (slow + huge output). Use only when truly necessary; prefer document_diagnostics for a specific file when possible.
 
 USAGE:
 - Full scan: workspace_uri="file://project/root"
@@ -54,6 +56,10 @@ OUTPUT: Categorized diagnostics by language with error explanations and suggesti
 			identifier := "mcp-lsp-bridge-workspace-diagnostics"
 			if id, err := request.RequireString("identifier"); err == nil {
 				identifier = id
+			}
+
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
 			}
 
 			// Detect project languages

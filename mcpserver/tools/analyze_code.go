@@ -44,6 +44,10 @@ func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandle
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			// Infer language from the file URI
 			language, err := bridge.InferLanguage(uri)
 			if err != nil {

@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"rockerboo/mcp-lsp-bridge/bridge"
 	"rockerboo/mcp-lsp-bridge/directories"
@@ -187,6 +188,10 @@ func main() {
 		}
 	}
 
+	// Allow runtime tuning from outside (e.g. via Cursor MCP env vars)
+	// without editing config files inside the container.
+	lsp.ApplyEnvOverrides(config)
+
 	// Override with command-line flags if provided
 	if logPath != "" {
 		logConfig.LogPath = logPath
@@ -207,14 +212,29 @@ func main() {
 	defer logger.Close()
 
 	logger.Info("Starting MCP-LSP Bridge...")
+	
+	// Debug: log to a file that persists between calls
+	debugFile, _ := os.OpenFile("/tmp/mcp-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if debugFile != nil {
+		fmt.Fprintf(debugFile, "=== MCP-LSP Bridge started at %s ===\n", time.Now().Format(time.RFC3339))
+		defer debugFile.Close()
+	}
 
 	cwd, err := os.Getwd()
 	if err != nil {
 		panic("Failed to get current working directory: " + err.Error())
 	}
 
+	// In container mode we must anchor workspace operations to the mounted workspace root,
+	// not to the process CWD (often /home/user).
+	workspaceRoot := os.Getenv("WORKSPACE_ROOT")
+	allowedDirs := []string{cwd}
+	if workspaceRoot != "" {
+		allowedDirs = []string{workspaceRoot}
+	}
+
 	// Create and initialize the bridge
-	bridgeInstance := bridge.NewMCPLSPBridge(config, []string{cwd})
+	bridgeInstance := bridge.NewMCPLSPBridge(config, allowedDirs)
 
 	// Setup MCP server with bridge
 	mcpServer := mcpserver.SetupMCPServer(bridgeInstance)
@@ -222,10 +242,22 @@ func main() {
 	// Store the server reference in the bridge
 	bridgeInstance.SetServer(mcpServer)
 
+	// Start auto-connect + warm-up SYNCHRONOUSLY before MCP server starts.
+	// This ensures LSP connections are fully established before stdin processing begins.
+	// Critical for docker exec scenarios where stdin closes immediately after sending a request.
+	logger.Info("Connecting to language servers...")
+	if err := bridgeInstance.SyncAutoConnect(); err != nil {
+		logger.Warn("Some language servers failed to connect: " + err.Error())
+	}
+	logger.Info("Language server connections ready.")
+
 	// Start MCP server
 	logger.Info("Starting MCP server...")
+	fmt.Fprintln(os.Stderr, "DEBUG MAIN: About to call ServeStdio...")
 
 	if err := server.ServeStdio(mcpServer); err != nil {
+		fmt.Fprintf(os.Stderr, "DEBUG MAIN: ServeStdio returned error: %v\n", err)
 		logger.Error("MCP server error: " + err.Error())
 	}
+	fmt.Fprintln(os.Stderr, "DEBUG MAIN: ServeStdio returned, main() exiting...")
 }

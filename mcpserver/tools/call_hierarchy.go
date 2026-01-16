@@ -7,7 +7,6 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
-	"rockerboo/mcp-lsp-bridge/utils"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -60,6 +59,10 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 				}
 			}
 
+			if result, ok := CheckReadyOrReturn(bridge); !ok {
+				return result, nil
+			}
+
 			// Validate parameters
 			lineUint32, err := safeUint32(line)
 			if err != nil {
@@ -70,11 +73,11 @@ func CallHierarchyTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
 			}
 
-			// Normalize URI to ensure proper file:// scheme
-			normalizedURI := utils.NormalizeURI(uri)
+			// Normalize URI - handles both host paths and container paths for Docker mode
+			normalizedURI := bridge.NormalizeURIForLSP(uri)
 
-			// Infer language from the specific file URI
-			language, err := bridge.InferLanguage(normalizedURI)
+			// Infer language from the original URI (for file extension detection)
+			language, err := bridge.InferLanguage(uri)
 			if err != nil {
 				logger.Error("call_hierarchy: language inference failed", err)
 				return mcp.NewToolResultError(fmt.Sprintf("Failed to infer language from URI: %v", err)), nil

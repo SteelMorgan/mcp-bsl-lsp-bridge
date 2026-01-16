@@ -1,10 +1,11 @@
 package bridge
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -33,7 +34,7 @@ func NewMCPLSPBridge(config types.LSPServerConfigProvider, allowedDirectories []
 	if err != nil {
 		logger.Warn(fmt.Sprintf("Path mapper initialization failed, using local mode: %v", err))
 	} else if pathMapper.IsEnabled() {
-		logger.Info(fmt.Sprintf("Docker path mapping enabled: %s -> %s", 
+		logger.Info(fmt.Sprintf("Docker path mapping enabled: %s -> %s",
 			pathMapper.HostRoot(), pathMapper.ContainerRoot()))
 	}
 	bridge.pathMapper = pathMapper
@@ -55,6 +56,43 @@ func DefaultConnectionConfig() ConnectionAttemptConfig {
 		RetryDelay:   2 * time.Second,
 		TotalTimeout: 30 * time.Second,
 	}
+}
+
+// NormalizeURIForLSP converts an input (file URI or raw local path) into the URI
+// format expected by the connected language server. If Docker path mapping is enabled,
+// it converts host paths to container paths.
+func (b *MCPLSPBridge) NormalizeURIForLSP(uri string) string {
+	// Check if it's a relative path (not a URI and not an absolute path)
+	// Note: isWindowsAbsPath handles Windows paths like D:\... or D:/... on Linux
+	isRelative := !strings.Contains(uri, "://") &&
+		!strings.HasPrefix(uri, "/") &&
+		!utils.IsWindowsAbsPath(uri)
+
+	// If bridge runs in container mode and caller passes a relative path,
+	// resolve it under the container root (/projects) instead of process CWD (/home/user).
+	if b.HasPathMapper() && b.pathMapper != nil && isRelative {
+		uri = path.Join(b.pathMapper.ContainerRoot(), strings.ReplaceAll(uri, "\\", "/"))
+	}
+
+	normalized := utils.NormalizeURI(uri)
+	if !b.HasPathMapper() || b.pathMapper == nil {
+		return normalized
+	}
+
+	// If it's already a container path, do not remap.
+	p := utils.URIToFilePath(normalized)
+	slash := strings.ReplaceAll(p, "\\", "/")
+	cr := strings.TrimSuffix(b.pathMapper.ContainerRoot(), "/")
+	if slash == cr || strings.HasPrefix(slash, cr+"/") {
+		return utils.NormalizeURI(slash)
+	}
+
+	// Otherwise try to map host -> container.
+	if mappedPath, err := b.pathMapper.HostToContainer(p); err == nil {
+		return utils.NormalizeURI(mappedPath)
+	}
+
+	return normalized
 }
 
 func (b *MCPLSPBridge) IsAllowedDirectory(path string) (string, error) {
@@ -93,18 +131,64 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 			break
 		}
 
-		// Create language client using the factory
-		var client *lsp.LanguageClient
-
+		// Create language client based on mode (stdio or tcp)
+		var client types.LanguageClientInterface
 		var err error
 
-		client, err = lsp.NewLanguageClient(serverConfig.GetCommand(), serverConfig.GetArgs()...)
-		if err != nil {
-			lastErr = fmt.Errorf("failed to create language client on attempt %d: %w", attempt+1, err)
-			continue
+		mode := serverConfig.GetMode()
+		logger.Debug(fmt.Sprintf("validateAndConnectClient: mode=%s host=%s port=%d", 
+			mode, serverConfig.GetHost(), serverConfig.GetPort()))
+
+		switch mode {
+		case "tcp":
+			// TCP mode - connect to lsp-proxy daemon
+			tcpClient, tcpErr := lsp.NewTCPLanguageClient(serverConfig.GetHost(), serverConfig.GetPort())
+			if tcpErr != nil {
+				lastErr = fmt.Errorf("failed to create TCP client on attempt %d: %w", attempt+1, tcpErr)
+				continue
+			}
+			client, err = tcpClient.ConnectTCP()
+
+		case "websocket":
+			// WebSocket mode - connect to WebSocket LSP server
+			wsClient, wsErr := lsp.NewWebSocketLanguageClient(serverConfig.GetHost(), serverConfig.GetPort())
+			if wsErr != nil {
+				lastErr = fmt.Errorf("failed to create WebSocket client on attempt %d: %w", attempt+1, wsErr)
+				continue
+			}
+			client, err = wsClient.ConnectWebSocket()
+
+		case "session":
+			// Session mode - connect to LSP Session Manager
+			// Session Manager maintains a persistent LSP session, so we don't need to initialize
+			sessionAdapter, sessionErr := lsp.NewSessionAdapter(serverConfig.GetHost(), serverConfig.GetPort())
+			if sessionErr != nil {
+				lastErr = fmt.Errorf("failed to create session adapter on attempt %d: %w", attempt+1, sessionErr)
+				continue
+			}
+			adapter, connectErr := sessionAdapter.Connect()
+			if connectErr != nil {
+				lastErr = fmt.Errorf("failed to connect to Session Manager on attempt %d: %w", attempt+1, connectErr)
+				continue
+			}
+			// Session Manager is already initialized - skip the initialize phase below
+			adapter.SetProjectRoots([]string{dir})
+			b.mu.Lock()
+			b.clients[types.LanguageServer(language)] = adapter
+			b.mu.Unlock()
+			logger.Info("Connected to LSP Session Manager for language: " + language)
+			return adapter, nil
+
+		default:
+			// Stdio mode (default) - launch LSP server process
+			stdioClient, stdioErr := lsp.NewLanguageClient(serverConfig.GetCommand(), serverConfig.GetArgs()...)
+			if stdioErr != nil {
+				lastErr = fmt.Errorf("failed to create language client on attempt %d: %w", attempt+1, stdioErr)
+				continue
+			}
+			client, err = stdioClient.Connect()
 		}
 
-		_, err = client.Connect()
 		if err != nil {
 			lastErr = fmt.Errorf("failed to connect to the LSP on attempt %d: %w", attempt+1, err)
 
@@ -113,18 +197,19 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 			continue
 		}
 
-		rootPath := "file://" + absPath
+		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: After connect, client=%p err=%v\n", client, err)
+		
+		hostRootURI := utils.NormalizeURI(absPath)
+		rootPath := hostRootURI
+		if b.HasPathMapper() {
+			if mapped, mapErr := b.pathMapper.NormalizeURI(hostRootURI); mapErr == nil {
+				rootPath = mapped
+			}
+		}
 		// root_uri := protocol.DocumentUri(root_path)
 
+		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: Root path for LSP: %s\n", rootPath)
 		logger.Debug("validateAndConnectClient: Root path for LSP: " + rootPath)
-		// Process IDs are typically small positive integers, safe to convert
-		// But we'll add bounds checking for completeness
-		pid := os.Getpid()
-		if pid < 0 || pid > math.MaxInt32 {
-			return nil, fmt.Errorf("process ID out of range: %d", pid)
-		}
-		process_id := int32(pid)
-
 		// Prepare initialization parameters
 		workspaceFolders := []protocol.WorkspaceFolder{
 			{
@@ -135,19 +220,30 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 
 		client.SetProjectRoots([]string{dir})
 
+		// IMPORTANT: ProcessId is set to nil to prevent the LSP server from monitoring
+		// the parent process. In docker exec scenarios, mcp-lsp-bridge is a short-lived
+		// process and BSL LS would shut down when it exits if it was monitoring the PID.
 		params := protocol.InitializeParams{
-			ProcessId: &process_id,
+			ProcessId: nil,
 			ClientInfo: &protocol.ClientInfo{
 				Name:    "MCP-LSP Bridge",
 				Version: "1.0.0",
 			},
 			// RootUri:          &root_uri,
 			WorkspaceFolders: &workspaceFolders,
-			// Capabilities: protocol.ClientCapabilities{
-			// 	TextDocument: &protocol.TextDocumentClientCapabilities{
-			// 		SignatureHelp: &protocol.SignatureHelpClientCapabilities{},
-			// 	},
-			// },
+			Capabilities: protocol.ClientCapabilities{
+				// Enable features that some servers gate behind client capabilities.
+				TextDocument: &protocol.TextDocumentClientCapabilities{
+					CallHierarchy: &protocol.CallHierarchyClientCapabilities{
+						DynamicRegistration: true,
+					},
+				},
+				// Critical for server-initiated progress:
+				// allows `window/workDoneProgress/create` + `$/progress`.
+				Window: &protocol.WindowClientCapabilities{
+					WorkDoneProgress: true,
+				},
+			},
 		}
 
 		// Apply any initialization options from the configuration
@@ -158,11 +254,14 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 		// Check connection status before initialize
 		metrics := client.GetMetrics()
 		logger.Debug(fmt.Sprintf("STATUS: Before Initialize - Client connected: %v, ctx.Err(): %v", metrics.IsConnected(), client.Context().Err()))
+		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: Before Initialize - connected=%v ctxErr=%v\n", metrics.IsConnected(), client.Context().Err())
 
 		logger.Debug(fmt.Sprintf("STATUS: client %+v", client))
+		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: Calling client.Initialize...\n")
 
 		// Send initialize request
 		result, err := client.Initialize(params)
+		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: Initialize returned err=%v\n", err)
 		if err != nil {
 			lastErr = fmt.Errorf("initialize request failed on attempt %d: %w", attempt+1, err)
 			logger.Error(lastErr)
@@ -271,11 +370,27 @@ func (b *MCPLSPBridge) GetClientForLanguage(language string) (types.LanguageClie
 	if existingClient, exists := b.clients[server]; exists {
 		// Check if client context is still valid (not cancelled)
 		if existingClient.Context().Err() == nil {
-			// Reset status to connected if it was in error state but context is still valid
 			metrics := existingClient.GetMetrics()
 			logger.Debug(fmt.Sprintf("GetClientForLanguage: Existing client for %s, metrics: %+v", language, metrics))
 
-			return existingClient, nil
+			// If client is not connected (or is in error/disconnected state), recreate it.
+			// This prevents one-off request timeouts from permanently poisoning readiness checks.
+			statusStr := lsp.ClientStatus(metrics.GetStatus()).String()
+			lastErr := metrics.GetLastError()
+			connErr := strings.Contains(lastErr, "connection is closed") ||
+				strings.Contains(lastErr, "already disconnected") ||
+				strings.Contains(lastErr, "EOF")
+			if !metrics.IsConnected() || statusStr == "disconnected" || connErr {
+				logger.Warn(fmt.Sprintf("GetClientForLanguage: recreating unhealthy client for %s (connected=%v status=%s last_error=%s)",
+					language, metrics.IsConnected(), statusStr, metrics.GetLastError()))
+
+				if err := existingClient.Close(); err != nil {
+					return nil, err
+				}
+				delete(b.clients, server)
+			} else {
+				return existingClient, nil
+			}
 		}
 		// Client context is cancelled, remove it and create a new one
 		logger.Warn("Removing client with cancelled context for language " + language)
@@ -558,7 +673,7 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (
 	logger.Debug(fmt.Sprintf("GetHoverInformation: Starting hover request for URI: %s, Line: %d, Character: %d", uri, line, character))
 
 	// Normalize URI to ensure proper file:// scheme
-	normalizedURI := utils.NormalizeURI(uri)
+	normalizedURI := b.NormalizeURIForLSP(uri)
 
 	// Infer language from URI (use original URI for file extension detection)
 	language, err := b.InferLanguage(uri)
@@ -594,9 +709,29 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (
 // ensureDocumentOpen sends a textDocument/didOpen notification to the language server
 // This is often required before other document operations can be performed
 func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, uri, language string) error {
-	// Read the file content
-	// Remove file:// prefix to get the actual file path
-	filePath := strings.TrimPrefix(uri, "file://")
+	// Read the file content. Accept file URI or raw path.
+	// If running in container mode, map host paths to container paths before any fs operations.
+	filePath := utils.URIToFilePath(uri)
+	if b.HasPathMapper() && b.pathMapper != nil {
+		// Normalize path separators for cross-platform compatibility
+		normalizedPath := strings.ReplaceAll(filePath, "\\", "/")
+		// Check if path is relative (not starting with / and not a Windows absolute path like D:/)
+		isRelative := !strings.HasPrefix(normalizedPath, "/") && !utils.IsWindowsAbsPath(normalizedPath)
+		// Relative paths are treated as container-root relative.
+		if isRelative {
+			filePath = path.Join(b.pathMapper.ContainerRoot(), normalizedPath)
+		}
+
+		slash := strings.ReplaceAll(filePath, "\\", "/")
+		cr := strings.TrimSuffix(b.pathMapper.ContainerRoot(), "/")
+		if !(slash == cr || strings.HasPrefix(slash, cr+"/")) {
+			mapped, mapErr := b.pathMapper.HostToContainer(filePath)
+			if mapErr != nil {
+				return fmt.Errorf("path mapping failed: %w", mapErr)
+			}
+			filePath = mapped
+		}
+	}
 
 	projectRoots := client.ProjectRoots()
 
@@ -609,22 +744,32 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, 
 		return fmt.Errorf("invalid file path: %w", err)
 	}
 
-	for _, allowedBaseDir := range projectRoots {
-		// Validate against allowed base directory
-		if !security.IsWithinAllowedDirectory(absPath, allowedBaseDir) {
+	// Validate against allowed project roots (ANY match is allowed).
+	if len(projectRoots) > 0 {
+		allowed := false
+		for _, allowedBaseDir := range projectRoots {
+			if security.IsWithinAllowedDirectory(absPath, allowedBaseDir) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
 			return errors.New("access denied: path outside allowed directory")
 		}
 	}
 
-	content, err := os.ReadFile(filePath)
+	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
 	// Send textDocument/didOpen notification
+	// absPath is already in the server filesystem namespace (container or local).
+	serverURI := utils.NormalizeURI(absPath)
+
 	didOpenParams := protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
-			Uri:        protocol.DocumentUri(uri),
+			Uri:        protocol.DocumentUri(serverURI),
 			LanguageId: protocol.LanguageKind(language),
 			Version:    1,
 			Text:       string(content),
@@ -644,7 +789,7 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, 
 // GetDocumentSymbols gets all symbols in a document
 func (b *MCPLSPBridge) GetDocumentSymbols(uri string) ([]protocol.DocumentSymbol, error) {
 	// Normalize URI to ensure proper file:// scheme
-	normalizedURI := utils.NormalizeURI(uri)
+	normalizedURI := b.NormalizeURIForLSP(uri)
 	logger.Debug(fmt.Sprintf("GetDocumentSymbols: Starting request for URI: %s -> %s", uri, normalizedURI))
 
 	// Infer language from URI
@@ -698,7 +843,7 @@ func (b *MCPLSPBridge) GetServerConfig(language string) (types.LanguageServerCon
 // GetSignatureHelp gets signature help for a function at a specific position
 func (b *MCPLSPBridge) GetSignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
 	// Normalize URI
-	normalizedURI := utils.NormalizeURI(uri)
+	normalizedURI := b.NormalizeURIForLSP(uri)
 
 	// Infer language from URI
 	language, err := b.InferLanguage(normalizedURI)
@@ -797,10 +942,192 @@ func (b *MCPLSPBridge) FormatDocument(uri string, tabSize uint32, insertSpaces b
 	return result, nil
 }
 
+// RangeFormatting formats a specific range in a document
+func (b *MCPLSPBridge) RangeFormatting(uri string, startLine, startCharacter, endLine, endCharacter uint32, tabSize uint32, insertSpaces bool) ([]protocol.TextEdit, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("RangeFormatting: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	edits, err := client.RangeFormatting(normalizedURI, startLine, startCharacter, endLine, endCharacter, tabSize, insertSpaces)
+	if err != nil {
+		return nil, fmt.Errorf("range formatting request failed: %w", err)
+	}
+
+	return edits, nil
+}
+
+// PrepareRename checks if rename is valid at a position and returns the rename range.
+func (b *MCPLSPBridge) PrepareRename(uri string, line, character uint32) (*protocol.PrepareRenameResult, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("PrepareRename: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	result, err := client.PrepareRename(normalizedURI, line, character)
+	if err != nil {
+		return nil, fmt.Errorf("prepare rename request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+// FoldingRange returns folding ranges for a document.
+func (b *MCPLSPBridge) FoldingRange(uri string) ([]protocol.FoldingRange, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("FoldingRange: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	ranges, err := client.FoldingRange(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("folding range request failed: %w", err)
+	}
+
+	return ranges, nil
+}
+
+// SelectionRange returns selection ranges for positions in a document.
+func (b *MCPLSPBridge) SelectionRange(uri string, positions []protocol.Position) ([]protocol.SelectionRange, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("SelectionRange: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	ranges, err := client.SelectionRange(normalizedURI, positions)
+	if err != nil {
+		return nil, fmt.Errorf("selection range request failed: %w", err)
+	}
+
+	return ranges, nil
+}
+
+// DocumentLink returns document links for a document.
+func (b *MCPLSPBridge) DocumentLink(uri string) ([]protocol.DocumentLink, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("DocumentLink: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	links, err := client.DocumentLink(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("document link request failed: %w", err)
+	}
+
+	return links, nil
+}
+
+// DocumentColor returns document color information.
+func (b *MCPLSPBridge) DocumentColor(uri string) ([]protocol.ColorInformation, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("DocumentColor: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	colors, err := client.DocumentColor(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("document color request failed: %w", err)
+	}
+
+	return colors, nil
+}
+
+// ColorPresentation returns color presentation suggestions for a color range.
+func (b *MCPLSPBridge) ColorPresentation(uri string, color protocol.Color, rng protocol.Range) ([]protocol.ColorPresentation, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("ColorPresentation: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	presentations, err := client.ColorPresentation(normalizedURI, color, rng)
+	if err != nil {
+		return nil, fmt.Errorf("color presentation request failed: %w", err)
+	}
+
+	return presentations, nil
+}
+
 // ApplyTextEdits applies text edits to a file
 func (b *MCPLSPBridge) ApplyTextEdits(uri string, edits []protocol.TextEdit) error {
 	// Convert URI to file path
-	filePath := strings.TrimPrefix(uri, "file://")
+	filePath := utils.URIToFilePath(uri)
 	filePath, err := b.IsAllowedDirectory(filePath)
 	// Check if file path is allowed
 	if err != nil {
@@ -909,7 +1236,7 @@ func applyTextEditsToContent(content string, edits []protocol.TextEdit) (string,
 // RenameSymbol renames a symbol with optional preview
 func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName string, preview bool) (*protocol.WorkspaceEdit, error) {
 	// Normalize URI to ensure proper file:// scheme
-	normalizedURI := utils.NormalizeURI(uri)
+	normalizedURI := b.NormalizeURIForLSP(uri)
 	logger.Debug(fmt.Sprintf("RenameSymbol: Starting rename request for URI: %s -> %s, Line: %d, Character: %d, NewName: %s", uri, normalizedURI, line, character, newName))
 
 	// Infer language from URI
@@ -940,6 +1267,53 @@ func (b *MCPLSPBridge) RenameSymbol(uri string, line, character uint32, newName 
 	}
 
 	return result, nil
+}
+
+// ExecuteCommand sends workspace/executeCommand to a language server.
+func (b *MCPLSPBridge) ExecuteCommand(language string, command string, arguments []any) (json.RawMessage, error) {
+	if language == "" {
+		return nil, fmt.Errorf("language is required for executeCommand")
+	}
+
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	result, err := client.ExecuteCommand(command, arguments)
+	if err != nil {
+		return nil, fmt.Errorf("execute command failed: %w", err)
+	}
+
+	return result, nil
+}
+
+// DidChangeWatchedFiles sends workspace/didChangeWatchedFiles notification.
+func (b *MCPLSPBridge) DidChangeWatchedFiles(language string, changes []protocol.FileEvent) error {
+	if language == "" {
+		return fmt.Errorf("language is required for didChangeWatchedFiles")
+	}
+
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	return client.DidChangeWatchedFiles(changes)
+}
+
+// DidChangeConfiguration sends workspace/didChangeConfiguration notification.
+func (b *MCPLSPBridge) DidChangeConfiguration(language string, settings any) error {
+	if language == "" {
+		return fmt.Errorf("language is required for didChangeConfiguration")
+	}
+
+	client, err := b.GetClientForLanguage(language)
+	if err != nil {
+		return fmt.Errorf("failed to get client for language %s: %w", language, err)
+	}
+
+	return client.DidChangeConfiguration(settings)
 }
 
 // ApplyWorkspaceEdit applies a workspace edit to multiple files
@@ -983,7 +1357,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 				}
 			} else if createFile, ok := docChange.Value.(protocol.CreateFile); ok {
 				logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Found CreateFile for URI: %s", createFile.Uri))
-				filePath := strings.TrimPrefix(string(createFile.Uri), "file://")
+				filePath := utils.URIToFilePath(string(createFile.Uri))
 				filePath, err := b.IsAllowedDirectory(filePath)
 				if err != nil {
 					return fmt.Errorf("failed to create file %s: %w", filePath, err)
@@ -996,8 +1370,8 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 				logger.Debug("ApplyWorkspaceEdit: Created file " + filePath)
 			} else if renameFile, ok := docChange.Value.(protocol.RenameFile); ok {
 				logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Found RenameFile from %s to %s", renameFile.OldUri, renameFile.NewUri))
-				oldPath := strings.TrimPrefix(string(renameFile.OldUri), "file://")
-				newPath := strings.TrimPrefix(string(renameFile.NewUri), "file://")
+				oldPath := utils.URIToFilePath(string(renameFile.OldUri))
+				newPath := utils.URIToFilePath(string(renameFile.NewUri))
 
 				oldPath, err := b.IsAllowedDirectory(oldPath)
 				if err != nil {
@@ -1015,7 +1389,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 				logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Renamed file from %s to %s", oldPath, newPath))
 			} else if deleteFile, ok := docChange.Value.(protocol.DeleteFile); ok {
 				logger.Debug(fmt.Sprintf("ApplyWorkspaceEdit: Found DeleteFile for URI: %s", deleteFile.Uri))
-				filePath := strings.TrimPrefix(string(deleteFile.Uri), "file://")
+				filePath := utils.URIToFilePath(string(deleteFile.Uri))
 				filePath, err := b.IsAllowedDirectory(filePath)
 				if err != nil {
 					return fmt.Errorf("failed to delete file %s: %w", filePath, err)
@@ -1047,7 +1421,7 @@ func (b *MCPLSPBridge) ApplyWorkspaceEdit(workspaceEdit *protocol.WorkspaceEdit)
 // FindImplementations finds implementations of a symbol
 func (b *MCPLSPBridge) FindImplementations(uri string, line, character uint32) ([]protocol.Location, error) {
 	// Normalize URI
-	normalizedURI := utils.NormalizeURI(uri)
+	normalizedURI := b.NormalizeURIForLSP(uri)
 
 	// Infer language from URI
 	language, err := b.InferLanguage(normalizedURI)
@@ -1170,8 +1544,10 @@ func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLin
 
 // PrepareCallHierarchy prepares call hierarchy items
 func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
 	// Infer language from URI
-	language, err := b.InferLanguage(uri)
+	language, err := b.InferLanguage(normalizedURI)
 	if err != nil {
 		return nil, err
 	}
@@ -1182,7 +1558,10 @@ func (b *MCPLSPBridge) PrepareCallHierarchy(uri string, line, character uint32) 
 		return nil, err
 	}
 
-	result, err := client.PrepareCallHierarchy(uri, line, character)
+	// Ensure document is open before call hierarchy queries.
+	_ = b.ensureDocumentOpen(client, normalizedURI, string(*language))
+
+	result, err := client.PrepareCallHierarchy(normalizedURI, line, character)
 	if err != nil {
 		return nil, err
 	}
@@ -1270,7 +1649,7 @@ func (b *MCPLSPBridge) GetWorkspaceDiagnostics(workspaceUri string, identifier s
 // GetDocumentDiagnostics gets diagnostics for a single document using LSP 3.17+ textDocument/diagnostic method
 func (b *MCPLSPBridge) GetDocumentDiagnostics(uri string, identifier string, previousResultId string) (*protocol.DocumentDiagnosticReport, error) {
 	// Normalize URI
-	normalizedURI := utils.NormalizeURI(uri)
+	normalizedURI := b.NormalizeURIForLSP(uri)
 
 	// Determine language from file extension
 	language, err := b.InferLanguage(normalizedURI)
