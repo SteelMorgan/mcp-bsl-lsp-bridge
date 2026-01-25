@@ -80,36 +80,63 @@ func formatDocumentDiagnostics(report *protocol.DocumentDiagnosticReport, uri st
 		return "No diagnostic report available"
 	}
 
-	var result strings.Builder
-	result.WriteString("DOCUMENT DIAGNOSTICS:\n")
-	result.WriteString(fmt.Sprintf("File: %s\n", uri))
-
 	// DocumentDiagnosticReport is Or2[RelatedFullDocumentDiagnosticReport, RelatedUnchangedDocumentDiagnosticReport]
-	// Try to extract the actual diagnostics by accessing the underlying data
-	// Since Or2 is a union type, we need to handle it carefully
+	// Try to access the Value directly first
+	if report.Value != nil {
+		switch v := report.Value.(type) {
+		case protocol.RelatedFullDocumentDiagnosticReport:
+			return formatFullDiagnosticReport(&v, uri)
+		case *protocol.RelatedFullDocumentDiagnosticReport:
+			return formatFullDiagnosticReport(v, uri)
+		case protocol.RelatedUnchangedDocumentDiagnosticReport:
+			return formatUnchangedDiagnosticReport(&v, uri)
+		case *protocol.RelatedUnchangedDocumentDiagnosticReport:
+			return formatUnchangedDiagnosticReport(v, uri)
+		}
+	}
 
-	// Convert to JSON and back to extract the actual diagnostic data
+	// Fallback: Convert to JSON and back to extract the actual diagnostic data
 	reportBytes, err := json.Marshal(report)
 	if err != nil {
 		return fmt.Sprintf("Error parsing diagnostic report: %v", err)
 	}
 
-	// Try to parse as RelatedFullDocumentDiagnosticReport first
+	// First, determine the report kind by parsing as a generic map
+	var rawReport map[string]interface{}
+	if err := json.Unmarshal(reportBytes, &rawReport); err != nil {
+		return fmt.Sprintf("Error parsing diagnostic report: %v", err)
+	}
+
+	kind, _ := rawReport["kind"].(string)
+
+	// Handle "full" report (with items array, even if empty)
+	if kind == "full" {
+		var fullReport protocol.RelatedFullDocumentDiagnosticReport
+		if err := json.Unmarshal(reportBytes, &fullReport); err == nil {
+			return formatFullDiagnosticReport(&fullReport, uri)
+		}
+	}
+
+	// Handle "unchanged" report
+	if kind == "unchanged" {
+		var unchangedReport protocol.RelatedUnchangedDocumentDiagnosticReport
+		if err := json.Unmarshal(reportBytes, &unchangedReport); err == nil {
+			return formatUnchangedDiagnosticReport(&unchangedReport, uri)
+		}
+	}
+
+	// Fallback: try to parse as full report anyway (for servers that don't set kind)
 	var fullReport protocol.RelatedFullDocumentDiagnosticReport
-	if err := json.Unmarshal(reportBytes, &fullReport); err == nil && len(fullReport.Items) > 0 {
+	if err := json.Unmarshal(reportBytes, &fullReport); err == nil {
 		return formatFullDiagnosticReport(&fullReport, uri)
 	}
 
-	// Try to parse as RelatedUnchangedDocumentDiagnosticReport
-	var unchangedReport protocol.RelatedUnchangedDocumentDiagnosticReport
-	if err := json.Unmarshal(reportBytes, &unchangedReport); err == nil {
-		return formatUnchangedDiagnosticReport(&unchangedReport, uri)
-	}
-
-	// If we can't parse it, show basic info
-	result.WriteString("Report Type: Document Diagnostic Report\n")
-	result.WriteString("LSP 3.17+ document diagnostics received successfully.\n")
-	result.WriteString("Raw report data available but type parsing needs refinement.\n")
+	// If we can't parse it, show raw data for debugging
+	var result strings.Builder
+	result.WriteString("DOCUMENT DIAGNOSTICS:\n")
+	result.WriteString(fmt.Sprintf("File: %s\n", uri))
+	result.WriteString("Report Type: Unknown\n")
+	result.WriteString(fmt.Sprintf("Raw data: %s\n", string(reportBytes)))
 
 	return result.String()
 }
@@ -117,15 +144,17 @@ func formatDocumentDiagnostics(report *protocol.DocumentDiagnosticReport, uri st
 func formatFullDiagnosticReport(report *protocol.RelatedFullDocumentDiagnosticReport, uri string) string {
 	var result strings.Builder
 
-	result.WriteString("Report Type: Full Document Diagnostic Report\n")
+	result.WriteString("DOCUMENT DIAGNOSTICS:\n")
+	result.WriteString(fmt.Sprintf("File: %s\n", uri))
+	result.WriteString("Report Type: Full\n")
 	if report.ResultId != "" {
 		result.WriteString(fmt.Sprintf("Result ID: %s\n", report.ResultId))
 	}
 
-	result.WriteString(fmt.Sprintf("Diagnostics: %d\n\n", len(report.Items)))
+	result.WriteString(fmt.Sprintf("\nTotal issues: %d\n", len(report.Items)))
 
 	if len(report.Items) == 0 {
-		result.WriteString("No issues found in this document.\n")
+		result.WriteString("\n✅ No issues found - code is clean!\n")
 	} else {
 		result.WriteString("ISSUES FOUND:\n")
 		result.WriteString(strings.Repeat("=", 50) + "\n\n")

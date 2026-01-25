@@ -11,8 +11,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -25,11 +23,12 @@ type SessionClient struct {
 	host string
 	port int
 
-	mu       sync.Mutex
-	conn     net.Conn
-	reader   *bufio.Reader
-	reqID    int64
-	pending  map[int64]chan sessionResponse
+	mu      sync.Mutex
+	conn    net.Conn
+	reader  *bufio.Reader
+	reqID   int64
+	pending map[int64]chan sessionResponse
+	closed  bool // true if explicitly closed (not error)
 }
 
 type sessionResponse struct {
@@ -90,6 +89,7 @@ func (sc *SessionClient) Close() error {
 	sc.mu.Lock()
 	defer sc.mu.Unlock()
 
+	sc.closed = true
 	if sc.conn != nil {
 		return sc.conn.Close()
 	}
@@ -201,7 +201,7 @@ func (sc *SessionClient) IncomingCalls(ctx context.Context, item json.RawMessage
 	if err := json.Unmarshal(item, &itemObj); err != nil {
 		return nil, err
 	}
-	
+
 	params := map[string]interface{}{
 		"item": itemObj,
 	}
@@ -218,7 +218,7 @@ func (sc *SessionClient) OutgoingCalls(ctx context.Context, item json.RawMessage
 	if err := json.Unmarshal(item, &itemObj); err != nil {
 		return nil, err
 	}
-	
+
 	params := map[string]interface{}{
 		"item": itemObj,
 	}
@@ -348,12 +348,20 @@ func (sc *SessionClient) WorkspaceSymbol(ctx context.Context, query string) (jso
 
 // Call makes a JSON-RPC call to Session Manager
 func (sc *SessionClient) Call(ctx context.Context, method string, params interface{}, result interface{}) error {
-	fmt.Fprintf(os.Stderr, "DEBUG SessionClient.Call: method=%s\n", method)
-	
+	// Check connection and try to reconnect if needed
 	sc.mu.Lock()
+	if sc.conn == nil && !sc.closed {
+		sc.mu.Unlock()
+		if err := sc.reconnect(); err != nil {
+			return fmt.Errorf("not connected to Session Manager and reconnect failed: %w", err)
+		}
+		// Start reader goroutine after reconnect
+		go sc.readResponses()
+		sc.mu.Lock()
+	}
+
 	if sc.conn == nil {
 		sc.mu.Unlock()
-		fmt.Fprintf(os.Stderr, "DEBUG SessionClient.Call: NOT CONNECTED!\n")
 		return fmt.Errorf("not connected to Session Manager")
 	}
 
@@ -381,19 +389,24 @@ func (sc *SessionClient) Call(ctx context.Context, method string, params interfa
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "DEBUG SessionClient.Call: sending request id=%d\n", id)
-
 	// Send request (newline-delimited)
 	sc.mu.Lock()
-	_, err = sc.conn.Write(append(reqJSON, '\n'))
+	conn := sc.conn
 	sc.mu.Unlock()
 
+	if conn == nil {
+		return fmt.Errorf("connection lost before sending request")
+	}
+
+	_, err = conn.Write(append(reqJSON, '\n'))
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG SessionClient.Call: write error: %v\n", err)
+		// Mark connection as broken
+		sc.mu.Lock()
+		sc.conn = nil
+		sc.reader = nil
+		sc.mu.Unlock()
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	
-	fmt.Fprintf(os.Stderr, "DEBUG SessionClient.Call: waiting for response...\n")
 
 	// Wait for response
 	select {
@@ -412,26 +425,40 @@ func (sc *SessionClient) Call(ctx context.Context, method string, params interfa
 
 // readResponses reads responses from Session Manager
 func (sc *SessionClient) readResponses() {
-	fmt.Fprintf(os.Stderr, "DEBUG readResponses: goroutine started\n")
 	for {
 		sc.mu.Lock()
 		reader := sc.reader
+		closed := sc.closed
 		sc.mu.Unlock()
 
-		if reader == nil {
-			fmt.Fprintf(os.Stderr, "DEBUG readResponses: reader is nil, exiting\n")
+		if reader == nil || closed {
 			return
 		}
 
-		fmt.Fprintf(os.Stderr, "DEBUG readResponses: waiting for line...\n")
 		line, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "DEBUG readResponses: read error: %v\n", err)
 			logger.Error(fmt.Sprintf("Session Manager read error: %v", err))
+
+			// Fail all pending requests
+			sc.failAllPending(fmt.Errorf("connection lost: %w", err))
+
+			// Try to reconnect if not explicitly closed
+			sc.mu.Lock()
+			wasClosed := sc.closed
+			sc.mu.Unlock()
+
+			if !wasClosed {
+				logger.Info("Attempting to reconnect to Session Manager...")
+				if reconnErr := sc.reconnect(); reconnErr != nil {
+					logger.Error(fmt.Sprintf("Reconnect failed: %v", reconnErr))
+					return
+				}
+				// Reconnect succeeded, continue reading
+				logger.Info("Reconnected to Session Manager")
+				continue
+			}
 			return
 		}
-
-		fmt.Fprintf(os.Stderr, "DEBUG readResponses: received line: %s\n", strings.TrimSpace(line))
 
 		var resp struct {
 			JSONRPC string          `json:"jsonrpc"`
@@ -441,23 +468,72 @@ func (sc *SessionClient) readResponses() {
 		}
 
 		if err := json.Unmarshal([]byte(line), &resp); err != nil {
-			fmt.Fprintf(os.Stderr, "DEBUG readResponses: parse error: %v\n", err)
 			logger.Error(fmt.Sprintf("Failed to parse response: %v", err))
 			continue
 		}
 
-		fmt.Fprintf(os.Stderr, "DEBUG readResponses: parsed response id=%d\n", resp.ID)
-
 		sc.mu.Lock()
 		if ch, ok := sc.pending[resp.ID]; ok {
-			fmt.Fprintf(os.Stderr, "DEBUG readResponses: sending to pending channel id=%d\n", resp.ID)
 			ch <- sessionResponse{
 				Result: resp.Result,
 				Error:  resp.Error,
 			}
-		} else {
-			fmt.Fprintf(os.Stderr, "DEBUG readResponses: no pending request for id=%d\n", resp.ID)
 		}
 		sc.mu.Unlock()
 	}
+}
+
+// failAllPending fails all pending requests with the given error
+func (sc *SessionClient) failAllPending(err error) {
+	sc.mu.Lock()
+	defer sc.mu.Unlock()
+
+	for _, ch := range sc.pending {
+		ch <- sessionResponse{
+			Error: &sessionError{
+				Code:    -32000,
+				Message: err.Error(),
+			},
+		}
+	}
+}
+
+// reconnect attempts to reconnect to Session Manager
+func (sc *SessionClient) reconnect() error {
+	sc.mu.Lock()
+	// Close existing connection
+	if sc.conn != nil {
+		sc.conn.Close()
+		sc.conn = nil
+		sc.reader = nil
+	}
+	sc.mu.Unlock()
+
+	addr := fmt.Sprintf("%s:%d", sc.host, sc.port)
+	logger.Info(fmt.Sprintf("Reconnecting to Session Manager at %s", addr))
+
+	var conn net.Conn
+	var err error
+
+	// Retry connection with backoff
+	for i := 0; i < 5; i++ {
+		conn, err = net.DialTimeout("tcp", addr, 5*time.Second)
+		if err == nil {
+			break
+		}
+		logger.Debug(fmt.Sprintf("Reconnect attempt %d failed: %v", i+1, err))
+		time.Sleep(time.Duration(i+1) * time.Second) // Exponential backoff
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to reconnect to Session Manager: %w", err)
+	}
+
+	sc.mu.Lock()
+	sc.conn = conn
+	sc.reader = bufio.NewReader(conn)
+	sc.mu.Unlock()
+
+	logger.Info("Reconnected to Session Manager")
+	return nil
 }

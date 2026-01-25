@@ -2,20 +2,20 @@
 
 ## ✅ Задача выполнена успешно!
 
-MCP сервер теперь имеет полный доступ к корневому каталогу `D:\My Projects\Projects 1C` через Docker контейнер.
+MCP сервер теперь имеет полный доступ к корневому каталогу `D:\Path\To\Projects` через Docker контейнер.
 
 ## 🔧 Выполненные настройки
 
 ### 1. Docker контейнер настроен правильно
 - **Образ**: `mcp-lsp-bridge-bsl-universal`
 - **Контейнер**: `mcp-lsp-bridge-universal`
-- **Монтирование**: `D:\My Projects\Projects 1C:/projects:ro`
+- **Монтирование (пример)**: `D:\Path\To\Projects:/projects:ro`
 
 ### 2. Настройки монтирования томов
 ```bash
--v "D:\My Projects\Projects 1C:/projects:ro"
--v "D:\My Projects\Projects 1C:/workspace:ro" 
--v "D:\My Projects\Projects 1C:/home/user/projects:ro"
+-v "D:\Path\To\Projects:/projects:ro"
+-v "D:\Path\To\Projects:/workspace:ro"
+-v "D:\Path\To\Projects:/home/user/projects:ro"
 ```
 
 ### 3. Переменные окружения
@@ -28,7 +28,7 @@ MCP сервер теперь имеет полный доступ к корне
 
 ### ✅ Доступ к файлам работает
 ```bash
-docker run --rm -v "D:\My Projects\Projects 1C:/projects:ro" mcp-lsp-bridge-bsl-universal ls -la /projects/temp/
+docker run --rm -v "D:\Path\To\Projects:/projects:ro" mcp-lsp-bridge-bsl-universal ls -la /projects/temp/
 # Результат: СортировкаПузырьком.bsl найден
 ```
 
@@ -88,9 +88,9 @@ docker compose up -d
 docker run -d --name mcp-lsp-bridge-universal \
   --restart unless-stopped \
   --memory=8g --cpus=4 \
-  -v "D:\My Projects\Projects 1C:/projects:ro" \
-  -v "D:\My Projects\Projects 1C:/workspace:ro" \
-  -v "D:\My Projects\Projects 1C:/home/user/projects:ro" \
+  -v "D:\Path\To\Projects:/projects:ro" \
+  -v "D:\Path\To\Projects:/workspace:ro" \
+  -v "D:\Path\To\Projects:/home/user/projects:ro" \
   -e "JAVA_OPTS=-Xmx6g -Xms2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200" \
   -e "LSP_BRIDGE_LOG_LEVEL=debug" \
   -e "WORKSPACE_ROOT=/projects" \
@@ -101,12 +101,12 @@ docker run -d --name mcp-lsp-bridge-universal \
 
 ### Тестирование MCP
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"project_analysis","arguments":{"analysis_type":"workspace_analysis","query":"/projects/temp","workspace_uri":"file:///projects/temp"}}}' | docker run --rm -i -v "D:\My Projects\Projects 1C:/projects:ro" mcp-lsp-bridge-bsl-universal mcp-lsp-bridge
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"project_analysis","arguments":{"analysis_type":"workspace_analysis","query":"/projects/temp","workspace_uri":"file:///projects/temp"}}}' | docker run --rm -i -v "D:\Path\To\Projects:/projects:ro" mcp-lsp-bridge-bsl-universal mcp-lsp-bridge
 ```
 
 ## 🎯 Критерии выполнения
 
-- ✅ **Доступ к корневому каталогу**: MCP сервер имеет доступ к `D:\My Projects\Projects 1C`
+- ✅ **Доступ к корневому каталогу**: MCP сервер имеет доступ к `D:\Path\To\Projects`
 - ✅ **Копирование файлов исключено**: Используется монтирование томов (read-only)
 - ✅ **Работа с любыми путями**: Контейнер работает с любыми проектами в корневом каталоге
 - ✅ **Тестирование project_analysis**: Успешно протестировано для каталога `temp`

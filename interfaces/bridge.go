@@ -98,6 +98,7 @@ type LanguageDetector interface {
 	InferLanguage(filePath string) (*types.Language, error)
 	DetectProjectLanguages(projectPath string) ([]types.Language, error)
 	DetectPrimaryProjectLanguage(projectPath string) (*types.Language, error)
+	GetConnectedLanguages() []types.Language
 }
 
 // type ProjectRootManager interface {

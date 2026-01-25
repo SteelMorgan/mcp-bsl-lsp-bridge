@@ -1,25 +1,47 @@
 # MCP Tools Reference
 
-Complete reference for all MCP tools provided by the LSP bridge.
+This document describes the MCP tools implemented in this repository.
+
+Important:
+- **Not every implemented tool is exposed by default.** The default exposed set is defined in `mcpserver/tools.go`.
+- Some tools are intentionally hidden because they are too noisy for agent workflows, unstable with specific language servers, or not useful for LLM-driven navigation.
 
 ## Quick Reference
 
-**Analysis**: `project_analysis`, `symbol_explore`, `workspace_diagnostics`
-**Navigation**: `hover`, `implementation`, `call_hierarchy`
-**Refactoring**: `rename`, `format_document`, `code_actions`
-**Utilities**: `detect_project_languages`, `get_range_content`, `infer_language`
+### Exposed by default (registered in `mcpserver/tools.go`)
 
-## Core Analysis Tools
+- **Discovery & analysis**: `project_analysis`, `symbol_explore`
+- **Navigation**: `hover`, `definition`, `selection_range`, `call_hierarchy`, `call_graph`
+- **Refactoring & edits**: `code_actions`, `prepare_rename`, `rename`
+- **Diagnostics**: `document_diagnostics`
+- **Workspace / LSP plumbing**: `did_change_watched_files`, `lsp_status`
+- **Utilities**: `get_range_content`
+
+### Implemented but hidden by default
+
+These exist in `mcpserver/tools/*.go` but are not registered by default:
+
+- **Language detection**: `detect_project_languages`, `infer_language`
+- **Connection management**: `lsp_connect`, `lsp_disconnect`
+- **Formatting**: `format_document`, `range_formatting`
+- **Additional LSP features**: `implementation`, `signature_help`, `semantic_tokens`, `folding_range`, `document_link`, `document_color`, `color_presentation`, `workspace_diagnostics`, `did_change_configuration`, `execute_command`
+- **Bridge diagnostics**: `mcp_lsp_diagnostics`
+
+## Tool → LSP mapping (high level)
+
+If you want the exact LSP method mapping for every tool (including composite tools), see `docs/tools/lsp-methods-map.md`.
+
+## Exposed tools (default)
 
 ### `project_analysis`
-Multi-purpose code analysis with 9 analysis types for symbols, files, and workspace patterns.
+Multi-purpose code analysis with multiple analysis types for symbols, files, and workspace patterns.
 
 **Common Usage:**
 - Find symbols: `analysis_type="workspace_symbols"`, `query="calculateTotal"`
 - Analyze files: `analysis_type="file_analysis"`, `query="src/auth.go"`
 - Workspace overview: `analysis_type="workspace_analysis"`, `query="entire_project"`
 
-**Key Parameters**: analysis_type (required), query (required), limit (default: 20)
+**Key Parameters**: analysis_type (required), query (required), limit (default: 20), offset (default: 0)
 **Output**: Structured analysis results with metadata and suggestions
 
 ### `symbol_explore`
@@ -40,29 +62,8 @@ Extract text content from specific file ranges with precise line/character posit
 - Extract function: `uri="file://path"`, `start_line=10`, `end_line=25`
 - Get code block: Use coordinates from `project_analysis` definitions
 
-**Key Parameters**: uri (required), start_line/end_line (required), strict (default: false)
+**Key Parameters**: uri (required), start_line/start_character/end_line/end_character (required), strict (default: false)
 **Output**: Exact text content from specified range
-
-### `analyze_code`
-Analyze code for completion suggestions and insights.
-
-## Language Detection Tools
-
-### `detect_project_languages`
-Detect all programming languages used in a project by examining root markers and file extensions.
-
-### `infer_language`
-Infer the programming language for a file.
-
-## LSP Connection Management
-
-### `lsp_connect`
-Connect to a language server for a specific language.
-
-### `lsp_disconnect`
-Disconnect all active language server clients.
-
-## Code Intelligence Tools
 
 ### `hover`
 Get detailed symbol information including signatures, documentation, and type details.
@@ -74,23 +75,24 @@ Get detailed symbol information including signatures, documentation, and type de
 **Key Parameters**: uri (required), line/character (required, 0-based)
 **Output**: Formatted documentation with code examples and pkg.go.dev links
 
-### `signature_help`
-Get function parameter information at call sites. Use when positioned inside function calls (between parentheses) to see parameter details and overloads.
-
-### `semantic_tokens`
-Get semantic tokens for a specific range of a file.
-
-### `workspace_diagnostics`
-Analyze entire workspace for errors, warnings, and code issues across all languages.
+### `definition`
+Get definition location(s) for the symbol at a specific cursor position (LSP `textDocument/definition`).
 
 **Common Usage:**
-- Full scan: `workspace_uri="file://project/root"`
-- Check health: Review error categories and language-specific issues
+- Go to definition: `uri="file://path"`, `line=15`, `character=10`
 
-**Key Parameters**: workspace_uri (required)
-**Output**: Categorized diagnostics by language with error explanations and suggestions
+**Key Parameters**: uri (required), line/character (required, 0-based), language (optional override)
+**Output**: One or more target locations (file + range)
 
-## Code Improvement & Refactoring Tools
+### `selection_range`
+Get selection ranges for positions (LSP `textDocument/selectionRange`). Useful for expanding selection from expression → statement → block.
+
+**Common Usage:**
+- Single position: `uri="file://path"`, `line=10`, `character=5`
+- Multiple positions: `uri="file://path"`, `positions_json="[{\"line\":10,\"character\":5}]"`
+
+**Key Parameters**: uri (required), (positions_json) OR (line + character)
+**Output**: JSON array of selection range trees
 
 ### `code_actions`
 Get intelligent quick fixes, refactoring suggestions, and automated code improvements.
@@ -102,15 +104,8 @@ Get intelligent quick fixes, refactoring suggestions, and automated code improve
 **Key Parameters**: uri (required), line/character (required)
 **Output**: Available actions with descriptions and edit previews
 
-### `format_document`
-Format documents with language-specific rules. Preview changes before applying.
-
-**Common Usage:**
-- Preview: `uri="file://path"`, `apply="false"` (default) - shows changes
-- Apply: `uri="file://path"`, `apply="true"` - formats file
-
-**Key Parameters**: uri (required), apply (default: false), tab_size (default: 4)
-**Output**: Formatting changes with line-by-line diffs
+### `prepare_rename`
+Check whether rename is valid at a position and return the rename range (LSP `textDocument/prepareRename`).
 
 ### `rename`
 Rename symbols across entire codebase with cross-file precision. Always preview first.
@@ -122,25 +117,31 @@ Rename symbols across entire codebase with cross-file precision. Always preview 
 **Key Parameters**: uri (required), line/character (required), new_name (required), apply (default: false)
 **Output**: All affected files with exact change locations
 
-## Advanced Navigation Tools
-
-### `implementation`
-Find implementations of a symbol (interfaces, abstract methods).
-
 ### `call_hierarchy`
 Show call hierarchy (callers and callees) for a symbol.
 
+### `call_graph`
+Build a full call graph by recursively traversing LSP call hierarchy (incoming + outgoing).
+This is a **composite** tool (it calls multiple LSP methods repeatedly) and is optimized for BSL workflows:
+- Entry-point detection (common event handler names)
+- Cycle detection
+- Depth/node limits and timeout
+
+### `document_diagnostics`
+Get diagnostics for a specific file using LSP 3.17+ `textDocument/diagnostic`.
+
+### `did_change_watched_files`
+Notify the language server about external file changes using `workspace/didChangeWatchedFiles`.
+
+### `lsp_status`
+Show current bridge-side LSP connection status and server progress (`$/progress`), plus indexing progress when running in session-manager mode.
+
 ## Common Workflows
 
-**Code Analysis**: `detect_project_languages` → `project_analysis` → `symbol_explore`
-**Navigation**: `hover` → `implementation` → `call_hierarchy`
-**Refactoring**: `hover` (get coordinates) → `rename` (preview) → `rename` (apply)
-**Code Quality**: `workspace_diagnostics` → `code_actions` → `format_document`
-
-## System Tools
-
-### `mcp_lsp_diagnostics`
-Provides diagnostic information about the MCP-LSP bridge, including registered language servers, configuration details, connected servers, and detected project languages.
+**Explore a codebase**: `project_analysis` → `symbol_explore` → `definition` → `get_range_content`  
+**Understand flow**: `call_hierarchy` (local) → `call_graph` (full traversal)  
+**Fix issues**: `document_diagnostics` → `code_actions` → `rename` (preview) → `rename` (apply)  
+**New/changed files**: run `did_change_watched_files` (or enable session-manager file watcher) before `call_graph`
 
 ## Safety Features
 
@@ -150,19 +151,3 @@ For tools that modify code (`format_document`, `rename`), the bridge provides cr
 - **Apply Mode**: Once reviewed and approved, applies the changes to your codebase
 
 This dual-mode operation ensures full control and visibility over automated code modifications.
-
-## Tool Categories Summary
-
-**Analysis & Discovery**: `project_analysis`, `symbol_explore`, `get_range_content`, `analyze_code`
-
-**Language Detection**: `detect_project_languages`, `infer_language`
-
-**Connection Management**: `lsp_connect`, `lsp_disconnect`
-
-**Code Intelligence**: `hover`, `signature_help`, `semantic_tokens`, `workspace_diagnostics`
-
-**Safe Refactoring**: `code_actions`, `format_document`, `rename` (with preview/apply modes)
-
-**Navigation**: `implementation`, `call_hierarchy`
-
-**System**: `mcp_lsp_diagnostics`

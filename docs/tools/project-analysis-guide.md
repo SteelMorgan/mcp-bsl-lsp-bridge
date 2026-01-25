@@ -32,7 +32,7 @@ Analyzes individual files for complexity metrics, structure, and code quality.
 **Sample Output:**
 ```
 === FILE ANALYSIS ===
-Analyzing file: file:///home/rockerboo/code/mcp-lsp-bridge/mcpserver/tools/project_analysis.go
+Analyzing file: file:///path/to/mcp-lsp-bridge/mcpserver/tools/project_analysis.go
 
 Language: go
 Symbols found: 16

@@ -1,0 +1,34 @@
+#!/bin/sh
+exec 2>&1
+
+echo "Starting LSP Session Manager for BSL Language Server..."
+echo "Workspace: ${WORKSPACE_ROOT:-/projects}"
+
+# Wait for BSL LS JAR to be mounted
+while [ ! -f /opt/bsl-ls/bsl-language-server.jar ]; do
+    echo "Waiting for bsl-language-server.jar..."
+    sleep 2
+done
+
+# Create log directory
+mkdir -p /home/user/.local/share/mcp-lsp-bridge/logs
+
+# Start LSP Session Manager which:
+# 1. Spawns BSL LS in stdio mode
+# 2. Initializes LSP session ONCE
+# 3. Listens on TCP port 9999 for API requests
+# 4. Keeps the session alive and ready
+#
+# Arguments after "--" are passed directly to the LSP command
+exec /usr/bin/lsp-session-manager \
+    --port=${BSL_LS_PORT:-9999} \
+    --workspace=${WORKSPACE_ROOT:-/projects} \
+    --command=java \
+    -- \
+    -Xmx${MCP_LSP_BSL_JAVA_XMX:-6g} \
+    -Xms${MCP_LSP_BSL_JAVA_XMS:-2g} \
+    -XX:+UseG1GC \
+    -XX:MaxGCPauseMillis=200 \
+    -jar /opt/bsl-ls/bsl-language-server.jar \
+    lsp \
+    -c /etc/mcp-lsp-bridge/bsl-ls.json

@@ -361,15 +361,12 @@ func (lc *LanguageClient) SetServerCapabilities(capabilities protocol.ServerCapa
 
 // SendRequest sends a request with timeout
 func (lc *LanguageClient) SendRequest(method string, params any, result any, timeout time.Duration) error {
-	fmt.Fprintf(os.Stderr, "DEBUG SendRequest: ENTER method=%s lc=%p\n", method, lc)
-	
+
 	// Increment total requests
 	atomic.AddInt64(&lc.totalRequests, 1)
 
 	// Ensure connection is still valid by checking context and connection
-	fmt.Fprintf(os.Stderr, "DEBUG SendRequest: checking ctx.Err=%v conn=%p\n", lc.ctx.Err(), lc.conn)
 	if lc.ctx.Err() != nil || lc.conn == nil {
-		fmt.Fprintf(os.Stderr, "DEBUG SendRequest: connection closed!\n")
 		return errors.New("language server connection is closed")
 	}
 
@@ -390,18 +387,13 @@ func (lc *LanguageClient) SendRequest(method string, params any, result any, tim
 	// Check connection state before call
 	select {
 	case <-lc.conn.DisconnectNotify():
-		fmt.Fprintf(os.Stderr, "DEBUG SendRequest: Connection already disconnected before Call\n")
 		return errors.New("connection already disconnected")
 	default:
-		fmt.Fprintf(os.Stderr, "DEBUG SendRequest: Connection OK, making Call for method=%s\n", method)
 	}
 
 	reqCtx, cancel := context.WithTimeout(lc.ctx, timeout)
 	defer cancel()
-
-	fmt.Fprintf(os.Stderr, "DEBUG SendRequest: Calling lc.conn.Call...\n")
 	err := lc.conn.Call(reqCtx, method, params, result)
-	fmt.Fprintf(os.Stderr, "DEBUG SendRequest: lc.conn.Call returned err=%v\n", err)
 
 	// Update status and metrics with brief locks
 	if err != nil {

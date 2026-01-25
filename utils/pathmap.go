@@ -10,7 +10,7 @@ import (
 
 // DockerPathMapper handles path conversion between host system and Docker container
 type DockerPathMapper struct {
-	hostRoot      string // D:/My Projects/Projects 1C (normalized with forward slashes)
+	hostRoot      string // D:/Path/To/Projects (normalized with forward slashes)
 	containerRoot string // /projects
 	enabled       bool   // true if working in Docker mode
 }

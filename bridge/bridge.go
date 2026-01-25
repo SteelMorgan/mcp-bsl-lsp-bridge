@@ -110,19 +110,27 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 
 	startTime := time.Now()
 
-	// Get current working directory
-	// dir, err := os.Getwd()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to get current directory: %w", err)
-	// }
+	// Get all allowed workspace directories
 	dirs := b.AllowedDirectories()
-	dir := dirs[0] // Get first directory (for now)
+	if len(dirs) == 0 {
+		return nil, fmt.Errorf("no allowed directories configured")
+	}
 
-	logger.Debug(fmt.Sprintf("validateAndConnectClient: Using directory: %s from allowed dirs: %v", dir, dirs))
+	logger.Debug(fmt.Sprintf("validateAndConnectClient: Using %d workspace directories: %v", len(dirs), dirs))
 
-	absPath, err := b.IsAllowedDirectory(dir)
-	if err != nil {
-		return nil, fmt.Errorf("file path is not allowed: %s", err)
+	// Validate and resolve absolute paths for all directories
+	absPaths := make([]string, 0, len(dirs))
+	for _, dir := range dirs {
+		absPath, err := b.IsAllowedDirectory(dir)
+		if err != nil {
+			logger.Warn(fmt.Sprintf("Skipping invalid directory %s: %v", dir, err))
+			continue
+		}
+		absPaths = append(absPaths, absPath)
+	}
+
+	if len(absPaths) == 0 {
+		return nil, fmt.Errorf("no valid directories found from allowed dirs: %v", dirs)
 	}
 
 	for attempt := 0; attempt < config.MaxRetries; attempt++ {
@@ -136,7 +144,7 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 		var err error
 
 		mode := serverConfig.GetMode()
-		logger.Debug(fmt.Sprintf("validateAndConnectClient: mode=%s host=%s port=%d", 
+		logger.Debug(fmt.Sprintf("validateAndConnectClient: mode=%s host=%s port=%d",
 			mode, serverConfig.GetHost(), serverConfig.GetPort()))
 
 		switch mode {
@@ -172,7 +180,7 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 				continue
 			}
 			// Session Manager is already initialized - skip the initialize phase below
-			adapter.SetProjectRoots([]string{dir})
+			adapter.SetProjectRoots(dirs)
 			b.mu.Lock()
 			b.clients[types.LanguageServer(language)] = adapter
 			b.mu.Unlock()
@@ -197,28 +205,24 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 			continue
 		}
 
-		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: After connect, client=%p err=%v\n", client, err)
-		
-		hostRootURI := utils.NormalizeURI(absPath)
-		rootPath := hostRootURI
-		if b.HasPathMapper() {
-			if mapped, mapErr := b.pathMapper.NormalizeURI(hostRootURI); mapErr == nil {
-				rootPath = mapped
+		// Build workspace folders from all validated directories
+		workspaceFolders := make([]protocol.WorkspaceFolder, 0, len(absPaths))
+		for _, ap := range absPaths {
+			hostRootURI := utils.NormalizeURI(ap)
+			rootPath := hostRootURI
+			if b.HasPathMapper() {
+				if mapped, mapErr := b.pathMapper.NormalizeURI(hostRootURI); mapErr == nil {
+					rootPath = mapped
+				}
 			}
-		}
-		// root_uri := protocol.DocumentUri(root_path)
-
-		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: Root path for LSP: %s\n", rootPath)
-		logger.Debug("validateAndConnectClient: Root path for LSP: " + rootPath)
-		// Prepare initialization parameters
-		workspaceFolders := []protocol.WorkspaceFolder{
-			{
+			workspaceFolders = append(workspaceFolders, protocol.WorkspaceFolder{
 				Uri:  protocol.URI(rootPath),
-				Name: filepath.Base(absPath),
-			},
+				Name: filepath.Base(ap),
+			})
+			logger.Debug(fmt.Sprintf("validateAndConnectClient: Added workspace folder: %s (%s)", filepath.Base(ap), rootPath))
 		}
 
-		client.SetProjectRoots([]string{dir})
+		client.SetProjectRoots(dirs)
 
 		// IMPORTANT: ProcessId is set to nil to prevent the LSP server from monitoring
 		// the parent process. In docker exec scenarios, mcp-lsp-bridge is a short-lived
@@ -254,14 +258,10 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 		// Check connection status before initialize
 		metrics := client.GetMetrics()
 		logger.Debug(fmt.Sprintf("STATUS: Before Initialize - Client connected: %v, ctx.Err(): %v", metrics.IsConnected(), client.Context().Err()))
-		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: Before Initialize - connected=%v ctxErr=%v\n", metrics.IsConnected(), client.Context().Err())
-
 		logger.Debug(fmt.Sprintf("STATUS: client %+v", client))
-		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: Calling client.Initialize...\n")
 
 		// Send initialize request
 		result, err := client.Initialize(params)
-		fmt.Fprintf(os.Stderr, "DEBUG BRIDGE: Initialize returned err=%v\n", err)
 		if err != nil {
 			lastErr = fmt.Errorf("initialize request failed on attempt %d: %w", attempt+1, err)
 			logger.Error(lastErr)
@@ -553,10 +553,11 @@ func (b *MCPLSPBridge) FindSymbolDefinitions(language, uri string, line, charact
 		return nil, fmt.Errorf("failed to get client for language %s: %w", language, err)
 	}
 
-	definitions, err := client.Definition(uri, line, character)
+	normalizedURI := b.NormalizeURIForLSP(uri)
+	definitions, err := client.Definition(normalizedURI, line, character)
 	if err != nil {
 		// Log the error but return empty results instead of failing
-		logger.Warn(fmt.Sprintf("Failed to find definitions for %s at %s:%d:%d: %v", language, uri, line, character, err))
+		logger.Warn(fmt.Sprintf("Failed to find definitions for %s at %s:%d:%d: %v", language, normalizedURI, line, character, err))
 		return []protocol.Or2[protocol.LocationLink, protocol.Location]{}, nil
 	}
 

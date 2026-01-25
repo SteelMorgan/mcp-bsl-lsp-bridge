@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,6 +72,10 @@ func TestDefaultUserProvider_Current(t *testing.T) {
 }
 
 func TestDirectoryResolver_DirectoryEnsuring(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-style directory resolution tests (XDG paths) are not applicable on Windows")
+	}
+
 	tests := []struct {
 		name            string
 		appName         string
@@ -466,6 +471,10 @@ func TestDirectoryResolver_maybeEnsureDir(t *testing.T) {
 }
 
 func TestDirectoryResolver_GetLogDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-style log directory tests are not applicable on Windows")
+	}
+
 	tests := []struct {
 		name            string
 		appName         string
@@ -551,6 +560,10 @@ func TestDirectoryResolver_GetLogDirectory(t *testing.T) {
 }
 
 func TestDirectoryResolver_GetDataDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-style data directory tests are not applicable on Windows")
+	}
+
 	tests := []struct {
 		name            string
 		appName         string
@@ -636,6 +649,10 @@ func TestDirectoryResolver_GetDataDirectory(t *testing.T) {
 }
 
 func TestDirectoryResolver_GetCacheDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-style cache directory tests are not applicable on Windows")
+	}
+
 	tests := []struct {
 		name            string
 		appName         string
@@ -721,6 +738,10 @@ func TestDirectoryResolver_GetCacheDirectory(t *testing.T) {
 }
 
 func TestDirectoryResolver_GetConfigDirectory_Comprehensive(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix-style config directory tests are not applicable on Windows")
+	}
+
 	tests := []struct {
 		name            string
 		appName         string

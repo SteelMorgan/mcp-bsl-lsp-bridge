@@ -136,8 +136,8 @@ func performSymbolSearch(ctx context.Context, bridge interfaces.BridgeInterface,
 	if projectDir == "" {
 		var err error
 		projectDir, err = os.Getwd()
-		if err != nil {
-			return nil, fmt.Errorf("failed to get current working directory: %w", err)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current working directory: %w", err)
 		}
 	}
 	

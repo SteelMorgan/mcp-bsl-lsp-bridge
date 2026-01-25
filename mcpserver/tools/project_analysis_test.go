@@ -3,6 +3,8 @@ package tools
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -64,7 +66,7 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
+			projectPath := utils.URIToFilePath(tc.workspaceUri)
 
 			// Set up mock expectations
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
@@ -126,6 +128,61 @@ func TestProjectAnalysisTool_WorkspaceSymbols(t *testing.T) {
 		})
 	}
 }
+
+func TestProjectAnalysisTool_TextSearch(t *testing.T) {
+	bridge := &mocks.MockBridge{}
+
+	tmpDir := t.TempDir()
+	filePath := filepath.Join(tmpDir, "test.bsl")
+	content := "ПерваяСтрока\nСтандартныеПодсистемыСервер.УстановкаПараметровСеанса()\n"
+	if err := os.WriteFile(filePath, []byte(content), 0o600); err != nil {
+		t.Fatalf("write temp file: %v", err)
+	}
+
+	// Setup language detection + clients (even though text_search doesn't use LSP calls directly)
+	langs := []types.Language{"bsl"}
+	bridge.On("DetectProjectLanguages", tmpDir).Return(langs, nil)
+
+	mockClient := &mocks.MockLanguageClient{}
+	mockClients := map[types.Language]types.LanguageClientInterface{
+		"bsl": mockClient,
+	}
+	bridge.On("GetMultiLanguageClients", []string{"bsl"}).Return(mockClients, nil)
+
+	tool, handler := ProjectAnalysisTool(bridge)
+	mcpServer, err := mcptest.NewServer(t, server.ServerTool{Tool: tool, Handler: handler})
+	if err != nil {
+		t.Fatalf("Could not create MCP server: %v", err)
+	}
+
+	ctx := context.Background()
+	toolResult, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
+		Request: mcp.Request{Method: "tools/call"},
+		Params: mcp.CallToolParams{
+			Name: "project_analysis",
+			Arguments: map[string]any{
+				"workspace_uri": tmpDir,
+				"query":         "СтандартныеПодсистемыСервер.УстановкаПараметровСеанса",
+				"analysis_type": "text_search",
+				"offset":        0,
+				"limit":         5,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Error calling tool: %v", err)
+	}
+	if toolResult.IsError {
+		t.Fatalf("Expected success, got error: %#v", toolResult.Content)
+	}
+	require.NotEmpty(t, toolResult.Content)
+	txt, ok := toolResult.Content[0].(mcp.TextContent)
+	require.True(t, ok)
+	require.Contains(t, txt.Text, "TEXT_SEARCH|")
+	require.Contains(t, txt.Text, "test.bsl")
+
+	bridge.AssertExpectations(t)
+}
 func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -164,7 +221,7 @@ func TestProjectAnalysisTool_SymbolReferences(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
+			projectPath := utils.URIToFilePath(tc.workspaceUri)
 
 			// Set up mock expectations
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
@@ -281,7 +338,7 @@ func TestProjectAnalysisTool_SymbolDefinitions(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
+			projectPath := utils.URIToFilePath(tc.workspaceUri)
 
 			// Set up mock expectations
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
@@ -376,7 +433,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 			query:        "",
 			setupMock: func(bridge *mocks.MockBridge) {
 				// This case expects DetectProjectLanguages to fail
-				bridge.On("DetectProjectLanguages", "/nonexistent").Return([]types.Language{}, errors.New("project not found"))
+				bridge.On("DetectProjectLanguages", utils.URIToFilePath("file:///nonexistent")).Return([]types.Language{}, errors.New("project not found"))
 			},
 			expectError: true,
 			errorMsg:    "project not found",
@@ -387,7 +444,7 @@ func TestProjectAnalysisTool_ErrorCases(t *testing.T) {
 			query:        "",
 			setupMock: func(bridge *mocks.MockBridge) {
 				// This case expects DetectProjectLanguages to succeed, and then GetMultiLanguageClients to fail
-				bridge.On("DetectProjectLanguages", "/workspace").Return([]types.Language{"go"}, nil)
+				bridge.On("DetectProjectLanguages", utils.URIToFilePath("file:///workspace")).Return([]types.Language{"go"}, nil)
 				bridge.On("GetMultiLanguageClients", []string{"go"}).Return(map[types.Language]types.LanguageClientInterface{}, errors.New("failed to create clients"))
 			},
 			expectError: true,
@@ -502,7 +559,7 @@ func TestProjectAnalysisTool_FileAnalysis(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
+			projectPath := utils.URIToFilePath(tc.workspaceUri)
 
 			// Set up mock expectations
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
@@ -630,7 +687,7 @@ func TestProjectAnalysisTool_PatternAnalysis(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
-			projectPath := strings.TrimPrefix(tc.workspaceUri, "file://")
+			projectPath := utils.URIToFilePath(tc.workspaceUri)
 
 			// Set up mock expectations
 			bridge.On("DetectProjectLanguages", projectPath).Return(tc.mockLanguages, nil)
@@ -876,7 +933,7 @@ func TestProjectAnalysisTool_NewAnalysisTypes(t *testing.T) {
 			bridge := &mocks.MockBridge{}
 
 			// Set up basic mock expectations that ALL tests need
-			bridge.On("DetectProjectLanguages", "/workspace").Return([]types.Language{"go"}, nil)
+			bridge.On("DetectProjectLanguages", utils.URIToFilePath("file:///workspace")).Return([]types.Language{"go"}, nil)
 
 			// AllowedDirectories is only called when workspace_uri is empty, which doesn't happen in our test
 			// since we provide "file:///workspace" as workspace_uri in the test arguments

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"time"
 
@@ -81,7 +80,6 @@ func (lc *LanguageClient) ConnectTCP() (*LanguageClient, error) {
 	}
 
 	logger.Info(fmt.Sprintf("TCP connection established to %s", addr))
-	fmt.Fprintf(os.Stderr, "DEBUG TCP: connection established to %s\n", addr)
 
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -96,53 +94,38 @@ func (lc *LanguageClient) ConnectTCP() (*LanguageClient, error) {
 		progress: lc.progress,
 	}
 
-	fmt.Fprintf(os.Stderr, "DEBUG TCP: creating JSON-RPC stream...\n")
-
 	// Create JSON-RPC stream over TCP connection
 	// LSP uses Content-Length headers, which VSCodeObjectCodec handles
 	stream := jsonrpc2.NewBufferedStream(conn, jsonrpc2.VSCodeObjectCodec{})
-
-	fmt.Fprintf(os.Stderr, "DEBUG TCP: creating JSON-RPC connection...\n")
 
 	jsonrpcLogger := &JSONRPCLogger{}
 	rpcConn := jsonrpc2.NewConn(ctx, stream, handler,
 		jsonrpc2.LogMessages(jsonrpcLogger),
 		jsonrpc2.SetLogger(jsonrpcLogger))
 
-	fmt.Fprintf(os.Stderr, "DEBUG TCP: JSON-RPC connection created\n")
-
 	// Check if connection is already closed
 	select {
 	case <-rpcConn.DisconnectNotify():
-		fmt.Fprintf(os.Stderr, "DEBUG TCP: Connection already disconnected!\n")
 		return nil, fmt.Errorf("connection closed immediately after creation")
 	default:
-		fmt.Fprintf(os.Stderr, "DEBUG TCP: Connection still alive\n")
 	}
 
 	// Monitor connection disconnects
 	go func() {
-		fmt.Fprintf(os.Stderr, "DEBUG TCP: Monitor goroutine started\n")
 		disconnectCh := rpcConn.DisconnectNotify()
 		select {
 		case <-disconnectCh:
 			logger.Error("DISCONNECT: TCP connection to LSP proxy was disconnected")
-			fmt.Fprintf(os.Stderr, "DEBUG TCP: DISCONNECT notified! Connection closed unexpectedly\n")
 			lc.status = StatusDisconnected
 		case <-ctx.Done():
 			logger.Debug("DISCONNECT: Context cancelled for TCP connection")
-			fmt.Fprintf(os.Stderr, "DEBUG TCP: Context cancelled reason=%v\n", ctx.Err())
 		}
-		fmt.Fprintf(os.Stderr, "DEBUG TCP: Monitor goroutine exiting\n")
 	}()
-
-	fmt.Fprintf(os.Stderr, "DEBUG TCP: Setting lc.conn...\n")
 	lc.conn = rpcConn
 	lc.status = StatusConnected
 	lc.lastInitialized = time.Now()
 
 	logger.Info("Successfully connected to LSP server via TCP proxy")
-	fmt.Fprintf(os.Stderr, "DEBUG TCP: ConnectTCP completed successfully\n")
 
 	return lc, nil
 }

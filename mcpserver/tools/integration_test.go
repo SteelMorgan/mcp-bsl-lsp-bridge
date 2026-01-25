@@ -592,6 +592,7 @@ func TestMCPToolRegistration(t *testing.T) {
 	RegisterLSPConnectTool(mcpServer, bridge)
 	RegisterLSPDisconnectTool(mcpServer, bridge)
 	RegisterHoverTool(mcpServer, bridge)
+	RegisterDefinitionTool(mcpServer, bridge)
 	RegisterSignatureHelpTool(mcpServer, bridge)
 	RegisterCodeActionsTool(mcpServer, bridge)
 	RegisterFormatDocumentTool(mcpServer, bridge)
@@ -605,6 +606,7 @@ func TestMCPToolRegistration(t *testing.T) {
 		"analyze_code",
 		"project_analysis",
 		"hover",
+		"definition",
 		"diagnostics",
 		"signature_help",
 		"code_actions",

@@ -20,6 +20,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/bridge"
@@ -227,10 +228,25 @@ func main() {
 
 	// In container mode we must anchor workspace operations to the mounted workspace root,
 	// not to the process CWD (often /home/user).
+	// WORKSPACE_ROOT supports multiple paths separated by semicolon (;)
+	// Example: WORKSPACE_ROOT=/projects/main-config;/projects/extension1;/projects/extension2
 	workspaceRoot := os.Getenv("WORKSPACE_ROOT")
 	allowedDirs := []string{cwd}
 	if workspaceRoot != "" {
-		allowedDirs = []string{workspaceRoot}
+		// Parse multiple workspace roots separated by semicolon
+		roots := strings.Split(workspaceRoot, ";")
+		allowedDirs = make([]string, 0, len(roots))
+		for _, root := range roots {
+			trimmed := strings.TrimSpace(root)
+			if trimmed != "" {
+				allowedDirs = append(allowedDirs, trimmed)
+			}
+		}
+		// Fallback to cwd if no valid paths found
+		if len(allowedDirs) == 0 {
+			allowedDirs = []string{cwd}
+		}
+		logger.Debug(fmt.Sprintf("Parsed %d workspace roots from WORKSPACE_ROOT: %v", len(allowedDirs), allowedDirs))
 	}
 
 	// Create and initialize the bridge
@@ -253,11 +269,8 @@ func main() {
 
 	// Start MCP server
 	logger.Info("Starting MCP server...")
-	fmt.Fprintln(os.Stderr, "DEBUG MAIN: About to call ServeStdio...")
 
 	if err := server.ServeStdio(mcpServer); err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG MAIN: ServeStdio returned error: %v\n", err)
 		logger.Error("MCP server error: " + err.Error())
 	}
-	fmt.Fprintln(os.Stderr, "DEBUG MAIN: ServeStdio returned, main() exiting...")
 }

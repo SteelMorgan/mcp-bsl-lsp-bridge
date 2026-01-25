@@ -1,0 +1,24 @@
+{
+  "global": {
+    "log_file_path": "/home/user/.local/share/mcp-lsp-bridge/logs/mcp-lsp-bridge.log",
+    "log_level": "debug",
+    "max_log_files": 10,
+    "max_restart_attempts": 3,
+    "restart_delay_ms": 2000
+  },
+  "language_servers": {
+    "bsl-language-server": {
+      "mode": "session",
+      "host": "localhost",
+      "port": 9999,
+      "initialization_options": {}
+    }
+  },
+  "language_server_map": {
+    "bsl-language-server": ["bsl", "os"]
+  },
+  "extension_language_map": {
+    ".bsl": "bsl",
+    ".os": "os"
+  }
+}

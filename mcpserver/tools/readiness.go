@@ -34,11 +34,21 @@ type LSPClientStatus struct {
 	ActiveProgress int    `json:"active_progress"`
 }
 
+type IndexingProgress struct {
+	State          string `json:"state"` // "idle" | "indexing" | "complete"
+	Current        int    `json:"current"`
+	Total          int    `json:"total"`
+	ETASeconds     int    `json:"eta_seconds,omitempty"`
+	ElapsedSeconds int    `json:"elapsed_seconds,omitempty"`
+	Message        string `json:"message,omitempty"`
+}
+
 type LSPStatus struct {
 	Ready    bool              `json:"ready"`
 	State    string            `json:"state"`
 	Activity []LSPActivity     `json:"activity"`
 	Clients  []LSPClientStatus `json:"clients,omitempty"`
+	Indexing *IndexingProgress `json:"indexing,omitempty"`
 }
 
 type LSPStatusResponse struct {
@@ -129,6 +139,26 @@ func BuildLSPStatus(bridge interfaces.BridgeInterface) (LSPStatus, error) {
 			LastError:      lastError,
 			ActiveProgress: activeCount,
 		})
+
+		// Try to get indexing status from SessionAdapter
+		if status.Indexing == nil {
+			if sa, ok := client.(*lsp.SessionAdapter); ok {
+				if idxStatus := sa.GetIndexingStatus(); idxStatus != nil {
+					status.Indexing = &IndexingProgress{
+						State:          idxStatus.State,
+						Current:        idxStatus.Current,
+						Total:          idxStatus.Total,
+						ETASeconds:     idxStatus.ETASeconds,
+						ElapsedSeconds: idxStatus.ElapsedSeconds,
+						Message:        idxStatus.Message,
+					}
+					// If indexing is active, mark as busy
+					if idxStatus.State == "indexing" {
+						anyBusy = true
+					}
+				}
+			}
+		}
 	}
 
 	switch {
@@ -199,6 +229,10 @@ func CheckReadyOrReturn(bridge interfaces.BridgeInterface) (*mcp.CallToolResult,
 				break
 			}
 			if s.Ready {
+				// In session mode, LSP Session Manager handles warmup - skip our gate.
+				if b.AllClientsInSessionMode() {
+					return nil, true
+				}
 				// Hard gate: warm-up must be finished before tools run (variant A).
 				running, done, werr, _, _ := b.WarmupStatus()
 				if done && werr == "" {
@@ -219,11 +253,20 @@ func CheckReadyOrReturn(bridge interfaces.BridgeInterface) (*mcp.CallToolResult,
 
 	status, err := BuildLSPStatus(bridge)
 	if err != nil {
+		// In unit tests and in alternative bridge implementations we may not support
+		// status introspection. In that case, don't block tool execution.
+		if strings.Contains(err.Error(), "does not support status introspection") {
+			return nil, true
+		}
 		return mcp.NewToolResultError(err.Error()), false
 	}
 	if status.Ready {
 		// Hard gate: warm-up must be finished before tools run (variant A).
 		if b, ok := bridge.(*bridgepkg.MCPLSPBridge); ok {
+			// In session mode, LSP Session Manager handles warmup - skip our gate.
+			if b.AllClientsInSessionMode() {
+				return nil, true
+			}
 			running, done, werr, _, _ := b.WarmupStatus()
 			if done && werr == "" {
 				return nil, true

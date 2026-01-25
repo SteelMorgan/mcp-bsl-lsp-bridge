@@ -30,12 +30,13 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 
 	// Code intelligence tools
 	tools.RegisterHoverTool(mcpServer, bridge)
+	tools.RegisterDefinitionTool(mcpServer, bridge)
+	tools.RegisterSelectionRangeTool(mcpServer, bridge)
 	// tools.RegisterSignatureHelpTool(mcpServer, bridge)  // BSL LS не поддерживает signature help
 	// tools.RegisterDiagnosticsTool(mcpServer, bridge)
 	// Hide IDE/UI-oriented tools that don't help an AI agent much:
 	// - semantic_tokens
 	// - folding_range
-	// - selection_range
 	// - document_link
 	// - document_color
 	// - color_presentation
@@ -52,19 +53,21 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 	tools.RegisterRenameTool(mcpServer, bridge)
 	// tools.RegisterImplementationTool(mcpServer, bridge)  // BSL LS не поддерживает implementation
 
-	// Call hierarchy tool
+	// Call hierarchy tools
 	tools.RegisterCallHierarchyTool(mcpServer, bridge)
+	tools.RegisterCallGraphTool(mcpServer, bridge)
 
 	// Workspace analysis
-	tools.RegisterWorkspaceDiagnosticsTool(mcpServer, bridge)
+	// tools.RegisterWorkspaceDiagnosticsTool(mcpServer, bridge) // Too heavy/noisy for AI agent workflows
 
 	// Document diagnostics
 	tools.RegisterDocumentDiagnosticsTool(mcpServer, bridge)
 
 	// Workspace notifications and commands
-	// Hide tools that mostly serve editor plumbing:
+	// did_change_watched_files - needed for notifying LSP about new files (essential for call_graph)
+	tools.RegisterDidChangeWatchedFilesTool(mcpServer, bridge)
+	// Hide other editor plumbing tools:
 	// - execute_command
-	// - did_change_watched_files
 	// - did_change_configuration
 
 	// Diagnostic tools

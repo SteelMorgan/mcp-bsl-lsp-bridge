@@ -831,6 +831,8 @@ func TestPrepareCallHierarchy(t *testing.T) {
 	bridge.clients["gopls"] = mockClient
 	testFile := createTempFile(t, "test.go", "package main\n\nfunc main() {}")
 	testURI := utils.NormalizeURI(testFile)
+	mockClient.On("ProjectRoots").Return([]string{filepath.Dir(testFile)})
+	mockClient.On("SendNotification", "textDocument/didOpen", mock.AnythingOfType("protocol.DidOpenTextDocumentParams")).Return(nil)
 	expectedItems := []protocol.CallHierarchyItem{
 		{
 			Name: "main",
@@ -956,7 +958,7 @@ func createTestPaths() (projectRoots []string, testCases []struct {
 		}
 	} else {
 		projectRoots = []string{
-			"/home/rockerboo/code/mcp-lsp-bridge",
+			"/path/to/mcp-lsp-bridge",
 			"/other/allowed/directory",
 		}
 		testCases = []struct {
@@ -964,11 +966,11 @@ func createTestPaths() (projectRoots []string, testCases []struct {
 			dir     string
 			allowed bool
 		}{
-			{"exact match", "/home/rockerboo/code/mcp-lsp-bridge", true},
-			{"subdirectory", "/home/rockerboo/code/mcp-lsp-bridge/lsp", true},
+			{"exact match", "/path/to/mcp-lsp-bridge", true},
+			{"subdirectory", "/path/to/mcp-lsp-bridge/lsp", true},
 			{"not allowed", "/not/allowed/directory", false},
-			{"parent with ..", "/home/rockerboo/code/mcp-lsp-bridge/lsp/..", true},
-			{"parent .. attempt", "/home/rockerboo/code/mcp-lsp-bridge/lsp/../..", false}, // Should go outside allowed dir
+			{"parent with ..", "/path/to/mcp-lsp-bridge/lsp/..", true},
+			{"parent .. attempt", "/path/to/mcp-lsp-bridge/lsp/../..", false}, // Should go outside allowed dir
 			{"other exact match", "/other/allowed/directory", true},
 			{"other subdirectory", "/other/allowed/directory/lsp", true},
 			{"root", "/", false},
@@ -1101,8 +1103,8 @@ func TestGetCleanAbsPath(t *testing.T) {
 		}{
 			{
 				name:    "valid absolute path",
-				path:    "/home/rockerboo/code/mcp-lsp-bridge/lsp",
-				want:    "/home/rockerboo/code/mcp-lsp-bridge/lsp",
+				path:    "/path/to/mcp-lsp-bridge/lsp",
+				want:    "/path/to/mcp-lsp-bridge/lsp",
 				wantErr: false,
 			},
 			{
@@ -1125,14 +1127,14 @@ func TestGetCleanAbsPath(t *testing.T) {
 			},
 			{
 				name:    "absolute path with ..",
-				path:    "/home/rockerboo/code/mcp-lsp-bridge/../lsp",
-				want:    "/home/rockerboo/code/lsp",
+				path:    "/path/to/mcp-lsp-bridge/../lsp",
+				want:    "/path/to/lsp",
 				wantErr: false,
 			},
 			{
 				name:    "absolute path with ./",
-				path:    "/home/rockerboo/code/mcp-lsp-bridge/./lsp",
-				want:    "/home/rockerboo/code/mcp-lsp-bridge/lsp",
+				path:    "/path/to/mcp-lsp-bridge/./lsp",
+				want:    "/path/to/mcp-lsp-bridge/lsp",
 				wantErr: false,
 			},
 		}
@@ -1242,7 +1244,7 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				},
 			},
 			allowedDirectories: []string{"."},
-			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
+			uri:                "file:///path/to/mcp-lsp-bridge/lsp/main.go",
 			line:               1,
 			character:          1,
 			endLine:            1,
@@ -1280,7 +1282,7 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				},
 			},
 			allowedDirectories: []string{"."},
-			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
+			uri:                "file:///path/to/mcp-lsp-bridge/lsp/main.go",
 			line:               1,
 			character:          1,
 			endLine:            1,
@@ -1308,7 +1310,7 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				},
 			},
 			allowedDirectories: []string{"."},
-			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.unknown", // unknown extension
+			uri:                "file:///path/to/mcp-lsp-bridge/lsp/main.unknown", // unknown extension
 			line:               1,
 			character:          1,
 			endLine:            1,
@@ -1333,7 +1335,7 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				},
 			},
 			allowedDirectories: []string{"."},
-			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
+			uri:                "file:///path/to/mcp-lsp-bridge/lsp/main.go",
 			line:               1,
 			character:          1,
 			endLine:            1,
@@ -1361,7 +1363,7 @@ func TestMCPLSPBridge_GetCodeActions(t *testing.T) {
 				},
 			},
 			allowedDirectories: []string{"."},
-			uri:                "file:///home/rockerboo/code/mcp-lsp-bridge/lsp/main.go",
+			uri:                "file:///path/to/mcp-lsp-bridge/lsp/main.go",
 			line:               1,
 			character:          1,
 			endLine:            1,
@@ -1454,7 +1456,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 				},
 			},
 			allowedDirectories:    []string{"."},
-			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
+			workspaceUri:          "file:///path/to/mcp-lsp-bridge",
 			identifier:            "workspace-1",
 			mockDetectedLanguages: []types.Language{"go"},
 			mockDetectError:       nil,
@@ -1466,7 +1468,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
 							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
-								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Uri:     protocol.DocumentUri("file:///path/to/mcp-lsp-bridge/main.go"),
 								Version: &version,
 								Items: []protocol.Diagnostic{
 									{
@@ -1491,7 +1493,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
 							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
-								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Uri:     protocol.DocumentUri("file:///path/to/mcp-lsp-bridge/main.go"),
 								Version: &version,
 								Items: []protocol.Diagnostic{
 									{
@@ -1534,7 +1536,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 				},
 			},
 			allowedDirectories:    []string{"."},
-			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
+			workspaceUri:          "file:///path/to/mcp-lsp-bridge",
 			identifier:            "workspace-1",
 			mockDetectedLanguages: []types.Language{"go", "typescript"},
 			mockDetectError:       nil,
@@ -1547,7 +1549,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
 							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
-								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Uri:     protocol.DocumentUri("file:///path/to/mcp-lsp-bridge/main.go"),
 								Version: &version,
 								Items:   []protocol.Diagnostic{},
 							},
@@ -1558,7 +1560,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
 							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
-								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/src/index.ts"),
+								Uri:     protocol.DocumentUri("file:///path/to/mcp-lsp-bridge/src/index.ts"),
 								Version: &version,
 								Items:   []protocol.Diagnostic{},
 							},
@@ -1575,7 +1577,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
 							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
-								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Uri:     protocol.DocumentUri("file:///path/to/mcp-lsp-bridge/main.go"),
 								Version: &version,
 								Items:   []protocol.Diagnostic{},
 							},
@@ -1586,7 +1588,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
 							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
-								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/src/index.ts"),
+								Uri:     protocol.DocumentUri("file:///path/to/mcp-lsp-bridge/src/index.ts"),
 								Version: &version,
 								Items:   []protocol.Diagnostic{},
 							},
@@ -1614,7 +1616,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 				},
 			},
 			allowedDirectories:    []string{"."},
-			workspaceUri:          "file:///home/rockerboo/code/empty-project",
+			workspaceUri:          "file:///path/to/empty-project",
 			identifier:            "workspace-1",
 			mockDetectedLanguages: []types.Language{}, // No languages detected
 			mockDetectError:       nil,
@@ -1667,7 +1669,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 				},
 			},
 			allowedDirectories:    []string{"."},
-			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
+			workspaceUri:          "file:///path/to/mcp-lsp-bridge",
 			identifier:            "workspace-1",
 			mockDetectedLanguages: []types.Language{"go"},
 			mockDetectError:       nil,
@@ -1703,7 +1705,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 				},
 			},
 			allowedDirectories:    []string{"."},
-			workspaceUri:          "file:///home/rockerboo/code/mcp-lsp-bridge",
+			workspaceUri:          "file:///path/to/mcp-lsp-bridge",
 			identifier:            "workspace-1",
 			mockDetectedLanguages: []types.Language{"go", "typescript"},
 			mockDetectError:       nil,
@@ -1716,7 +1718,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
 							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
-								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Uri:     protocol.DocumentUri("file:///path/to/mcp-lsp-bridge/main.go"),
 								Version: &version,
 								Items:   []protocol.Diagnostic{},
 							},
@@ -1736,7 +1738,7 @@ func TestMCPLSPBridge_GetWorkspaceDiagnostics(t *testing.T) {
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
 						{
 							Value: protocol.WorkspaceFullDocumentDiagnosticReport{
-								Uri:     protocol.DocumentUri("file:///home/rockerboo/code/mcp-lsp-bridge/main.go"),
+								Uri:     protocol.DocumentUri("file:///path/to/mcp-lsp-bridge/main.go"),
 								Version: &version,
 								Items:   []protocol.Diagnostic{},
 							},
@@ -1826,6 +1828,12 @@ func TestIsAllowedDirectory(t *testing.T) {
 	project1 := filepath.Join(base, "project1")
 	project2 := filepath.Join(base, "project2")
 	other := filepath.Join(base, "other")
+
+	// Ensure directories exist (some tests chdir into them).
+	require.NoError(t, os.MkdirAll(project, 0o755))
+	require.NoError(t, os.MkdirAll(project1, 0o755))
+	require.NoError(t, os.MkdirAll(project2, 0o755))
+	require.NoError(t, os.MkdirAll(other, 0o755))
 
 	t.Run("allowed directory exact match", func(t *testing.T) {
 		bridge := createTestBridge([]string{project})

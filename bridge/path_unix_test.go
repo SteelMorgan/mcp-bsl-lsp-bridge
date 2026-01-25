@@ -18,8 +18,8 @@ func TestUnixSpecificPaths(t *testing.T) {
 	}{
 		{
 			name:    "absolute path",
-			path:    "/home/rockerboo/code/mcp-lsp-bridge",
-			want:    "/home/rockerboo/code/mcp-lsp-bridge",
+			path:    "/path/to/mcp-lsp-bridge",
+			want:    "/path/to/mcp-lsp-bridge",
 			wantErr: false,
 		},
 		{
@@ -88,32 +88,32 @@ func TestUnixIsWithinAllowedDirectory(t *testing.T) {
 	}{
 		{
 			name:    "subdirectory",
-			path:    "/home/rockerboo/code/mcp-lsp-bridge/lsp",
-			baseDir: "/home/rockerboo/code/mcp-lsp-bridge",
+			path:    "/path/to/mcp-lsp-bridge/lsp",
+			baseDir: "/path/to/mcp-lsp-bridge",
 			allowed: true,
 		},
 		{
 			name:    "different root directory",
 			path:    "/etc/config",
-			baseDir: "/home/rockerboo/code",
+			baseDir: "/path/to",
 			allowed: false,
 		},
 		{
 			name:    "case sensitive (Unix)",
-			path:    "/HOME/ROCKERBOO/CODE",
-			baseDir: "/home/rockerboo/code",
+			path:    "/PATH/TO",
+			baseDir: "/path/to",
 			allowed: false,
 		},
 		{
 			name:    "parent directory escape attempt",
-			path:    "/home/rockerboo/code/mcp-lsp-bridge/../..",
-			baseDir: "/home/rockerboo/code/mcp-lsp-bridge",
+			path:    "/path/to/mcp-lsp-bridge/../..",
+			baseDir: "/path/to/mcp-lsp-bridge",
 			allowed: false,
 		},
 		{
 			name:    "symlink-like path (resolved by filepath.Abs)",
-			path:    "/home/rockerboo/code/mcp-lsp-bridge/./lsp",
-			baseDir: "/home/rockerboo/code/mcp-lsp-bridge",
+			path:    "/path/to/mcp-lsp-bridge/./lsp",
+			baseDir: "/path/to/mcp-lsp-bridge",
 			allowed: true,
 		},
 		{
@@ -151,15 +151,15 @@ func TestUnixPermissions(t *testing.T) {
 	}{
 		{
 			name:    "non-existent subdirectory",
-			path:    "/home/rockerboo/code/nonexistent/subdir",
-			baseDir: "/home/rockerboo/code",
+			path:    "/path/to/nonexistent/subdir",
+			baseDir: "/path/to",
 			allowed: true,
 		},
 		{
 			name:    "non-existent parent attempt",
-			path:    "/home/rockerboo/code/../../../etc",
-			baseDir: "/home/rockerboo/code",
-			allowed: false, // /etc is NOT within /home/rockerboo/code
+			path:    "/path/to/../../../etc",
+			baseDir: "/path/to",
+			allowed: false, // /etc is NOT within /path/to
 		},
 	}
 

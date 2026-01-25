@@ -22,7 +22,7 @@ func TestWorkspaceDiagnosticsTool(t *testing.T) {
 	}{
 		{
 			name:         "successful workspace diagnostics",
-			workspaceUri: "/home/rockerboo/code/mcp-lsp-bridge",
+			workspaceUri: "/path/to/mcp-lsp-bridge",
 			mockDiagnostics: []any{
 				protocol.WorkspaceDiagnosticReport{
 					Items: []protocol.WorkspaceDocumentDiagnosticReport{
@@ -37,7 +37,7 @@ func TestWorkspaceDiagnosticsTool(t *testing.T) {
 		},
 		{
 			name:            "workspace diagnostics error",
-			workspaceUri:    "/home/rockerboo/code/mcp-lsp-bridge",
+			workspaceUri:    "/path/to/mcp-lsp-bridge",
 			mockDiagnostics: nil,
 			mockError:       errors.New("workspace diagnostics failed"),
 			expectError:     true,
@@ -45,7 +45,7 @@ func TestWorkspaceDiagnosticsTool(t *testing.T) {
 		},
 		{
 			name:            "empty workspace diagnostics",
-			workspaceUri:    "/home/rockerboo/code/mcp-lsp-bridge",
+			workspaceUri:    "/path/to/mcp-lsp-bridge",
 			mockDiagnostics: []any{},
 			mockError:       nil,
 			expectError:     false,
@@ -53,7 +53,7 @@ func TestWorkspaceDiagnosticsTool(t *testing.T) {
 		},
 		{
 			name:            "file URI workspace diagnostics",
-			workspaceUri:    "file:///home/rockerboo/code/mcp-lsp-bridge",
+			workspaceUri:    "file:///path/to/mcp-lsp-bridge",
 			mockDiagnostics: []any{},
 			mockError:       nil,
 			expectError:     false,

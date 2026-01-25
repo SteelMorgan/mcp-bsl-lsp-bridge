@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -34,6 +35,14 @@ func IsWithinAllowedDirectory(path, baseDir string) bool {
 	// Normalize paths by cleaning them
 	cleanBase := filepath.Clean(absBase)
 	cleanPath := filepath.Clean(absPath)
+
+	// Windows paths are case-insensitive by default.
+	// Make comparisons case-insensitive to avoid false negatives like:
+	// C:\Users\X vs c:\users\x
+	if runtime.GOOS == "windows" {
+		cleanBase = strings.ToLower(cleanBase)
+		cleanPath = strings.ToLower(cleanPath)
+	}
 
 	// Exact match
 	if cleanPath == cleanBase {

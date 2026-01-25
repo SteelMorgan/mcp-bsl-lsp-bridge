@@ -12,7 +12,7 @@
 
 ### Переменные окружения
 
-- `HOST_PROJECTS_ROOT` - корневой каталог на хост-системе (например: `D:\My Projects\Projects 1C`)
+- `HOST_PROJECTS_ROOT` - корневой каталог на хост-системе (например: `D:\Path\To\Projects`)
 - `PROJECTS_ROOT` - корневой каталог в контейнере (например: `/projects`)
 
 ### Примеры автоматического преобразования
@@ -20,8 +20,8 @@
 ```json
 // Входной запрос (хост-путь)
 {
-  "workspace_uri": "D:\\My Projects\\Projects 1C\\temp",
-  "query": "D:\\My Projects\\Projects 1C\\temp\\file.bsl"
+  "workspace_uri": "D:\\Path\\To\\Projects\\temp",
+  "query": "D:\\Path\\To\\Projects\\temp\\file.bsl"
 }
 
 // Автоматически преобразуется в (контейнер-путь)
@@ -66,34 +66,34 @@
 #### 3. Абсолютный путь Windows (обратные слэши)
 ```json
 {
-  "workspace_uri": "D:\\My Projects\\FrameWork 1C\\mcp-lsp-bridge\\test-workspace"
+  "workspace_uri": "D:\\Path\\To\\mcp-lsp-bridge\\test-workspace"
 }
 ```
-**Ошибка**: `project directory does not exist: D:\My Projects\FrameWork 1C\mcp-lsp-bridge\test-workspace`
+**Ошибка**: `project directory does not exist: D:\Path\To\mcp-lsp-bridge\test-workspace`
 
 #### 4. Абсолютный путь Unix (прямые слэши)
 ```json
 {
-  "workspace_uri": "D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace"
+  "workspace_uri": "D:/Path/To/mcp-lsp-bridge/test-workspace"
 }
 ```
-**Ошибка**: `project directory does not exist: D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace`
+**Ошибка**: `project directory does not exist: D:/Path/To/mcp-lsp-bridge/test-workspace`
 
 #### 5. File URI с тремя слэшами
 ```json
 {
-  "workspace_uri": "file:///D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace"
+  "workspace_uri": "file:///D:/Path/To/mcp-lsp-bridge/test-workspace"
 }
 ```
-**Ошибка**: `project directory does not exist: /D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace`
+**Ошибка**: `project directory does not exist: /D:/Path/To/mcp-lsp-bridge/test-workspace`
 
 #### 6. File URI с URL-кодированием пробелов
 ```json
 {
-  "workspace_uri": "file:///D:/My%20Projects/FrameWork%201C/mcp-lsp-bridge/test-workspace"
+  "workspace_uri": "file:///D:/Path%20To/mcp-lsp-bridge/test-workspace"
 }
 ```
-**Ошибка**: `project directory does not exist: /D:/My%20Projects/FrameWork%201C/mcp-lsp-bridge/test-workspace`
+**Ошибка**: `project directory does not exist: /D:/Path%20To/mcp-lsp-bridge/test-workspace`
 
 ## 🐳 Работающее решение через Docker
 
@@ -104,7 +104,7 @@
 ```bash
 # Монтируем корневой каталог проектов
 docker run --rm -i \
-  -v "D:\My Projects\Projects 1C:/projects:ro" \
+  -v "D:\Path\To\Projects:/projects:ro" \
   mcp-lsp-bridge-bsl-universal \
   mcp-lsp-bridge
 ```
@@ -162,7 +162,7 @@ docker run --rm -i \
 
 **Пример команды для тестирования**:
 ```bash
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"project_analysis","arguments":{"analysis_type":"workspace_analysis","query":"/projects/temp","workspace_uri":"file:///projects/temp"}}}' | docker run --rm -i -v "D:\My Projects\Projects 1C:/projects:ro" mcp-lsp-bridge-bsl-universal mcp-lsp-bridge
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"project_analysis","arguments":{"analysis_type":"workspace_analysis","query":"/projects/temp","workspace_uri":"file:///projects/temp"}}}' | docker run --rm -i -v "D:\Path\To\Projects:/projects:ro" mcp-lsp-bridge-bsl-universal mcp-lsp-bridge
 ```
 
 ## 🔧 Конфигурация для Docker
@@ -186,7 +186,7 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"project_an
       "env": {
         "WORKSPACE_ROOT": "/projects",
         "PROJECTS_ROOT": "/projects",
-        "HOST_PROJECTS_ROOT": "D:\\My Projects\\Projects 1C"
+        "HOST_PROJECTS_ROOT": "D:\\Path\\To\\Projects"
       }
     }
   }
@@ -196,9 +196,9 @@ echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"project_an
 ### Монтирование томов
 
 ```bash
--v "D:\My Projects\Projects 1C:/projects:ro"
--v "D:\My Projects\Projects 1C:/workspace:ro"
--v "D:\My Projects\Projects 1C:/home/user/projects:ro"
+-v "D:\Path\To\Projects:/projects:ro"
+-v "D:\Path\To\Projects:/workspace:ro"
+-v "D:\Path\To\Projects:/home/user/projects:ro"
 ```
 
 ## 🎯 Выводы
@@ -218,7 +218,7 @@ ENV HOST_PROJECTS_ROOT=""
 ENV PROJECTS_ROOT="/projects"
 
 # При запуске контейнера
--e "HOST_PROJECTS_ROOT=D:\My Projects\Projects 1C"
+-e "HOST_PROJECTS_ROOT=D:\Path\To\Projects"
 -e "PROJECTS_ROOT=/projects"
 ```
 
@@ -231,12 +231,11 @@ ENV PROJECTS_ROOT="/projects"
 
 Bridge автоматически логирует режим работы:
 ```
-INFO: Docker path mapping enabled: D:\My Projects\Projects 1C -> /projects
+INFO: Docker path mapping enabled: D:\Path\To\Projects -> /projects
 WARN: Path mapper initialization failed, using local mode: ...
 ```
 
 ## 📚 Дополнительные ресурсы
 
-- [DOCKER_SETUP_REPORT.md](DOCKER_SETUP_REPORT.md) - Отчет о настройке Docker контейнера
 - [DOCKER_UNIVERSAL_SETUP.md](DOCKER_UNIVERSAL_SETUP.md) - Универсальная настройка Docker
 - [mcp_config.docker.test.json](mcp_config.docker.test.json) - Конфигурация для Docker

@@ -14,7 +14,7 @@ func TestNewDockerPathMapper(t *testing.T) {
 	}{
 		{
 			name:          "valid paths",
-			hostRoot:      "D:/My Projects/Projects 1C",
+			hostRoot:      "D:/Path/To/Projects",
 			containerRoot: "/projects",
 			expectError:   false,
 		},
@@ -26,13 +26,13 @@ func TestNewDockerPathMapper(t *testing.T) {
 		},
 		{
 			name:          "empty container root",
-			hostRoot:      "D:/My Projects/Projects 1C",
+			hostRoot:      "D:/Path/To/Projects",
 			containerRoot: "",
 			expectError:   true,
 		},
 		{
 			name:          "relative container root",
-			hostRoot:      "D:/My Projects/Projects 1C",
+			hostRoot:      "D:/Path/To/Projects",
 			containerRoot: "projects",
 			expectError:   true,
 		},
@@ -91,7 +91,7 @@ func TestNewDockerPathMapperFromEnv(t *testing.T) {
 	}{
 		{
 			name:           "enabled with HOST_PROJECTS_ROOT",
-			hostRootEnv:    "D:/My Projects/Projects 1C",
+			hostRootEnv:    "D:/Path/To/Projects",
 			projectsRootEnv: "/projects",
 			expectEnabled:  true,
 		},
@@ -138,7 +138,7 @@ func TestNewDockerPathMapperFromEnv(t *testing.T) {
 }
 
 func TestHostToContainer(t *testing.T) {
-	mapper, err := NewDockerPathMapper("D:/My Projects/Projects 1C", "/projects")
+	mapper, err := NewDockerPathMapper("D:/Path/To/Projects", "/projects")
 	if err != nil {
 		t.Fatalf("Failed to create mapper: %v", err)
 	}
@@ -151,26 +151,26 @@ func TestHostToContainer(t *testing.T) {
 	}{
 		{
 			name:        "root directory",
-			hostPath:    "D:/My Projects/Projects 1C",
+			hostPath:    "D:/Path/To/Projects",
 			expected:    "/projects",
 			expectError: false,
 		},
 		{
 			name:        "subdirectory",
-			hostPath:    "D:/My Projects/Projects 1C/temp",
+			hostPath:    "D:/Path/To/Projects/temp",
 			expected:    "/projects/temp",
 			expectError: false,
 		},
 		{
 			name:        "file path",
-			hostPath:    "D:/My Projects/Projects 1C/temp/file.bsl",
+			hostPath:    "D:/Path/To/Projects/temp/file.bsl",
 			expected:    "/projects/temp/file.bsl",
 			expectError: false,
 		},
 		{
 			name:        "path with spaces",
-			hostPath:    "D:/My Projects/Projects 1C/GBIG Portfolio asset management",
-			expected:    "/projects/GBIG Portfolio asset management",
+			hostPath:    "D:/Path/To/Projects/Example Project With Spaces",
+			expected:    "/projects/Example Project With Spaces",
 			expectError: false,
 		},
 		{
@@ -208,7 +208,7 @@ func TestHostToContainer(t *testing.T) {
 }
 
 func TestContainerToHost(t *testing.T) {
-	mapper, err := NewDockerPathMapper("D:/My Projects/Projects 1C", "/projects")
+	mapper, err := NewDockerPathMapper("D:/Path/To/Projects", "/projects")
 	if err != nil {
 		t.Fatalf("Failed to create mapper: %v", err)
 	}
@@ -222,19 +222,19 @@ func TestContainerToHost(t *testing.T) {
 		{
 			name:          "root directory",
 			containerPath: "/projects",
-			expected:      "D:/My Projects/Projects 1C",
+			expected:      "D:/Path/To/Projects",
 			expectError:   false,
 		},
 		{
 			name:          "subdirectory",
 			containerPath: "/projects/temp",
-			expected:      "D:/My Projects/Projects 1C/temp",
+			expected:      "D:/Path/To/Projects/temp",
 			expectError:   false,
 		},
 		{
 			name:          "file path",
 			containerPath: "/projects/temp/file.bsl",
-			expected:      "D:/My Projects/Projects 1C/temp/file.bsl",
+			expected:      "D:/Path/To/Projects/temp/file.bsl",
 			expectError:   false,
 		},
 		{
@@ -272,7 +272,7 @@ func TestContainerToHost(t *testing.T) {
 }
 
 func TestDockerPathMapperNormalizeURI(t *testing.T) {
-	mapper, err := NewDockerPathMapper("D:/My Projects/Projects 1C", "/projects")
+	mapper, err := NewDockerPathMapper("D:/Path/To/Projects", "/projects")
 	if err != nil {
 		t.Fatalf("Failed to create mapper: %v", err)
 	}
@@ -285,25 +285,25 @@ func TestDockerPathMapperNormalizeURI(t *testing.T) {
 	}{
 		{
 			name:        "file URI with subdirectory",
-			uri:         "file:///D:/My Projects/Projects 1C/temp",
+			uri:         "file:///D:/Path/To/Projects/temp",
 			expected:    "file:///projects/temp",
 			expectError: false,
 		},
 		{
 			name:        "file URI with file",
-			uri:         "file:///D:/My Projects/Projects 1C/temp/file.bsl",
+			uri:         "file:///D:/Path/To/Projects/temp/file.bsl",
 			expected:    "file:///projects/temp/file.bsl",
 			expectError: false,
 		},
 		{
 			name:        "file URI with Windows path format",
-			uri:         "file:///D:/My Projects/Projects 1C/temp",
+			uri:         "file:///D:/Path/To/Projects/temp",
 			expected:    "file:///projects/temp",
 			expectError: false,
 		},
 		{
 			name:        "path without file:// prefix",
-			uri:         "D:/My Projects/Projects 1C/temp",
+			uri:         "D:/Path/To/Projects/temp",
 			expected:    "file:///projects/temp",
 			expectError: false,
 		},
@@ -336,7 +336,7 @@ func TestDockerPathMapperNormalizeURI(t *testing.T) {
 }
 
 func TestValidatePath(t *testing.T) {
-	mapper, err := NewDockerPathMapper("D:/My Projects/Projects 1C", "/projects")
+	mapper, err := NewDockerPathMapper("D:/Path/To/Projects", "/projects")
 	if err != nil {
 		t.Fatalf("Failed to create mapper: %v", err)
 	}
@@ -348,12 +348,12 @@ func TestValidatePath(t *testing.T) {
 	}{
 		{
 			name:        "valid path",
-			path:        "D:/My Projects/Projects 1C/temp",
+			path:        "D:/Path/To/Projects/temp",
 			expectError: false,
 		},
 		{
 			name:        "root path",
-			path:        "D:/My Projects/Projects 1C",
+			path:        "D:/Path/To/Projects",
 			expectError: false,
 		},
 		{
@@ -393,7 +393,7 @@ func TestDisabledMapper(t *testing.T) {
 	}
 
 	// Test that disabled mapper returns paths as-is
-	hostPath := "D:/My Projects/Projects 1C/temp"
+	hostPath := "D:/Path/To/Projects/temp"
 	result, err := mapper.HostToContainer(hostPath)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -403,7 +403,7 @@ func TestDisabledMapper(t *testing.T) {
 	}
 
 	// Test URI normalization
-	uri := "file:///D:/My Projects/Projects 1C/temp"
+	uri := "file:///D:/Path/To/Projects/temp"
 	result, err = mapper.NormalizeURI(uri)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -440,7 +440,7 @@ func TestPathWithCyrillic(t *testing.T) {
 
 func TestCrossPlatformPaths(t *testing.T) {
 	// Test with different path separators
-	mapper, err := NewDockerPathMapper("D:/My Projects/Projects 1C", "/projects")
+	mapper, err := NewDockerPathMapper("D:/Path/To/Projects", "/projects")
 	if err != nil {
 		t.Fatalf("Failed to create mapper: %v", err)
 	}
@@ -452,17 +452,17 @@ func TestCrossPlatformPaths(t *testing.T) {
 	}{
 		{
 			name:     "forward slashes",
-			hostPath: "D:/My Projects/Projects 1C/temp",
+			hostPath: "D:/Path/To/Projects/temp",
 			expected: "/projects/temp",
 		},
 		{
 			name:     "backslashes",
-			hostPath: "D:\\My Projects\\Projects 1C\\temp",
+			hostPath: "D:\\Path\\To\\Projects\\temp",
 			expected: "/projects/temp",
 		},
 		{
 			name:     "mixed separators",
-			hostPath: "D:/My Projects\\Projects 1C/temp",
+			hostPath: "D:/Path/To\\Projects/temp",
 			expected: "/projects/temp",
 		},
 	}
@@ -513,7 +513,7 @@ func TestIsWindowsAbsPath(t *testing.T) {
 // TestCaseInsensitiveMatching tests that path matching is case-insensitive for Windows paths
 func TestCaseInsensitiveMatching(t *testing.T) {
 	// Create mapper with mixed case host root
-	mapper, err := NewDockerPathMapper("D:/My Projects/Projects 1C", "/projects")
+	mapper, err := NewDockerPathMapper("D:/Path/To/Projects", "/projects")
 	if err != nil {
 		t.Fatalf("Failed to create mapper: %v", err)
 	}
@@ -526,25 +526,25 @@ func TestCaseInsensitiveMatching(t *testing.T) {
 	}{
 		{
 			name:        "exact case match",
-			hostPath:    "D:/My Projects/Projects 1C/test",
+			hostPath:    "D:/Path/To/Projects/test",
 			expected:    "/projects/test",
 			expectError: false,
 		},
 		{
 			name:        "lowercase drive letter",
-			hostPath:    "d:/My Projects/Projects 1C/test",
+			hostPath:    "d:/Path/To/Projects/test",
 			expected:    "/projects/test",
 			expectError: false,
 		},
 		{
 			name:        "uppercase path",
-			hostPath:    "D:/MY PROJECTS/PROJECTS 1C/test",
+			hostPath:    "D:/PATH/TO/PROJECTS/test",
 			expected:    "/projects/test",
 			expectError: false,
 		},
 		{
 			name:        "mixed case",
-			hostPath:    "d:/my projects/projects 1c/Test",
+			hostPath:    "d:/path/to/projects/Test",
 			expected:    "/projects/Test",
 			expectError: false,
 		},
@@ -573,7 +573,7 @@ func TestCaseInsensitiveMatching(t *testing.T) {
 // TestWindowsBackslashHostRoot tests that mapper works when host root has backslashes
 func TestWindowsBackslashHostRoot(t *testing.T) {
 	// Create mapper with Windows-style backslash host root
-	mapper, err := NewDockerPathMapper("D:\\My Projects\\Projects 1C", "/projects")
+	mapper, err := NewDockerPathMapper("D:\\Path\\To\\Projects", "/projects")
 	if err != nil {
 		t.Fatalf("Failed to create mapper: %v", err)
 	}
@@ -586,19 +586,19 @@ func TestWindowsBackslashHostRoot(t *testing.T) {
 	}{
 		{
 			name:        "backslash input",
-			hostPath:    "D:\\My Projects\\Projects 1C\\test",
+			hostPath:    "D:\\Path\\To\\Projects\\test",
 			expected:    "/projects/test",
 			expectError: false,
 		},
 		{
 			name:        "forward slash input",
-			hostPath:    "D:/My Projects/Projects 1C/test",
+			hostPath:    "D:/Path/To/Projects/test",
 			expected:    "/projects/test",
 			expectError: false,
 		},
 		{
 			name:        "file URI input",
-			hostPath:    "file:///D:/My Projects/Projects 1C/test.bsl",
+			hostPath:    "file:///D:/Path/To/Projects/test.bsl",
 			expected:    "file:///projects/test.bsl",
 			expectError: false,
 		},
@@ -626,8 +626,8 @@ func TestWindowsBackslashHostRoot(t *testing.T) {
 
 // TestRealWorldPaths tests paths that would actually be used by Cursor/Claude
 func TestRealWorldPaths(t *testing.T) {
-	// This is the exact scenario from the user's setup
-	mapper, err := NewDockerPathMapper("D:\\My Projects\\FrameWork 1C\\mcp-lsp-bridge", "/projects")
+	// Example scenario similar to a Windows dev setup (paths with spaces)
+	mapper, err := NewDockerPathMapper("D:\\Path\\To\\mcp-lsp-bridge", "/projects")
 	if err != nil {
 		t.Fatalf("Failed to create mapper: %v", err)
 	}
@@ -640,31 +640,31 @@ func TestRealWorldPaths(t *testing.T) {
 	}{
 		{
 			name:        "test-workspace with backslashes",
-			hostPath:    "D:\\My Projects\\FrameWork 1C\\mcp-lsp-bridge\\test-workspace",
+			hostPath:    "D:\\Path\\To\\mcp-lsp-bridge\\test-workspace",
 			expected:    "/projects/test-workspace",
 			expectError: false,
 		},
 		{
 			name:        "test-workspace with forward slashes",
-			hostPath:    "D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace",
+			hostPath:    "D:/Path/To/mcp-lsp-bridge/test-workspace",
 			expected:    "/projects/test-workspace",
 			expectError: false,
 		},
 		{
 			name:        "BSL file with backslashes",
-			hostPath:    "D:\\My Projects\\FrameWork 1C\\mcp-lsp-bridge\\test-workspace\\Catalogs\\Test\\Module.bsl",
+			hostPath:    "D:\\Path\\To\\mcp-lsp-bridge\\test-workspace\\Catalogs\\Test\\Module.bsl",
 			expected:    "/projects/test-workspace/Catalogs/Test/Module.bsl",
 			expectError: false,
 		},
 		{
 			name:        "file URI format",
-			hostPath:    "file:///D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace/test.bsl",
+			hostPath:    "file:///D:/Path/To/mcp-lsp-bridge/test-workspace/test.bsl",
 			expected:    "file:///projects/test-workspace/test.bsl",
 			expectError: false,
 		},
 		{
 			name:        "lowercase drive in file URI",
-			hostPath:    "file:///d:/My Projects/FrameWork 1C/mcp-lsp-bridge/test.bsl",
+			hostPath:    "file:///d:/Path/To/mcp-lsp-bridge/test.bsl",
 			expected:    "file:///projects/test.bsl",
 			expectError: false,
 		},

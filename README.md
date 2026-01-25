@@ -1,126 +1,182 @@
-# MCP LSP Bridge
+# MCP BSL LS Bridge
 
-Brings Language Server Protocol capabilities to MCP-compatible agents like Claude Code. Analyze, navigate, and refactor code across 20+ programming languages.
+MCP-сервер, который даёт ИИ-агентам (Cursor, Claude Code и др.) доступ к возможностям BSL Language Server для работы с кодом 1С и OneScript: навигация, поиск, диагностика, рефакторинг. Цель - обеспечить детерминированные операции над кодом и экономия токенов (конечно модель всё может сделать грепами, но сколько токенов сожжет?)
 
-## Status
+## Особенности проекта
+- BSL LS поднимается заранее и сразу начинает подготовку кеша.
+- добавлена надстройка call_graph для формирования полного графа вызовов силами BSL LS
 
-**Under active development** - Core functionality works today, but expect rapid improvements and interface changes.
+## Как это работает
 
-## Roadmap
-
-- Improve performance for smaller models, Qwen3-4B, quantized models
-- Improve detection and usage for LSP tools
-- Add functionality to reduce the number of tools we expose (rename, formatting may be low priority and optional)
-- Make onboarding easier with default configuration options and separate configuration options that can be scripted (maybe like Lua to allow scripting the LSP configuration)
-
-## Quick Start
-
-1. **Install**: Download from releases or build with `go build`
-2. **Configure**: Add to your MCP client (like Claude Code):
-   ```json
-   {
-     "mcpServers": {
-       "lsp": {
-         "type": "stdio",
-         "command": "mcp-lsp-bridge",
-         "args": [],
-         "env": {}
-       }
-     }
-   }
-   ```
-3. Configure LSP servers with lsp_config.json in your configuration location: [default-directory-locations](/docs/configuration.md#default-directory-locations)
-  - or with `mcp-lsp-bridge --config /path/to/my-config.json` inside your MCP client configuration.
-4. **Use**: Access LSP tools through your MCP client
-
-See [docs/configuration.md](docs/configuration.md) for detailed setup.
-
-## What It Does
-
-Provides MCP-compatible agents with LSP capabilities:
-
-**Code Intelligence**: Get documentation, find definitions, trace references, identify errors
-
-**Safe Refactoring**: Rename symbols, format code, apply quick fixes (with preview mode)
-
-**Project Analysis**: Search across codebases, understand project structure, detect languages
-
-Supports 20+ languages including Go, Python, TypeScript, Rust, Java, C#, C++.
-
-## Configuration
-
-Requires an `lsp_config.json` file to define language servers. See [configuration.md](docs/configuration.md) for where to place it.
-
-Basic example with passing your configuration (useful if you want a specific configuration for a project):
-
-```bash
-mcp-lsp-bridge --config lsp_config.json
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  HOST (Windows/Linux/macOS)                                     │
+│                                                                 │
+│  ┌──────────────┐      ┌──────────────────────────────────────┐ │
+│  │   Cursor     │      │         Кодовая база 1С              │ │
+│  │   (IDE)      │      │   D:/Projects/MyConfig               │ │
+│  └──────┬───────┘      └──────────────┬───────────────────────┘ │
+│         │ docker exec -i              │ volume mount            │
+└─────────┼─────────────────────────────┼─────────────────────────┘
+          │                             │
+          ▼                             ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  DOCKER CONTAINER                                               │
+│                                                                 │
+│  ┌──────────────────────────────────────────────────────────┐   │
+│  │  mcp-lsp-bridge (MCP Server)                             │   │
+│  │  Принимает запросы от IDE, транслирует в LSP             │   │
+│  └──────────────────────┬───────────────────────────────────┘   │
+│                         │ TCP :9999                             │
+│  ┌──────────────────────▼───────────────────────────────────┐   │
+│  │  lsp-session-manager                                     │   │
+│  │  Держит BSL LS запущенным, следит за индексацией         │   │
+│  └──────────────────────┬───────────────────────────────────┘   │
+│                         │ stdio                                 │
+│  ┌──────────────────────▼───────────────────────────────────┐   │
+│  │  BSL Language Server (Java)                              │   │
+│  │  Индексация, диагностика, навигация, рефакторинг         │   │
+│  └──────────────────────────────────────────────────────────┘   │
+│                         ▲                                       │
+│  ┌──────────────────────┴───────────────────────────────────┐   │
+│  │  /projects (смонтированная кодовая база)                 │   │
+│  └──────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-In your .mcp.json or other MCP configuration:
+## Требования
+
+- Docker + Docker Compose
+- IDE с поддержкой MCP (Cursor, Claude Code)
+- 8+ ГБ RAM (BSL LS требователен к памяти на больших проектах)
+
+## Быстрый старт
+
+**Принцип**: один проект = один контейнер (каталог проекта задаётся в `.env`)
+
+### 1. Клонируй репозиторий
+
+```bash
+git clone https://github.com/SteelMorgan/mcp-bsl-lsp-bridge.git
+cd mcp-bsl-lsp-bridge
+```
+
+### 2. Настрой окружение
+
+```bash
+cp env.example .env
+```
+
+Отредактируй `.env` — минимум нужно указать:
+- `MCP_PROJECT_NAME` — имя проекта (будет частью имени контейнера)
+- `HOST_PROJECTS_ROOT` — путь к коду 1С на хосте
+
+Все параметры описаны в `env.example`.
+
+### 3. Собери и запусти контейнер
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+Имя контейнера: `${MCP_CONTAINER_PREFIX}-${MCP_PROJECT_NAME}` (например `mcp-lsp-demo`)
+
+### 4. Подключи MCP в IDE
+
+Создай `.cursor/mcp.json` (или аналог для твоего MCP-клиента):
 
 ```json
 {
   "mcpServers": {
-    "lsp": {
+    "lsp-bsl-bridge": {
       "type": "stdio",
-      "command": "mcp-lsp-bridge",
-      "args": ["--config", "lsp_config.json"],
+      "command": "docker",
+      "args": [
+        "exec",
+        "-i",
+        "mcp-lsp-demo",
+        "mcp-lsp-bridge"
+      ],
       "env": {}
     }
   }
 }
 ```
 
-See [docs/configuration.md](docs/configuration.md) for complete setup instructions.
+Замени `mcp-lsp-demo` на реальное имя контейнера.
 
-## Available Tools
+### 5. Проверь подключение
 
-16 MCP tools for code analysis and manipulation:
+В IDE вызови tool `lsp_status` — должен показать статус подключения и прогресс индексации.
 
-- **Analysis**: Symbol search, project exploration, diagnostics
-- **Navigation**: Find definitions, references, implementations
-- **Refactoring**: Rename symbols, format code, apply fixes
-- **Intelligence**: Hover info, signatures, semantic tokens
+---
 
-**📚 Documentation:**
+## Возможности (Tools)
 
-- [Codebase Guide](docs/codebase-guide.md) - Architecture and structure overview 🆕
-- [Tools Reference](docs/tools/tools-reference.md) - Complete tool list
-- [Analysis Overview](docs/analysis-overview.md) - Quick start guide
-- [Project Analysis Guide](docs/tools/project-analysis-guide.md) - Detailed analysis tool guide
-- [Symbol Exploration Guide](docs/tools/symbol-exploration-guide.md) - Smart symbol search guide
+### Поиск и навигация
 
-## Docker
+| Tool | Что делает | Когда использовать |
+|------|------------|-------------------|
+| `project_analysis` | Универсальный поиск: символы, файлы, текст | Найти процедуру по имени, обзор проекта |
+| `symbol_explore` | Детальный поиск с кодом и документацией | Нужна полная информация о символе |
+| `definition` | Перейти к определению | "Где объявлена эта процедура?" |
+| `hover` | Документация и сигнатура | "Какие параметры у функции?" |
+| `get_range_content` | Получить фрагмент кода | Извлечь код по координатам |
 
-Base image available (LSP servers not included):
+### Анализ зависимостей
 
-```bash
-docker pull ghcr.io/rockerboo/mcp-lsp-bridge:latest
-```
+| Tool | Что делает | Когда использовать |
+|------|------------|-------------------|
+| `call_hierarchy` | Кто вызывает / что вызывает (1 уровень) | Быстро понять связи |
+| `call_graph` | Полный граф вызовов | Глубокий анализ перед рефакторингом |
 
-Extend the image to add your needed LSP servers. See [docs/configuration.md](docs/configuration.md) for examples.
+### Диагностика и исправления
 
-## Project-per-container workflow (recommended for 1C/BSL)
+| Tool | Что делает | Когда использовать |
+|------|------------|-------------------|
+| `document_diagnostics` | Ошибки и предупреждения | "Что не так в модуле?" |
+| `code_actions` | Предложения по исправлению | Автофиксы от BSL LS |
 
-This repo includes a **Dockerfile + docker-compose.yml** intended for a "one container per project" workflow.
+### Рефакторинг
 
-- Copy `env.example` → `.env` and set at least:
-  - `MCP_PROJECT_NAME`
-  - `HOST_PROJECTS_ROOT`
-  - `WORKSPACE_ROOT`
-  - `MCP_LSP_BSL_JAVA_XMX` (heap size per project)
-- Build & run:
+| Tool | Что делает | Когда использовать |
+|------|------------|-------------------|
+| `prepare_rename` | Проверить возможность переименования | Перед переименованием |
+| `rename` | Переименовать символ везде | `apply=false` для preview |
 
-```bash
-docker compose build --no-cache
-docker compose up -d
-```
+### Служебные
 
-The container name becomes: `mcp-lsp-${MCP_PROJECT_NAME}` (prefix controlled by `MCP_CONTAINER_PREFIX`).
+| Tool | Что делает | Когда использовать |
+|------|------------|-------------------|
+| `lsp_status` | Статус LSP и прогресс индексации | Проверить готовность |
+| `did_change_watched_files` | Уведомить об изменении файлов | После git pull |
 
-## Contribute
+> Подробнее: `docs/tools/tools-reference.md`
 
-Open for contributions. Will help get changes merged in while I develop a contributors document about the key details. 
+---
 
-Open issues for any problems you have or ideas for improvement.
+## Документация
+
+- [Конфигурация](docs/configuration.md) — параметры `.env` и `lsp_config.json`
+- [Архитектура кода](docs/codebase-guide.md) — структура проекта для контрибьюторов
+- [Справочник tools](docs/tools/tools-reference.md) — полное описание инструментов
+- [Tool → LSP mapping](docs/tools/lsp-methods-map.md) — какие LSP методы вызывает каждый tool
+
+---
+
+## Дорожная карта
+
+- [ ] Улучшить File Watcher для Win + Docker (пока polling, ищем решения)
+- [ ] Автообновление BSL LS при запуске контейнера
+- [ ] Сократить количество tools, упаковать логику в навыки
+
+---
+
+## Вклад в проект
+
+См. `CONTRIBUTING.md`. Баги и идеи — через Issues.
+
+## Благодарности
+https://github.com/rockerBOO/mcp-lsp-bridge - взято за основу
+https://github.com/nixel2007 - за консультации по BSL LS

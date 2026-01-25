@@ -1,0 +1,44 @@
+name: ${MCP_CONTAINER_PREFIX}-${MCP_PROJECT_NAME}
+
+services:
+  mcp-lsp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # BSL LS version: "latest" for newest, or specific like "0.28.1"
+        BSL_LS_VERSION: ${BSL_LS_VERSION:-latest}
+    image: mcp-lsp-bridge-bsl:${MCP_LSP_BRIDGE_TAG:-latest}
+
+    container_name: ${MCP_CONTAINER_PREFIX:-mcp-lsp}-${MCP_PROJECT_NAME:-bridge}
+    restart: unless-stopped
+
+    mem_limit: ${CONTAINER_MEMORY:-8g}
+    cpus: ${CONTAINER_CPUS:-4}
+
+    environment:
+      HOST_PROJECTS_ROOT: ${HOST_PROJECTS_ROOT}
+      PROJECTS_ROOT: ${PROJECTS_ROOT:-/projects}
+      WORKSPACE_ROOT: ${WORKSPACE_ROOT:-/projects}
+      BSL_LS_PORT: ${BSL_LS_PORT:-9999}
+      MCP_LSP_BSL_JAVA_XMX: ${MCP_LSP_BSL_JAVA_XMX:-6g}
+      MCP_LSP_BSL_JAVA_XMS: ${MCP_LSP_BSL_JAVA_XMS:-2g}
+      MCP_LSP_LOG_LEVEL: ${MCP_LSP_LOG_LEVEL:-debug}
+      # File watcher configuration
+      # Modes: off (manual tool only), polling (for Docker/Windows), fsnotify (Linux native), auto
+      FILE_WATCHER_MODE: ${FILE_WATCHER_MODE:-polling}
+      FILE_WATCHER_INTERVAL: ${FILE_WATCHER_INTERVAL:-30s}
+      FILE_WATCHER_WORKERS: ${FILE_WATCHER_WORKERS:-8}
+
+    volumes:
+      - "${HOST_PROJECTS_ROOT}:${PROJECTS_ROOT:-/projects}:${PROJECTS_MOUNT_MODE:-ro}"
+      # BSL LS is now bundled in the image (downloaded during build)
+      # Uncomment below to override with a local version:
+      # - "${BSL_LS_HOST_DIR}:/opt/bsl-ls:ro"
+
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost ${BSL_LS_PORT:-9999}"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3

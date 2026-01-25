@@ -97,6 +97,18 @@ func (m *MockBridge) DetectPrimaryProjectLanguage(projectPath string) (*types.La
 	return args.Get(0).(*types.Language), args.Error(1)
 }
 
+func (m *MockBridge) GetConnectedLanguages() []types.Language {
+	// This method is an optimization hint. Many tests don't care about it, so
+	// provide a safe default when no expectation was configured.
+	for _, c := range m.ExpectedCalls {
+		if c.Method == "GetConnectedLanguages" {
+			args := m.Called()
+			return args.Get(0).([]types.Language)
+		}
+	}
+	return nil
+}
+
 func (m *MockBridge) FindSymbolReferences(language, uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
 	args := m.Called(language, uri, line, character, includeDeclaration)
 	return args.Get(0).([]protocol.Location), args.Error(1)

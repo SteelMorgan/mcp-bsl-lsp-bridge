@@ -9,12 +9,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"time"
 
-	"github.com/myleshyson/lsprotocol-go/protocol"
 	"rockerboo/mcp-lsp-bridge/logger"
 	"rockerboo/mcp-lsp-bridge/types"
+
+	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
 // SessionAdapter adapts SessionClient to LanguageClientInterface
@@ -28,7 +28,7 @@ type SessionAdapter struct {
 // NewSessionAdapter creates a new session adapter
 func NewSessionAdapter(host string, port int) (*SessionAdapter, error) {
 	client := NewSessionClient(host, port)
-	
+
 	return &SessionAdapter{
 		client: client,
 	}, nil
@@ -36,14 +36,11 @@ func NewSessionAdapter(host string, port int) (*SessionAdapter, error) {
 
 // Connect connects to Session Manager
 func (sa *SessionAdapter) Connect() (types.LanguageClientInterface, error) {
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: Connecting to Session Manager at %s:%d\n", sa.client.host, sa.client.port)
 	if err := sa.client.Connect(); err != nil {
 		sa.lastError = err.Error()
-		fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: Connect error: %v\n", err)
 		return nil, err
 	}
 	sa.connected = true
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: Connected successfully\n")
 	return sa, nil
 }
 
@@ -76,26 +73,20 @@ func (sa *SessionAdapter) GetProjectRoots() []string {
 // Initialize - Session Manager is already initialized, just return success
 func (sa *SessionAdapter) Initialize(params protocol.InitializeParams) (*protocol.InitializeResult, error) {
 	logger.Debug("SessionAdapter: Initialize called - Session Manager already initialized")
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: Initialize called\n")
-	
+
 	// Get capabilities from Session Manager
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: Getting status from Session Manager\n")
 	status, err := sa.client.GetStatus(ctx)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: GetStatus error: %v\n", err)
 		return nil, fmt.Errorf("failed to get session status: %w", err)
 	}
-	
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: Status: %+v\n", status)
-	
+
 	initialized, ok := status["initialized"].(bool)
 	if !ok || !initialized {
 		return nil, fmt.Errorf("Session Manager not initialized")
 	}
-	
+
 	// Return minimal result - actual capabilities are in Session Manager
 	// We return an empty capabilities struct - the bridge doesn't really use this
 	return &protocol.InitializeResult{
@@ -134,7 +125,7 @@ func (sa *SessionAdapter) DidChange(uri string, version int32, changes []protoco
 	return nil
 }
 
-// DidSave - not implemented yet  
+// DidSave - not implemented yet
 func (sa *SessionAdapter) DidSave(uri string, text *string) error {
 	// TODO: implement if needed
 	return nil
@@ -151,21 +142,21 @@ func (sa *SessionAdapter) DidClose(uri string) error {
 func (sa *SessionAdapter) Hover(uri string, line, character uint32) (*protocol.Hover, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	result, err := sa.client.Hover(ctx, uri, line, character)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var hover protocol.Hover
 	if err := json.Unmarshal(result, &hover); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal hover: %w", err)
 	}
-	
+
 	return &hover, nil
 }
 
@@ -173,21 +164,21 @@ func (sa *SessionAdapter) Hover(uri string, line, character uint32) (*protocol.H
 func (sa *SessionAdapter) Definition(uri string, line, character uint32) ([]protocol.Or2[protocol.LocationLink, protocol.Location], error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	
+
 	result, err := sa.client.Definition(ctx, uri, line, character)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var locations []protocol.Or2[protocol.LocationLink, protocol.Location]
 	if err := json.Unmarshal(result, &locations); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal definition: %w", err)
 	}
-	
+
 	return locations, nil
 }
 
@@ -195,21 +186,21 @@ func (sa *SessionAdapter) Definition(uri string, line, character uint32) ([]prot
 func (sa *SessionAdapter) References(uri string, line, character uint32, includeDeclaration bool) ([]protocol.Location, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	
+
 	result, err := sa.client.References(ctx, uri, line, character, includeDeclaration)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var locations []protocol.Location
 	if err := json.Unmarshal(result, &locations); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal references: %w", err)
 	}
-	
+
 	return locations, nil
 }
 
@@ -217,21 +208,21 @@ func (sa *SessionAdapter) References(uri string, line, character uint32, include
 func (sa *SessionAdapter) DocumentSymbols(uri string) ([]protocol.DocumentSymbol, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	
+
 	result, err := sa.client.DocumentSymbols(ctx, uri)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var symbols []protocol.DocumentSymbol
 	if err := json.Unmarshal(result, &symbols); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal document symbols: %w", err)
 	}
-	
+
 	return symbols, nil
 }
 
@@ -239,109 +230,97 @@ func (sa *SessionAdapter) DocumentSymbols(uri string) ([]protocol.DocumentSymbol
 func (sa *SessionAdapter) WorkspaceSymbols(query string) ([]protocol.WorkspaceSymbol, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	
+
 	result, err := sa.client.WorkspaceSymbol(ctx, query)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var symbols []protocol.WorkspaceSymbol
 	if err := json.Unmarshal(result, &symbols); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal workspace symbols: %w", err)
 	}
-	
+
 	return symbols, nil
 }
 
 // PrepareCallHierarchy prepares call hierarchy
 func (sa *SessionAdapter) PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error) {
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: PrepareCallHierarchy uri=%s line=%d char=%d\n", uri, line, character)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	
+
 	result, err := sa.client.PrepareCallHierarchy(ctx, uri, line, character)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: PrepareCallHierarchy error: %v\n", err)
 		return nil, err
 	}
-	
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: PrepareCallHierarchy result: %s\n", string(result))
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var items []protocol.CallHierarchyItem
 	if err := json.Unmarshal(result, &items); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal call hierarchy items: %w", err)
 	}
-	
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: PrepareCallHierarchy found %d items\n", len(items))
+
 	return items, nil
 }
 
 // IncomingCalls gets incoming calls
 func (sa *SessionAdapter) IncomingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyIncomingCall, error) {
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: IncomingCalls for item: %s\n", item.Name)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	
+
 	itemJSON, err := json.Marshal(item)
 	if err != nil {
 		return nil, err
 	}
-	
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: IncomingCalls sending: %s\n", string(itemJSON))
+
 	result, err := sa.client.IncomingCalls(ctx, itemJSON)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: IncomingCalls error: %v\n", err)
 		return nil, err
 	}
-	
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: IncomingCalls result: %s\n", string(result))
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var calls []protocol.CallHierarchyIncomingCall
 	if err := json.Unmarshal(result, &calls); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal incoming calls: %w", err)
 	}
-	
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: IncomingCalls found %d calls\n", len(calls))
+
 	return calls, nil
 }
 
 // OutgoingCalls gets outgoing calls
 func (sa *SessionAdapter) OutgoingCalls(item protocol.CallHierarchyItem) ([]protocol.CallHierarchyOutgoingCall, error) {
-	fmt.Fprintf(os.Stderr, "DEBUG SessionAdapter: OutgoingCalls for item: %s\n", item.Name)
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
-	
+
 	itemJSON, err := json.Marshal(item)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	result, err := sa.client.OutgoingCalls(ctx, itemJSON)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var calls []protocol.CallHierarchyOutgoingCall
 	if err := json.Unmarshal(result, &calls); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal outgoing calls: %w", err)
 	}
-	
+
 	return calls, nil
 }
 
@@ -432,21 +411,21 @@ func (sa *SessionAdapter) DocumentDiagnostics(uri string, identifier string, pre
 	// Document diagnostics can be slow on large BSL workspaces.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	
+
 	result, err := sa.client.Diagnostic(ctx, uri, identifier, previousResultId)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if result == nil || string(result) == "null" {
 		return nil, nil
 	}
-	
+
 	var report protocol.DocumentDiagnosticReport
 	if err := json.Unmarshal(result, &report); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal diagnostic: %w", err)
 	}
-	
+
 	return &report, nil
 }
 
@@ -540,7 +519,13 @@ func (sa *SessionAdapter) ConnectInterface() (interface{}, error) {
 
 // GetMetrics returns client metrics (stub for now)
 func (sa *SessionAdapter) GetMetrics() types.ClientMetricsProvider {
-	return &sessionMetrics{connected: sa.connected}
+	status := int(StatusUninitialized)
+	if sa.connected && sa.client.IsConnected() {
+		status = int(StatusConnected)
+	} else if !sa.connected {
+		status = int(StatusDisconnected)
+	}
+	return &sessionMetrics{connected: sa.connected, status: status}
 }
 
 // Status returns connection status as int
@@ -588,36 +573,93 @@ type sessionMetrics struct {
 	status    int
 }
 
-func (m *sessionMetrics) GetCommand() string { return m.command }
-func (m *sessionMetrics) SetCommand(command string) { m.command = command }
-func (m *sessionMetrics) GetStatus() int { return m.status }
-func (m *sessionMetrics) SetStatus(status int) { m.status = status }
-func (m *sessionMetrics) GetTotalRequests() int64 { return 0 }
-func (m *sessionMetrics) SetTotalRequests(total int64) {}
-func (m *sessionMetrics) IncrementTotalRequests() {}
-func (m *sessionMetrics) GetSuccessfulRequests() int64 { return 0 }
+func (m *sessionMetrics) GetCommand() string                     { return m.command }
+func (m *sessionMetrics) SetCommand(command string)              { m.command = command }
+func (m *sessionMetrics) GetStatus() int                         { return m.status }
+func (m *sessionMetrics) SetStatus(status int)                   { m.status = status }
+func (m *sessionMetrics) GetTotalRequests() int64                { return 0 }
+func (m *sessionMetrics) SetTotalRequests(total int64)           {}
+func (m *sessionMetrics) IncrementTotalRequests()                {}
+func (m *sessionMetrics) GetSuccessfulRequests() int64           { return 0 }
 func (m *sessionMetrics) SetSuccessfulRequests(successful int64) {}
-func (m *sessionMetrics) IncrementSuccessfulRequests() {}
-func (m *sessionMetrics) GetFailedRequests() int64 { return 0 }
-func (m *sessionMetrics) SetFailedRequests(failed int64) {}
-func (m *sessionMetrics) IncrementFailedRequests() {}
-func (m *sessionMetrics) GetLastInitialized() time.Time { return time.Time{} }
-func (m *sessionMetrics) SetLastInitialized(t time.Time) {}
-func (m *sessionMetrics) GetLastErrorTime() time.Time { return time.Time{} }
-func (m *sessionMetrics) SetLastErrorTime(t time.Time) {}
-func (m *sessionMetrics) GetLastError() string { return "" }
-func (m *sessionMetrics) SetLastError(err string) {}
-func (m *sessionMetrics) IsConnected() bool { return m.connected }
-func (m *sessionMetrics) SetConnected(connected bool) { m.connected = connected }
-func (m *sessionMetrics) GetProcessID() int32 { return 0 }
-func (m *sessionMetrics) SetProcessID(pid int32) {}
+func (m *sessionMetrics) IncrementSuccessfulRequests()           {}
+func (m *sessionMetrics) GetFailedRequests() int64               { return 0 }
+func (m *sessionMetrics) SetFailedRequests(failed int64)         {}
+func (m *sessionMetrics) IncrementFailedRequests()               {}
+func (m *sessionMetrics) GetLastInitialized() time.Time          { return time.Time{} }
+func (m *sessionMetrics) SetLastInitialized(t time.Time)         {}
+func (m *sessionMetrics) GetLastErrorTime() time.Time            { return time.Time{} }
+func (m *sessionMetrics) SetLastErrorTime(t time.Time)           {}
+func (m *sessionMetrics) GetLastError() string                   { return "" }
+func (m *sessionMetrics) SetLastError(err string)                {}
+func (m *sessionMetrics) IsConnected() bool                      { return m.connected }
+func (m *sessionMetrics) SetConnected(connected bool)            { m.connected = connected }
+func (m *sessionMetrics) GetProcessID() int32                    { return 0 }
+func (m *sessionMetrics) SetProcessID(pid int32)                 {}
 
-// DidChangeWatchedFiles notifies about file changes (no-op)
+// DidChangeWatchedFiles notifies about file changes
 func (sa *SessionAdapter) DidChangeWatchedFiles(changes []protocol.FileEvent) error {
-	return nil
+	params := protocol.DidChangeWatchedFilesParams{
+		Changes: changes,
+	}
+	return sa.SendNotification("workspace/didChangeWatchedFiles", params)
 }
 
 // DidChangeConfiguration notifies about config changes (no-op)
 func (sa *SessionAdapter) DidChangeConfiguration(settings any) error {
 	return nil
+}
+
+// IndexingStatus represents the current indexing progress from session manager (minimal)
+type IndexingStatus struct {
+	State          string `json:"state"` // "idle" | "indexing" | "complete"
+	Current        int    `json:"current"`
+	Total          int    `json:"total"`
+	ETASeconds     int    `json:"eta_seconds,omitempty"`
+	ElapsedSeconds int    `json:"elapsed_seconds,omitempty"`
+	Message        string `json:"message,omitempty"`
+}
+
+// GetSessionStatus returns the full session status including indexing progress
+func (sa *SessionAdapter) GetSessionStatus(ctx context.Context) (map[string]interface{}, error) {
+	return sa.client.GetStatus(ctx)
+}
+
+// GetIndexingStatus returns the current indexing progress
+func (sa *SessionAdapter) GetIndexingStatus() *IndexingStatus {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	status, err := sa.client.GetStatus(ctx)
+	if err != nil {
+		return nil
+	}
+
+	indexingData, ok := status["indexing"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	result := &IndexingStatus{State: "idle"}
+
+	if v, ok := indexingData["state"].(string); ok {
+		result.State = v
+	}
+	if v, ok := indexingData["current"].(float64); ok {
+		result.Current = int(v)
+	}
+	if v, ok := indexingData["total"].(float64); ok {
+		result.Total = int(v)
+	}
+	if v, ok := indexingData["eta_seconds"].(float64); ok {
+		result.ETASeconds = int(v)
+	}
+	if v, ok := indexingData["elapsed_seconds"].(float64); ok {
+		result.ElapsedSeconds = int(v)
+	}
+	if v, ok := indexingData["message"].(string); ok {
+		result.Message = v
+	}
+
+	return result
 }

@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -53,7 +52,6 @@ func (lc *LanguageClient) ConnectWebSocket() (*LanguageClient, error) {
 	wsURL := fmt.Sprintf("ws://%s/lsp", addr)
 
 	logger.Info(fmt.Sprintf("ConnectWebSocket: Starting connection to: %s", wsURL))
-	fmt.Fprintf(os.Stderr, "DEBUG: ConnectWebSocket URL=%s\n", wsURL)
 
 	// Retry connection with backoff
 	var wsConn *websocket.Conn
@@ -67,7 +65,6 @@ func (lc *LanguageClient) ConnectWebSocket() (*LanguageClient, error) {
 
 		logger.Warn(fmt.Sprintf("WebSocket connection attempt %d/%d failed: %v",
 			attempt, lc.maxConnectionAttempts, err))
-		fmt.Fprintf(os.Stderr, "DEBUG: attempt %d failed: %v\n", attempt, err)
 
 		if attempt < lc.maxConnectionAttempts {
 			time.Sleep(lc.restartDelay * time.Duration(attempt))
@@ -80,7 +77,6 @@ func (lc *LanguageClient) ConnectWebSocket() (*LanguageClient, error) {
 	}
 
 	logger.Info(fmt.Sprintf("WebSocket connection established to %s", wsURL))
-	fmt.Fprintf(os.Stderr, "DEBUG: WebSocket connected!\n")
 
 	// Create cancellable context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -121,13 +117,11 @@ func (lc *LanguageClient) ConnectWebSocket() (*LanguageClient, error) {
 	lc.lastInitialized = time.Now()
 
 	logger.Info("Successfully connected to LSP server via WebSocket")
-	fmt.Fprintf(os.Stderr, "DEBUG: JSONRPC connection established\n")
 
 	return lc, nil
 }
 
 func dialGorillaWebSocket(wsURL string) (*websocket.Conn, error) {
-	fmt.Fprintf(os.Stderr, "DEBUG dial: dialing %s\n", wsURL)
 
 	// Create a custom dialer with TCP settings
 	netDialer := &net.Dialer{
@@ -137,36 +131,27 @@ func dialGorillaWebSocket(wsURL string) (*websocket.Conn, error) {
 
 	dialer := websocket.Dialer{
 		NetDial: func(network, addr string) (net.Conn, error) {
-			fmt.Fprintf(os.Stderr, "DEBUG dial: TCP connecting to %s\n", addr)
 			conn, err := netDialer.Dial(network, addr)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "DEBUG dial: TCP failed: %v\n", err)
 				return nil, err
 			}
 			// Set TCP_NODELAY for immediate packet sending
 			if tcpConn, ok := conn.(*net.TCPConn); ok {
 				tcpConn.SetNoDelay(true)
 			}
-			fmt.Fprintf(os.Stderr, "DEBUG dial: TCP connected\n")
 			return conn, nil
 		},
 		HandshakeTimeout: 45 * time.Second,
 		ReadBufferSize:   4096,
 		WriteBufferSize:  4096,
 	}
-
-	fmt.Fprintf(os.Stderr, "DEBUG dial: starting WebSocket handshake\n")
 	conn, resp, err := dialer.Dial(wsURL, http.Header{})
 	if err != nil {
 		if resp != nil {
-			fmt.Fprintf(os.Stderr, "DEBUG dial: handshake failed, status=%d\n", resp.StatusCode)
 		} else {
-			fmt.Fprintf(os.Stderr, "DEBUG dial: handshake failed, no response\n")
 		}
 		return nil, err
 	}
-
-	fmt.Fprintf(os.Stderr, "DEBUG dial: WebSocket handshake successful\n")
 	return conn, nil
 }
 

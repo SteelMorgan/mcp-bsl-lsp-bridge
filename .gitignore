@@ -3,34 +3,43 @@
 
 # But not these files...
 !/.gitignore
-!/.pre-commit-config.yaml
+
+# Never publish local secrets
+.env
+.env.*
 
 !*.go
 !go.sum
 !go.mod
-!*.bsl
 
 !README.md
+!README.AI.md
 !LICENSE
-!CHANGELOG.md
+!CONTRIBUTING.md
+!SECURITY.md
+!CODE_OF_CONDUCT.md
+!NOTICE
 
 !Makefile
 !Dockerfile
+!docker-compose.yml
+!env.example
 
 !lsp_config.example.json
 !.golangci.yml
 !.goreleaser.yaml
 
-!*.py
-!*.sh
-
-!.github/workflows/*
 !docs/*
 !docs/**/*
+!docker/*
+!docker/**/*
 
 # ...even if they are in subdirectories
 !*/
 
+# Test data (large, not needed in repo)
+test-workspace/
+
+# Build artifacts
 lsp_parsed/
-# Added by goreleaser init:
 dist/

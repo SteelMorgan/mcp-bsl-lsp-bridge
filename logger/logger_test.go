@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -142,6 +143,10 @@ func TestLogLevels(t *testing.T) {
 
 // TestLogRotation tests log file rotation
 func TestLogRotation(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("log rotation behavior differs on Windows due to file locking semantics")
+	}
+
 	// Create a temporary log directory
 	logDir := t.TempDir()
 

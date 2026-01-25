@@ -122,15 +122,15 @@ func PathToFileURI(path string) (string, error) {
 	
 	if !isWindowsAbs {
 		// Only call Abs for non-Windows paths (Unix paths or relative paths)
-		absPath, err := filepath.Abs(path)
-		if err == nil {
-			path = absPath
-		}
+	absPath, err := filepath.Abs(path)
+	if err == nil {
+		path = absPath
+	}
 	}
 
 	// Normalize path separators to forward slashes
 	slashPath := strings.ReplaceAll(path, "\\", "/")
-	
+
 	// Clean double slashes but preserve Windows drive letter
 	if isWindowsAbs {
 		// For Windows: D:/path → D:/path (keep as-is, just clean)

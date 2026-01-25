@@ -12,7 +12,7 @@
 |----------|----------|
 | MCP server | `lsp-bsl-bridge` |
 | Container | `mcp-lsp-test` |
-| Workspace (host) | `D:/My Projects/FrameWork 1C/mcp-lsp-bridge/test-workspace` |
+| Workspace (host) | `/path/to/mcp-lsp-bridge/test-workspace` |
 | Workspace (container) | `/projects/test-workspace` |
 | BSL LS | bsl-language-server (через Session Manager) |
 | Session Manager port | 9999 |

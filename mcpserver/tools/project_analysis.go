@@ -2,7 +2,11 @@ package tools
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -27,7 +31,7 @@ func RegisterProjectAnalysisTool(mcpServer ToolServer, bridge interfaces.BridgeI
 func ProjectAnalysisTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool(
 			"project_analysis",
-			mcp.WithDescription(`Multi-purpose code analysis with 9 analysis types for symbols, files, and workspace patterns. HIGHLY RECOMMENDED when exploring unfamiliar codebases - dramatically more efficient than manual file navigation.
+			mcp.WithDescription(`Multi-purpose code analysis tool with multiple analysis types. Use this as a "Swiss army knife" when exploring unfamiliar codebases.
 
 USAGE:
 - Find symbols: analysis_type="workspace_symbols", query="calculateTotal"
@@ -36,6 +40,24 @@ USAGE:
 
 ANALYSIS TYPES:
 workspace_symbols, document_symbols, references, definitions, text_search, workspace_analysis, symbol_relationships, file_analysis, pattern_analysis
+
+QUICK GUIDE (what each type does + what query means):
+- workspace_symbols: find symbol candidates in the whole project. query = symbol name / substring.
+- document_symbols: list symbols in a single file. query = file path or file URI.
+- references: find usage sites of the first matching symbol (includes declaration). query = symbol name.
+- definitions: find definition location(s) of the first matching symbol. query = symbol name.
+- text_search: search raw text across workspace files (fast fallback when LSP is not enough). query = substring.
+- file_analysis: analyze a file (structure/metrics/patterns). query = file path or file URI.
+- workspace_analysis: high-level overview of the workspace. query = "entire_project" (or any placeholder).
+- symbol_relationships: analyze relationships around a symbol. query = symbol name.
+- pattern_analysis: analyze patterns across files. query = keyword/pattern.
+
+PAGINATION:
+- offset: skip N results (default 0)
+- limit: max results (default 20, max 100)
+
+OPTIONAL:
+- workspace_uri: project root URI (defaults to the first allowed directory).
 
 PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 			mcp.WithDestructiveHintAnnotation(false),
@@ -77,15 +99,23 @@ PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 				workspaceUri = dirs[0] // Get the first allow dir
 			}
 
-			// Convert URI to local file path
-			projectPath := strings.TrimPrefix(workspaceUri, "file://")
+			// Convert URI to local file path (Windows-safe)
+			projectPath := utils.URIToFilePath(workspaceUri)
 
-			// Use the project language detection method instead of single file inference
-			languages, err := bridge.DetectProjectLanguages(projectPath)
-
-			if err != nil {
-				logger.Error("Project language detection failed", fmt.Sprintf("Workspace URI: %s, Error: %v", workspaceUri, err))
-				return mcp.NewToolResultError(fmt.Sprintf("Failed to detect project languages: %v", err)), nil
+			// Fast path: if clients are already connected (e.g., via auto-connect),
+			// use their languages instead of expensive filesystem scan.
+			// This is especially important for large BSL projects (2000+ files).
+			var languages []types.Language
+			if connectedLangs := bridge.GetConnectedLanguages(); len(connectedLangs) > 0 {
+				languages = connectedLangs
+				logger.Debug("Using pre-connected languages: " + fmt.Sprintf("%v", languages))
+			} else {
+				// Fallback to project language detection (slower)
+				languages, err = bridge.DetectProjectLanguages(projectPath)
+				if err != nil {
+					logger.Error("Project language detection failed", fmt.Sprintf("Workspace URI: %s, Error: %v", workspaceUri, err))
+					return mcp.NewToolResultError(fmt.Sprintf("Failed to detect project languages: %v", err)), nil
+				}
 			}
 
 			// Use the first detected language
@@ -139,6 +169,8 @@ PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 				return handleReferences(bridge, clients, query, offset, limit, activeLanguage, &response)
 			case "definitions":
 				return handleDefinitions(bridge, lspClient, query, activeLanguage, &response)
+			case "text_search":
+				return handleTextSearch(ctx, bridge, projectPath, query, offset, limit, activeLanguage, &response)
 			case "workspace_analysis":
 				return handleWorkspaceAnalysis(bridge, clients, query, options, &response)
 			case "symbol_relationships":
@@ -151,6 +183,198 @@ PARAMETERS: analysis_type (required), query (required), limit (default: 20)`),
 				return mcp.NewToolResultError("Unknown analysis type: " + analysisType), nil
 			}
 		}
+}
+
+type textSearchHit struct {
+	URI       string
+	Line      int
+	Character int
+	Preview   string
+}
+
+func handleTextSearch(ctx context.Context, bridge interfaces.BridgeInterface, projectPath string, query string, offset, limit int, activeLanguage types.Language, response *strings.Builder) (*mcp.CallToolResult, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return mcp.NewToolResultError("query must be non-empty for text_search"), nil
+	}
+
+	if limit < 0 {
+		limit = 0
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	exts := defaultTextSearchExtensions(activeLanguage)
+	extSet := make(map[string]struct{}, len(exts))
+	for _, e := range exts {
+		extSet[strings.ToLower(e)] = struct{}{}
+	}
+
+	ignoredDirs := map[string]struct{}{
+		".git":         {},
+		".hg":          {},
+		".svn":         {},
+		".idea":        {},
+		".vscode":      {},
+		"node_modules": {},
+		"vendor":       {},
+		"dist":         {},
+		"build":        {},
+		"out":          {},
+		"target":       {},
+		"_bin":         {},
+	}
+
+	const maxFileSizeBytes int64 = 2 * 1024 * 1024 // 2MB guardrail
+	const maxPreviewLen = 220
+
+	var (
+		scannedFiles  int
+		seenMatches   int
+		returnedHits  []textSearchHit
+		truncatedScan bool
+	)
+
+	errStopWalk := errors.New("text_search: stop walk")
+
+	need := offset + limit
+	if limit == 0 {
+		need = offset // still scan until offset? but nothing to return → we can short-circuit.
+	}
+
+	walkErr := filepath.WalkDir(projectPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
+		if d.IsDir() {
+			if _, ok := ignoredDirs[strings.ToLower(d.Name())]; ok {
+				return fs.SkipDir
+			}
+			return nil
+		}
+
+		ext := strings.ToLower(filepath.Ext(d.Name()))
+		if len(extSet) > 0 {
+			if _, ok := extSet[ext]; !ok {
+				return nil
+			}
+		}
+
+		info, statErr := d.Info()
+		if statErr != nil {
+			return nil
+		}
+		if info.Size() > maxFileSizeBytes {
+			return nil
+		}
+
+		f, openErr := os.Open(path) // #nosec G304 -- walking within user workspace
+		if openErr != nil {
+			return nil
+		}
+		defer func() { _ = f.Close() }()
+
+		scannedFiles++
+
+		// Read as bytes and split by '\n' manually to avoid Scanner token limits on huge lines.
+		data, readErr := io.ReadAll(f)
+		if readErr != nil {
+			return nil
+		}
+
+		// Simple line scan
+		start := 0
+		line := 0
+		for start <= len(data) {
+			end := start
+			for end < len(data) && data[end] != '\n' {
+				end++
+			}
+			// Strip trailing '\r'
+			lineBytes := data[start:end]
+			if len(lineBytes) > 0 && lineBytes[len(lineBytes)-1] == '\r' {
+				lineBytes = lineBytes[:len(lineBytes)-1]
+			}
+
+			lineStr := string(lineBytes)
+			if idx := strings.Index(lineStr, query); idx >= 0 {
+				seenMatches++
+				if seenMatches > offset && limit > 0 && len(returnedHits) < limit {
+					u := bridge.NormalizeURIForLSP(utils.FilePathToURI(path))
+					preview := strings.TrimSpace(lineStr)
+					if len(preview) > maxPreviewLen {
+						preview = preview[:maxPreviewLen] + "…"
+					}
+					returnedHits = append(returnedHits, textSearchHit{
+						URI:       u,
+						Line:      line,
+						Character: idx,
+						Preview:   preview,
+					})
+				}
+
+				// Early stop if we have enough matches for this page.
+				if need > 0 && seenMatches >= need && (limit == 0 || len(returnedHits) >= limit) {
+					truncatedScan = true
+					return errStopWalk
+				}
+			}
+
+			line++
+			if end >= len(data) {
+				break
+			}
+			start = end + 1
+		}
+
+		return nil
+	})
+
+	if walkErr != nil && !errors.Is(walkErr, errStopWalk) && walkErr != context.Canceled && walkErr != context.DeadlineExceeded {
+		logger.Warn(fmt.Sprintf("text_search: walk error: %v", walkErr))
+	}
+
+	fmt.Fprintf(response, "TEXT_SEARCH|%s|offset=%d|limit=%d\n", query, offset, limit)
+	fmt.Fprintf(response, "LANG=%s|EXTS=%s\n", activeLanguage, strings.Join(exts, ","))
+	fmt.Fprintf(response, "SCANNED_FILES=%d|SEEN_MATCHES=%d|RETURNED=%d|TRUNCATED=%t\n", scannedFiles, seenMatches, len(returnedHits), truncatedScan)
+	response.WriteString("\n")
+
+	if len(returnedHits) == 0 {
+		response.WriteString("NO_MATCHES\n")
+		return mcp.NewToolResultText(response.String()), nil
+	}
+
+	for i, h := range returnedHits {
+		fmt.Fprintf(response, "%d|%d:%d|%s|%s\n", offset+i+1, h.Line, h.Character, h.URI, h.Preview)
+	}
+
+	if truncatedScan {
+		next := offset + len(returnedHits)
+		fmt.Fprintf(response, "MORE|next_offset=%d\n", next)
+	}
+
+	return mcp.NewToolResultText(response.String()), nil
+}
+
+func defaultTextSearchExtensions(lang types.Language) []string {
+	switch strings.ToLower(string(lang)) {
+	case "bsl":
+		return []string{".bsl", ".os"}
+	case "go":
+		return []string{".go"}
+	case "python":
+		return []string{".py"}
+	case "typescript":
+		return []string{".ts", ".tsx", ".js", ".jsx"}
+	default:
+		// Safe default: keep it narrow to avoid scanning binaries/noise.
+		return []string{".bsl"}
+	}
 }
 
 // handleWorkspaceSymbols handles the 'workspace_symbols' analysis type

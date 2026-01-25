@@ -16,6 +16,28 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/mcp-lsp-bri
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/lsp-session-manager ./cmd/lsp-session-manager
 
 
+# === Separate stage for BSL LS download (cached independently) ===
+FROM debian:bookworm-slim AS bsl-ls-downloader
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends wget ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+# Download BSL Language Server from GitHub releases
+# Use "latest" to always get the newest version, or specify version like "0.28.1"
+ARG BSL_LS_VERSION=latest
+RUN mkdir -p /opt/bsl-ls \
+  && if [ "$BSL_LS_VERSION" = "latest" ]; then \
+       BSL_LS_URL=$(wget -qO- https://api.github.com/repos/1c-syntax/bsl-language-server/releases/latest | grep -o '"browser_download_url": *"[^"]*-exec.jar"' | head -1 | cut -d'"' -f4); \
+     else \
+       BSL_LS_URL="https://github.com/1c-syntax/bsl-language-server/releases/download/v${BSL_LS_VERSION}/bsl-language-server-${BSL_LS_VERSION}-exec.jar"; \
+     fi \
+  && echo "Downloading BSL LS from: $BSL_LS_URL" \
+  && wget -q -O /opt/bsl-ls/bsl-language-server.jar "$BSL_LS_URL" \
+  && echo "BSL LS downloaded successfully"
+
+
+# === Final stage ===
 FROM debian:bookworm-slim
 
 # Install xz-utils first for unpacking s6-overlay, then other packages
@@ -38,13 +60,17 @@ RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz \
 # Create non-root user (match existing conventions)
 RUN useradd -m -s /bin/sh user
 
-# Copy built binaries
+# Copy BSL LS from downloader stage (cached independently from Go binaries)
+RUN mkdir -p /opt/bsl-ls
+COPY --from=bsl-ls-downloader /opt/bsl-ls/bsl-language-server.jar /opt/bsl-ls/bsl-language-server.jar
+RUN chown -R user:user /opt/bsl-ls
+
+# Copy built binaries (changes here won't trigger BSL LS re-download)
 COPY --from=build /out/mcp-lsp-bridge /usr/bin/mcp-lsp-bridge
 COPY --from=build /out/lsp-session-manager /usr/bin/lsp-session-manager
 
-# Place for mounted BSL Language Server JAR
-RUN mkdir -p /opt/bsl-ls \
-  && chown -R user:user /opt/bsl-ls
+# Store version info for runtime checks
+RUN java -jar /opt/bsl-ls/bsl-language-server.jar --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' > /opt/bsl-ls/VERSION || echo "unknown" > /opt/bsl-ls/VERSION
 
 # Default locations used by the bridge
 RUN mkdir -p /home/user/.config/mcp-lsp-bridge /home/user/.local/share/mcp-lsp-bridge/logs \
