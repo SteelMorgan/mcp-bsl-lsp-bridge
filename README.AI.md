@@ -33,7 +33,7 @@ cp env.example .env
 |----------|----------|--------|
 | `MCP_PROJECT_NAME` | Уникальный ID проекта | `my-project` |
 | `HOST_PROJECTS_ROOT` | Путь к коду 1С на хосте | `D:/Projects/1C/MyConfig` |
-| `WORKSPACE_ROOT` | Путь внутри контейнера | `/projects` или `/projects/src;/projects/ext1` |
+| `WORKSPACE_ROOT` | Путь внутри контейнера | `/projects` |
 
 **Пример .env:**
 
@@ -51,11 +51,6 @@ PROJECTS_MOUNT_MODE=rw
 MCP_LSP_BSL_JAVA_XMX=6g
 MCP_LSP_BSL_JAVA_XMS=2g
 MCP_LSP_LOG_LEVEL=error
-```
-
-**Несколько каталогов** (основная конфа + расширения):
-```env
-WORKSPACE_ROOT=/projects/main-config;/projects/extension1;/projects/extension2
 ```
 
 ### 1.3 Сборка и запуск контейнера

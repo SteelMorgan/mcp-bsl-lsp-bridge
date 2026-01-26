@@ -110,27 +110,15 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 
 	startTime := time.Now()
 
-	// Get all allowed workspace directories
+	// Get allowed workspace directories
 	dirs := b.AllowedDirectories()
-	if len(dirs) == 0 {
-		return nil, fmt.Errorf("no allowed directories configured")
-	}
+	dir := dirs[0] // Get first directory
 
-	logger.Debug(fmt.Sprintf("validateAndConnectClient: Using %d workspace directories: %v", len(dirs), dirs))
+	logger.Debug(fmt.Sprintf("validateAndConnectClient: Using directory: %s from allowed dirs: %v", dir, dirs))
 
-	// Validate and resolve absolute paths for all directories
-	absPaths := make([]string, 0, len(dirs))
-	for _, dir := range dirs {
-		absPath, err := b.IsAllowedDirectory(dir)
-		if err != nil {
-			logger.Warn(fmt.Sprintf("Skipping invalid directory %s: %v", dir, err))
-			continue
-		}
-		absPaths = append(absPaths, absPath)
-	}
-
-	if len(absPaths) == 0 {
-		return nil, fmt.Errorf("no valid directories found from allowed dirs: %v", dirs)
+	absPath, err := b.IsAllowedDirectory(dir)
+	if err != nil {
+		return nil, fmt.Errorf("file path is not allowed: %s", err)
 	}
 
 	for attempt := 0; attempt < config.MaxRetries; attempt++ {
@@ -180,7 +168,7 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 				continue
 			}
 			// Session Manager is already initialized - skip the initialize phase below
-			adapter.SetProjectRoots(dirs)
+			adapter.SetProjectRoots([]string{dir})
 			b.mu.Lock()
 			b.clients[types.LanguageServer(language)] = adapter
 			b.mu.Unlock()
@@ -205,24 +193,22 @@ func (b *MCPLSPBridge) validateAndConnectClient(language string, serverConfig ty
 			continue
 		}
 
-		// Build workspace folders from all validated directories
-		workspaceFolders := make([]protocol.WorkspaceFolder, 0, len(absPaths))
-		for _, ap := range absPaths {
-			hostRootURI := utils.NormalizeURI(ap)
-			rootPath := hostRootURI
-			if b.HasPathMapper() {
-				if mapped, mapErr := b.pathMapper.NormalizeURI(hostRootURI); mapErr == nil {
-					rootPath = mapped
-				}
+		hostRootURI := utils.NormalizeURI(absPath)
+		rootPath := hostRootURI
+		if b.HasPathMapper() {
+			if mapped, mapErr := b.pathMapper.NormalizeURI(hostRootURI); mapErr == nil {
+				rootPath = mapped
 			}
-			workspaceFolders = append(workspaceFolders, protocol.WorkspaceFolder{
+		}
+		// Prepare initialization parameters
+		workspaceFolders := []protocol.WorkspaceFolder{
+			{
 				Uri:  protocol.URI(rootPath),
-				Name: filepath.Base(ap),
-			})
-			logger.Debug(fmt.Sprintf("validateAndConnectClient: Added workspace folder: %s (%s)", filepath.Base(ap), rootPath))
+				Name: filepath.Base(absPath),
+			},
 		}
 
-		client.SetProjectRoots(dirs)
+		client.SetProjectRoots([]string{dir})
 
 		// IMPORTANT: ProcessId is set to nil to prevent the LSP server from monitoring
 		// the parent process. In docker exec scenarios, mcp-lsp-bridge is a short-lived

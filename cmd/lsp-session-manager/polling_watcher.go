@@ -32,6 +32,7 @@ type PollingWatcher struct {
 	interval       time.Duration
 	workers        int
 	sendNotifyFunc func(changes []FileChange) error
+	isIndexingFunc func() bool // Check if LSP is currently indexing
 
 	mu       sync.RWMutex
 	fileMap  map[string]int64 // path -> mtime
@@ -46,13 +47,14 @@ type FileChange struct {
 }
 
 // NewPollingWatcher создаёт новый polling watcher
-func NewPollingWatcher(workspaceDir string, interval time.Duration, workers int, notifyFunc func([]FileChange) error) *PollingWatcher {
+func NewPollingWatcher(workspaceDir string, interval time.Duration, workers int, notifyFunc func([]FileChange) error, isIndexingFunc func() bool) *PollingWatcher {
 	return &PollingWatcher{
 		workspaceDir:   workspaceDir,
 		extensions:     []string{".bsl", ".os"},
 		interval:       interval,
 		workers:        workers,
 		sendNotifyFunc: notifyFunc,
+		isIndexingFunc: isIndexingFunc,
 		fileMap:        make(map[string]int64),
 		stopChan:       make(chan struct{}),
 	}
@@ -171,6 +173,12 @@ func (pw *PollingWatcher) checkForChanges() {
 				changeType = "deleted"
 			}
 			log.Printf("  %s: %s", changeType, c.URI)
+		}
+
+		// Skip sending notifications while LSP is indexing
+		if pw.isIndexingFunc != nil && pw.isIndexingFunc() {
+			log.Printf("Polling watcher: skipping notification (LSP is indexing)")
+			return
 		}
 
 		if pw.sendNotifyFunc != nil {
