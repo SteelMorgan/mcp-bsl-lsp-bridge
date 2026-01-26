@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
 
     mem_limit: ${CONTAINER_MEMORY:-8g}
-    cpus: ${CONTAINER_CPUS:-4}
+    cpus: ${CONTAINER_CPUS:-16}
 
     environment:
       HOST_PROJECTS_ROOT: ${HOST_PROJECTS_ROOT}
