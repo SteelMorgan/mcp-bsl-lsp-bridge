@@ -20,7 +20,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"rockerboo/mcp-lsp-bridge/bridge"
@@ -213,7 +212,7 @@ func main() {
 	defer logger.Close()
 
 	logger.Info("Starting MCP-LSP Bridge...")
-	
+
 	// Debug: log to a file that persists between calls
 	debugFile, _ := os.OpenFile("/tmp/mcp-debug.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if debugFile != nil {
@@ -228,25 +227,10 @@ func main() {
 
 	// In container mode we must anchor workspace operations to the mounted workspace root,
 	// not to the process CWD (often /home/user).
-	// WORKSPACE_ROOT supports multiple paths separated by semicolon (;)
-	// Example: WORKSPACE_ROOT=/projects/main-config;/projects/extension1;/projects/extension2
 	workspaceRoot := os.Getenv("WORKSPACE_ROOT")
 	allowedDirs := []string{cwd}
 	if workspaceRoot != "" {
-		// Parse multiple workspace roots separated by semicolon
-		roots := strings.Split(workspaceRoot, ";")
-		allowedDirs = make([]string, 0, len(roots))
-		for _, root := range roots {
-			trimmed := strings.TrimSpace(root)
-			if trimmed != "" {
-				allowedDirs = append(allowedDirs, trimmed)
-			}
-		}
-		// Fallback to cwd if no valid paths found
-		if len(allowedDirs) == 0 {
-			allowedDirs = []string{cwd}
-		}
-		logger.Debug(fmt.Sprintf("Parsed %d workspace roots from WORKSPACE_ROOT: %v", len(allowedDirs), allowedDirs))
+		allowedDirs = []string{workspaceRoot}
 	}
 
 	// Create and initialize the bridge

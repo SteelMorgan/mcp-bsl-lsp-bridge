@@ -173,16 +173,17 @@ type SessionManager struct {
 	openDocsMu sync.Mutex
 
 	// Indexing progress tracking
-	indexingMu         sync.RWMutex
-	indexingActive     bool
-	indexingTitle      string
-	indexingMessage    string
-	indexingCurrent    int
-	indexingTotal      int
-	indexingPercentage int
-	indexingStartedAt  time.Time
-	indexingLastUpdate time.Time
-	indexingSpeed      float64 // files per second (rolling average)
+	indexingMu             sync.RWMutex
+	indexingActive         bool
+	indexingTitle          string
+	indexingMessage        string
+	indexingCurrent        int
+	indexingTotal          int
+	indexingPercentage     int
+	indexingStartedAt      time.Time // Start of current phase
+	indexingFirstStartedAt time.Time // Start of first phase (for total elapsed time)
+	indexingLastUpdate     time.Time
+	indexingSpeed          float64 // files per second (rolling average)
 
 	// File watcher for automatic didChangeWatchedFiles
 	watcher        *fsnotify.Watcher
@@ -242,13 +243,35 @@ func (sm *SessionManager) Start() error {
 		return fmt.Errorf("failed to initialize LSP session: %w", err)
 	}
 
+	// Start file watcher AFTER indexing completes to avoid resource contention
+	go sm.startFileWatcherAfterIndexing()
+
+	return nil
+}
+
+// startFileWatcherAfterIndexing waits for indexing to complete, then starts file watcher
+func (sm *SessionManager) startFileWatcherAfterIndexing() {
+	// Wait for indexing to complete (check every 5 seconds)
+	for {
+		time.Sleep(5 * time.Second)
+
+		sm.indexingMu.RLock()
+		isActive := sm.indexingActive
+		sm.indexingMu.RUnlock()
+
+		if !isActive {
+			break
+		}
+		log.Println("File watcher: waiting for indexing to complete...")
+	}
+
+	log.Println("File watcher: indexing complete, starting watcher")
+
 	// Start file watcher for automatic didChangeWatchedFiles
 	if err := sm.startFileWatcher(); err != nil {
 		log.Printf("Warning: failed to start file watcher: %v", err)
 		// Non-fatal - continue without file watching
 	}
-
-	return nil
 }
 
 // Stop stops the LSP server
@@ -324,9 +347,17 @@ func (sm *SessionManager) startPollingWatcher() error {
 			}
 			return sm.sendNotification("workspace/didChangeWatchedFiles", params)
 		},
+		sm.IsIndexing, // Pass indexing check function
 	)
 
 	return sm.pollingWatcher.Start()
+}
+
+// IsIndexing returns true if LSP is currently indexing
+func (sm *SessionManager) IsIndexing() bool {
+	sm.indexingMu.RLock()
+	defer sm.indexingMu.RUnlock()
+	return sm.indexingActive
 }
 
 // startFsnotifyWatcher запускает fsnotify-based file watcher
@@ -691,10 +722,16 @@ func (sm *SessionManager) handleNotification(method string, msg []byte) {
 				sm.indexingMessage = message
 				sm.indexingPercentage = percentage
 				sm.indexingStartedAt = now
+				// Reset counters only for new indexing cycle (> 30s since last update)
+				// This preserves progress across multiple phases of the same indexing
+				isNewCycle := sm.indexingFirstStartedAt.IsZero() || now.Sub(sm.indexingLastUpdate) > 30*time.Second
+				if isNewCycle {
+					sm.indexingFirstStartedAt = now
+					sm.indexingCurrent = 0
+					sm.indexingTotal = 0
+					sm.indexingSpeed = 0
+				}
 				sm.indexingLastUpdate = now
-				sm.indexingCurrent = 0
-				sm.indexingTotal = 0
-				sm.indexingSpeed = 0
 
 			case "report":
 				sm.indexingMessage = message
@@ -731,6 +768,8 @@ func (sm *SessionManager) handleNotification(method string, msg []byte) {
 				if sm.indexingTotal > 0 {
 					sm.indexingCurrent = sm.indexingTotal
 				}
+				sm.indexingLastUpdate = now
+				// Keep indexingFirstStartedAt for displaying total elapsed time
 			}
 			sm.indexingMu.Unlock()
 		}
@@ -988,12 +1027,16 @@ func (sm *SessionManager) getStatus() map[string]interface{} {
 		indexing["eta_seconds"] = int(float64(remaining) / sm.indexingSpeed)
 	}
 
-	// Add elapsed time
-	if !sm.indexingStartedAt.IsZero() {
+	// Add elapsed time (using first start time for total duration across all phases)
+	startTime := sm.indexingFirstStartedAt
+	if startTime.IsZero() {
+		startTime = sm.indexingStartedAt
+	}
+	if !startTime.IsZero() {
 		if isActive {
-			indexing["elapsed_seconds"] = int(time.Since(sm.indexingStartedAt).Seconds())
+			indexing["elapsed_seconds"] = int(time.Since(startTime).Seconds())
 		} else if isComplete {
-			indexing["elapsed_seconds"] = int(sm.indexingLastUpdate.Sub(sm.indexingStartedAt).Seconds())
+			indexing["elapsed_seconds"] = int(sm.indexingLastUpdate.Sub(startTime).Seconds())
 		}
 	}
 	sm.indexingMu.RUnlock()
