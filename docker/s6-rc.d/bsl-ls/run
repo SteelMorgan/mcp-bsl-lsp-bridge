@@ -21,9 +21,9 @@ mkdir -p /home/user/.local/share/mcp-lsp-bridge/logs
 #
 # Arguments after "--" are passed directly to the LSP command
 exec /usr/bin/lsp-session-manager \
-    --port=${BSL_LS_PORT:-9999} \
-    --workspace=${WORKSPACE_ROOT:-/projects} \
-    --command=java \
+    --port="${BSL_LS_PORT:-9999}" \
+    --workspace="${WORKSPACE_ROOT:-/projects}" \
+    --command="java" \
     -- \
     -Xmx${MCP_LSP_BSL_JAVA_XMX:-6g} \
     -Xms${MCP_LSP_BSL_JAVA_XMS:-2g} \

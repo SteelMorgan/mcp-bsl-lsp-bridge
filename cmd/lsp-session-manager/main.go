@@ -31,6 +31,8 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+
+	"rockerboo/mcp-lsp-bridge/utils"
 )
 
 var (
@@ -498,10 +500,12 @@ func (sm *SessionManager) runFsnotifyWatcher() {
 func (sm *SessionManager) initialize() error {
 	log.Println("Initializing LSP session...")
 
+	rootURI := utils.FilePathToURI(sm.workspaceDir)
+
 	// Build workspace folders
 	workspaceFolders := []map[string]string{
 		{
-			"uri":  "file://" + sm.workspaceDir,
+			"uri":  rootURI,
 			"name": "workspace",
 		},
 	}
@@ -528,7 +532,7 @@ func (sm *SessionManager) initialize() error {
 				"workDoneProgress": true, // Enable $/progress notifications
 			},
 		},
-		"rootUri":          "file://" + sm.workspaceDir,
+		"rootUri":          rootURI,
 		"workspaceFolders": workspaceFolders,
 	}
 
