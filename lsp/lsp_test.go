@@ -79,8 +79,12 @@ func TestLanguageClientMetrics(t *testing.T) {
 		t.Errorf("Expected 5 failed requests initially, got %v", metrics.GetFailedRequests())
 	}
 
-	if metrics.IsConnected() != false {
-		t.Error("Client should not be marked as connected initially")
+	// Failed requests flip the status to StatusError, but the underlying JSON-RPC
+	// connection is still alive (the server replied with method-not-found errors,
+	// it did not disconnect). Per IsConnected()'s documented semantics, StatusError
+	// is a transient "last request failed" marker and the client stays connected.
+	if metrics.IsConnected() != true {
+		t.Error("Client should remain connected after failed (but answered) requests")
 	}
 
 	if metrics.GetStatus() != StatusError.Status() {

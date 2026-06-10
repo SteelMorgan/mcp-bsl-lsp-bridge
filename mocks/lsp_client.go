@@ -265,6 +265,16 @@ func (m *MockLanguageClient) SemanticTokensRange(uri string, startLine, startCha
 	return args.Get(0).(*protocol.SemanticTokens), args.Error(1)
 }
 
+func (m *MockLanguageClient) InlayHint(uri string, startLine, startCharacter, endLine, endCharacter uint32) ([]protocol.InlayHint, error) {
+	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter)
+	return args.Get(0).([]protocol.InlayHint), args.Error(1)
+}
+
+func (m *MockLanguageClient) Completion(uri string, line, character uint32) (*protocol.CompletionList, error) {
+	args := m.Called(uri, line, character)
+	return args.Get(0).(*protocol.CompletionList), args.Error(1)
+}
+
 func (m *MockLanguageClient) DocumentDiagnostics(uri string, identifier string, previousResultId string) (*protocol.DocumentDiagnosticReport, error) {
 	args := m.Called(uri, identifier, previousResultId)
 	return args.Get(0).(*protocol.DocumentDiagnosticReport), args.Error(1)

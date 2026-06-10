@@ -39,6 +39,7 @@ var (
 	port         = flag.Int("port", 9999, "TCP port to listen on")
 	command      = flag.String("command", "", "LSP server command to run")
 	workspaceDir = flag.String("workspace", "/projects", "Workspace directory for LSP")
+	statePath    = flag.String("state", "/var/lib/mcp-lsp-bridge/state.json", "Path to multi-project state.json (multi-project mode only)")
 )
 
 // JSONRPCID handles JSON-RPC 2.0 id field which can be string, number, or null
@@ -114,9 +115,22 @@ func main() {
 	// Create session manager
 	sm := NewSessionManager(*command, cmdArgs, *workspaceDir)
 
+	// Multi-project mode: accumulative warm projects behind one BSL LS process.
+	if os.Getenv("MULTI_PROJECT") == "1" {
+		if err := sm.EnableMultiProject(*statePath); err != nil {
+			log.Printf("Warning: failed to load multi-project state: %v", err)
+		}
+		log.Printf("Multi-project mode ENABLED (state: %s)", *statePath)
+	}
+
 	// Start LSP server and initialize session
 	if err := sm.Start(); err != nil {
 		log.Fatalf("Failed to start LSP session: %v", err)
+	}
+
+	// In multi-project mode, warm only the last-used project (lazy for the rest).
+	if sm.multiProject {
+		go sm.warmupBoot()
 	}
 
 	// Start TCP listener for API requests
@@ -192,6 +206,14 @@ type SessionManager struct {
 	watcherStop    chan struct{}
 	pollingWatcher *PollingWatcher
 	watcherMode    FileWatcherMode
+
+	// Multi-project mode (MULTI_PROJECT=1). When disabled, pm is nil and the
+	// daemon keeps its original single-workspace behavior.
+	multiProject bool
+	pm           *ProjectManager
+	warmupMu     sync.Mutex // serializes project warm-ups so $/progress is attributable
+	warmingMu    sync.RWMutex
+	warming      string // root of the project currently being warmed (diagnostics)
 }
 
 type lspResponse struct {
@@ -502,12 +524,23 @@ func (sm *SessionManager) initialize() error {
 
 	rootURI := utils.FilePathToURI(sm.workspaceDir)
 
-	// Build workspace folders
+	// Build workspace folders.
+	//
+	// In multi-project mode we start with NO workspace folders and a null
+	// rootUri so BSL LS does not eagerly index the mounted parent directory
+	// (`/projects`) as a single configuration. Projects are added later, one at
+	// a time, via workspace/didChangeWorkspaceFolders. Guards invariant #2 from
+	// the design (avoid the BSLLanguageServer rootUri/rootPath fallback).
 	workspaceFolders := []map[string]string{
 		{
+			//"uri":  "file://" + sm.workspaceDir,
 			"uri":  rootURI,
 			"name": "workspace",
 		},
+	}
+	if sm.multiProject {
+		workspaceFolders = []map[string]string{}
+		rootURI = ""
 	}
 
 	params := map[string]interface{}{
@@ -524,6 +557,35 @@ func (sm *SessionManager) initialize() error {
 				"callHierarchy":  map[string]interface{}{},
 				"documentSymbol": map[string]interface{}{},
 				"diagnostic":     map[string]interface{}{},
+				"signatureHelp": map[string]interface{}{
+					"contextSupport": true,
+				},
+				"completion": map[string]interface{}{
+					"completionItem": map[string]interface{}{
+						"snippetSupport":      false,
+						"documentationFormat": []string{"markdown", "plaintext"},
+						"labelDetailsSupport": true,
+					},
+				},
+				"selectionRange": map[string]interface{}{},
+				"inlayHint":      map[string]interface{}{},
+				"semanticTokens": map[string]interface{}{
+					"requests": map[string]interface{}{
+						"range": true,
+						"full":  true,
+					},
+					"tokenTypes": []string{
+						"namespace", "type", "class", "enum", "interface", "struct",
+						"typeParameter", "parameter", "variable", "property", "enumMember",
+						"event", "function", "method", "macro", "keyword", "modifier",
+						"comment", "string", "number", "regexp", "operator",
+					},
+					"tokenModifiers": []string{
+						"declaration", "definition", "readonly", "static", "deprecated",
+						"abstract", "async", "modification", "documentation", "defaultLibrary",
+					},
+					"formats": []string{"relative"},
+				},
 			},
 			"workspace": map[string]interface{}{
 				"workspaceFolders": true,
@@ -532,8 +594,13 @@ func (sm *SessionManager) initialize() error {
 				"workDoneProgress": true, // Enable $/progress notifications
 			},
 		},
+		//"rootUri":          "file://" + sm.workspaceDir,
 		"rootUri":          rootURI,
 		"workspaceFolders": workspaceFolders,
+	}
+	if rootURI == "" {
+		// Explicit null rootUri (multi-project): nothing to index at init time.
+		params["rootUri"] = nil
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -631,6 +698,10 @@ func (sm *SessionManager) writeMessage(msg interface{}) error {
 
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
+
+	if sm.stdin == nil {
+		return fmt.Errorf("LSP stdin is not connected")
+	}
 
 	if _, err := sm.stdin.Write([]byte(header)); err != nil {
 		return err
@@ -924,6 +995,9 @@ func (sm *SessionManager) handleAPIRequest(method string, params json.RawMessage
 	case "session/status":
 		return sm.getStatus(), nil
 
+	case "project/add", "project/close", "project/list", "project/status":
+		return sm.handleProjectAPI(method, params)
+
 	case "session/capabilities":
 		sm.mu.RLock()
 		caps := sm.capabilities
@@ -941,14 +1015,23 @@ func (sm *SessionManager) handleAPIRequest(method string, params json.RawMessage
 		"textDocument/references",
 		"textDocument/documentSymbol",
 		"textDocument/diagnostic",
-		// NOTE: BSL LS doesn't provide meaningful implementations/signatureHelp for our use cases,
-		// but we keep forwarding for compatibility if requested.
 		"textDocument/implementation",
 		"textDocument/codeAction",
 		"textDocument/formatting",
 		"textDocument/rename",
 		"textDocument/prepareRename",
-		"textDocument/prepareCallHierarchy":
+		"textDocument/prepareCallHierarchy",
+		// Platform-aware features enabled with BSL LS type-system v2 / bsl-context.
+		"textDocument/signatureHelp",
+		"textDocument/completion",
+		"textDocument/selectionRange",
+		"textDocument/inlayHint",
+		// CodeLens for complexity metrics (cyclomatic/cognitive). Two-step:
+		// textDocument/codeLens returns range+data, codeLens/resolve fills command.title.
+		"textDocument/codeLens",
+		"codeLens/resolve",
+		"textDocument/semanticTokens/range",
+		"textDocument/semanticTokens/full":
 		// Forward directly to LSP server
 		var p interface{}
 		json.Unmarshal(params, &p)
@@ -1045,12 +1128,31 @@ func (sm *SessionManager) getStatus() map[string]interface{} {
 	}
 	sm.indexingMu.RUnlock()
 
-	return map[string]interface{}{
+	status := map[string]interface{}{
 		"initialized":   initialized,
 		"openDocuments": openDocsCount,
 		"pid":           sm.cmd.Process.Pid,
 		"indexing":      indexing,
+		"multiProject":  sm.multiProject,
 	}
+
+	// In multi-project mode, attach the per-project registry so the bridge can
+	// gate readiness per project instead of relying on the single global state.
+	if sm.pm != nil {
+		projects := sm.pm.List()
+		projList := make([]map[string]interface{}, 0, len(projects))
+		for _, p := range projects {
+			projList = append(projList, map[string]interface{}{
+				"root":      p.Root,
+				"state":     string(p.State),
+				"last_used": p.LastUsed,
+			})
+		}
+		status["projects"] = projList
+		status["last_project"] = sm.pm.LastProject()
+	}
+
+	return status
 }
 
 // handleDidOpen handles textDocument/didOpen

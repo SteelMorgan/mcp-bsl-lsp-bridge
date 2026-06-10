@@ -696,6 +696,10 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (
 // ensureDocumentOpen sends a textDocument/didOpen notification to the language server
 // This is often required before other document operations can be performed
 func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, uri, language string) error {
+	// Multi-project mode: make sure the project owning this URI is registered
+	// with the daemon before we open the document. Best-effort and cheap (cached).
+	b.ensureProjectForURI(uri)
+
 	// Read the file content. Accept file URI or raw path.
 	// If running in container mode, map host paths to container paths before any fs operations.
 	filePath := utils.URIToFilePath(uri)
@@ -1032,6 +1036,109 @@ func (b *MCPLSPBridge) SelectionRange(uri string, positions []protocol.Position)
 	}
 
 	return ranges, nil
+}
+
+// InlayHint returns inlay hints (parameter-name / type annotations) for a range.
+func (b *MCPLSPBridge) InlayHint(uri string, startLine, startCharacter, endLine, endCharacter uint32) ([]protocol.InlayHint, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("InlayHint: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	hints, err := client.InlayHint(normalizedURI, startLine, startCharacter, endLine, endCharacter)
+	if err != nil {
+		return nil, fmt.Errorf("inlay hint request failed: %w", err)
+	}
+
+	return hints, nil
+}
+
+// MethodComplexity returns resolved complexity CodeLenses (cyclomatic + cognitive)
+// for every method in the document. BSL LS exposes complexity only through CodeLens,
+// which is a two-step protocol: textDocument/codeLens returns lenses carrying range+data
+// (no title), then codeLens/resolve fills command.title with the metric value. The caller
+// parses data.id (cyclomaticComplexity|cognitiveComplexity) and the trailing integer of
+// the resolved title. Requires the complexity CodeLens enabled in the BSL LS config
+// (codeLens.parameters.cyclomaticComplexity / cognitiveComplexity, on by default).
+func (b *MCPLSPBridge) MethodComplexity(uri string) ([]protocol.CodeLens, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("MethodComplexity: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{"uri": normalizedURI},
+	}
+
+	var lenses []protocol.CodeLens
+	if err := client.SendRequest("textDocument/codeLens", params, &lenses, 60*time.Second); err != nil {
+		return nil, fmt.Errorf("codeLens request failed: %w", err)
+	}
+
+	resolved := make([]protocol.CodeLens, 0, len(lenses))
+	for _, lens := range lenses {
+		// Already resolved (server returned a title eagerly) - keep as is.
+		if lens.Command != nil && lens.Command.Title != "" {
+			resolved = append(resolved, lens)
+			continue
+		}
+		var r protocol.CodeLens
+		if err := client.SendRequest("codeLens/resolve", lens, &r, 30*time.Second); err != nil {
+			logger.Warn(fmt.Sprintf("MethodComplexity: resolve failed for %v: %v", lens.Data, err))
+			continue
+		}
+		resolved = append(resolved, r)
+	}
+
+	return resolved, nil
+}
+
+// GetCompletion returns completion suggestions at a position.
+func (b *MCPLSPBridge) GetCompletion(uri string, line, character uint32) (*protocol.CompletionList, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("GetCompletion: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	completion, err := client.Completion(normalizedURI, line, character)
+	if err != nil {
+		return nil, fmt.Errorf("completion request failed: %w", err)
+	}
+
+	return completion, nil
 }
 
 // DocumentLink returns document links for a document.

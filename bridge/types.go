@@ -33,6 +33,15 @@ type MCPLSPBridge struct {
 	warmupRunning     bool
 	warmupDone        bool
 	warmupErr         string
+
+	// Multi-project support (daemon MULTI_PROJECT=1). Cached so file ops don't
+	// hit the daemon on every call: a project is auto-added on first touch and
+	// re-touched only when the active project root changes.
+	projectMu       sync.Mutex
+	knownProjects   map[string]bool
+	lastTouchedRoot string
+	mpEnabled       bool      // true once the daemon is confirmed multi-project
+	mpCheckedAt     time.Time // last time we probed the daemon for the flag
 }
 
 // WarmupStatus returns current warm-up state.

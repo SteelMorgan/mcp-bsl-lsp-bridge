@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -612,6 +613,66 @@ func (lc *LanguageClient) SemanticTokensRange(uri string, startLine, startCharac
 
 	logger.Debug(fmt.Sprintf("SemanticTokensRange: Parsed result: %+v", result))
 	return &result, nil
+}
+
+// InlayHint retrieves inlay hints (e.g. parameter-name and type annotations) for a range.
+func (lc *LanguageClient) InlayHint(uri string, startLine, startCharacter, endLine, endCharacter uint32) ([]protocol.InlayHint, error) {
+	params := protocol.InlayHintParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Range: protocol.Range{
+			Start: protocol.Position{Line: startLine, Character: startCharacter},
+			End:   protocol.Position{Line: endLine, Character: endCharacter},
+		},
+	}
+
+	var result []protocol.InlayHint
+
+	err := lc.SendRequest("textDocument/inlayHint", params, &result, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("inlay hint request failed: %w", err)
+	}
+
+	return result, nil
+}
+
+// Completion retrieves completion suggestions at a position.
+func (lc *LanguageClient) Completion(uri string, line, character uint32) (*protocol.CompletionList, error) {
+	params := protocol.CompletionParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: protocol.DocumentUri(uri)},
+		Position:     protocol.Position{Line: line, Character: character},
+	}
+
+	var raw json.RawMessage
+
+	err := lc.SendRequest("textDocument/completion", params, &raw, 30*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("completion request failed: %w", err)
+	}
+
+	return parseCompletionResult(raw)
+}
+
+// parseCompletionResult normalizes a textDocument/completion response, which per
+// the LSP spec may be a CompletionItem[], a CompletionList, or null.
+func parseCompletionResult(raw json.RawMessage) (*protocol.CompletionList, error) {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
+		return &protocol.CompletionList{Items: []protocol.CompletionItem{}}, nil
+	}
+
+	if trimmed[0] == '[' {
+		var items []protocol.CompletionItem
+		if err := json.Unmarshal(trimmed, &items); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal completion items: %w", err)
+		}
+		return &protocol.CompletionList{Items: items}, nil
+	}
+
+	var list protocol.CompletionList
+	if err := json.Unmarshal(trimmed, &list); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal completion list: %w", err)
+	}
+	return &list, nil
 }
 
 // IncomingCalls retrieves incoming calls for a given Call Hierarchy Item

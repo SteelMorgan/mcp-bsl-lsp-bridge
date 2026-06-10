@@ -54,6 +54,7 @@ PARAMETERS: query (required), file_context (optional), detail_level (auto/basic/
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("query", mcp.Description("Symbol name to search for"), mcp.Required()),
 			mcp.WithString("file_context", mcp.Description("Fuzzy file filter (filename, directory, or path component)")),
+			mcp.WithString("project_root", mcp.Description("Multi-project mode: restrict results to symbols under this project root (container path). workspace/symbol spans all warm projects otherwise.")),
 			mcp.WithString("detail_level", mcp.Description("Information depth: auto, basic, full")),
 			mcp.WithString("workspace_scope", mcp.Description("Search scope: project, current_dir")),
 			mcp.WithNumber("limit", mcp.Description("Maximum number of detailed results to show (default: 3)"), mcp.Min(1)),
@@ -73,6 +74,7 @@ PARAMETERS: query (required), file_context (optional), detail_level (auto/basic/
 			}
 
 			fileContext := request.GetString("file_context", "")
+			projectRoot := request.GetString("project_root", "")
 			detailLevel := request.GetString("detail_level", "auto")
 			limit := request.GetInt("limit", 3)
 			offset := request.GetInt("offset", 0)
@@ -101,6 +103,14 @@ PARAMETERS: query (required), file_context (optional), detail_level (auto/basic/
 
 			if len(symbols) == 0 {
 				return mcp.NewToolResultText(fmt.Sprintf("No symbols found matching '%s'", query)), nil
+			}
+
+			// Multi-project: restrict to one project root if requested.
+			if projectRoot != "" {
+				symbols = filterSymbolsByProjectRoot(symbols, projectRoot)
+				if len(symbols) == 0 {
+					return mcp.NewToolResultText(fmt.Sprintf("No symbols matching '%s' under project root '%s'", query, projectRoot)), nil
+				}
 			}
 
 			// Filter by file context if provided
@@ -136,11 +146,11 @@ func performSymbolSearch(ctx context.Context, bridge interfaces.BridgeInterface,
 	if projectDir == "" {
 		var err error
 		projectDir, err = os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get current working directory: %w", err)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current working directory: %w", err)
 		}
 	}
-	
+
 	logger.Info(fmt.Sprintf("symbol_explore: using project directory: %s", projectDir))
 
 	// First detect all project languages from the project directory
@@ -223,6 +233,23 @@ func convertWorkspaceSymbolToMatch(symbol protocol.WorkspaceSymbol) SymbolMatch 
 // filterSymbolsByFileContext applies intelligent file context resolution
 // First attempts to resolve the file context to an actual file path, then filters symbols.
 // If resolution fails, falls back to the original fuzzy matching with helpful error guidance.
+// filterSymbolsByProjectRoot keeps only symbols whose location lies under root
+// (separator-aware prefix on the file path), for multi-project scoping.
+func filterSymbolsByProjectRoot(symbols []SymbolMatch, root string) []SymbolMatch {
+	want := filepath.Clean(utils.URIToFilePath(root))
+	if want == "" || want == "." {
+		want = filepath.Clean(root)
+	}
+	out := make([]SymbolMatch, 0, len(symbols))
+	for _, s := range symbols {
+		p := filepath.Clean(utils.URIToFilePath(string(s.Location.Uri)))
+		if p == want || strings.HasPrefix(p, want+string(filepath.Separator)) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func filterSymbolsByFileContext(bridge interfaces.BridgeInterface, symbols []SymbolMatch, fileContext string) ([]SymbolMatch, error) {
 	if fileContext == "" {
 		return symbols, nil

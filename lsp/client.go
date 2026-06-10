@@ -98,30 +98,18 @@ func (lc *LanguageClient) Connect() (types.LanguageClientInterface, error) {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		closeErr := stdin.Close()
+		// Best-effort cleanup; surface the real cause, not a secondary close error.
+		_ = stdin.Close()
 		cancel()
-
-		if closeErr != nil {
-			return nil, fmt.Errorf("failed to close stdin pipe: %w", closeErr)
-		}
 
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		stdCloseErr := stdin.Close()
-		if stdCloseErr != nil {
-			cancel()
-			return nil, fmt.Errorf("failed to close stdin pipe: %w", stdCloseErr)
-		}
-
-		stdOutClose := stdout.Close()
-		if stdOutClose != nil {
-			cancel()
-			return nil, fmt.Errorf("failed to close stdout pipe: %w", stdOutClose)
-		}
-
+		// Best-effort cleanup; surface the real cause, not a secondary close error.
+		_ = stdin.Close()
+		_ = stdout.Close()
 		cancel()
 
 		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
@@ -129,24 +117,13 @@ func (lc *LanguageClient) Connect() (types.LanguageClientInterface, error) {
 
 	// Start the process
 	if err := cmd.Start(); err != nil {
-		stdinCloseErr := stdin.Close()
-		if stdinCloseErr != nil {
-			cancel()
-			return nil, fmt.Errorf("failed to close stdin pipe: %w", stdinCloseErr)
-		}
-
-		stdoutCloseErr := stdout.Close()
-		if stdoutCloseErr != nil {
-			cancel()
-			return nil, fmt.Errorf("failed to close stdout pipe: %w", stdoutCloseErr)
-		}
-
-		stderrCloseErr := stderr.Close()
-		if stderrCloseErr != nil {
-			cancel()
-			return nil, fmt.Errorf("failed to close stderr pipe: %w", stderrCloseErr)
-		}
-
+		// Best-effort cleanup. On a failed Start the os/exec internals already
+		// close the parent ends of these pipes, so Close() typically returns
+		// "file already closed" - ignore it and return the real Start error
+		// (e.g. "executable file not found in $PATH").
+		_ = stdin.Close()
+		_ = stdout.Close()
+		_ = stderr.Close()
 		cancel()
 
 		return nil, fmt.Errorf("failed to start command: %w", err)
