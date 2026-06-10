@@ -3,6 +3,7 @@ exec 2>&1
 
 echo "Starting LSP Session Manager for BSL Language Server..."
 echo "Workspace: ${WORKSPACE_ROOT:-/projects}"
+echo "Multi-project: ${MULTI_PROJECT:-0}"
 
 # Wait for BSL LS JAR to be mounted
 while [ ! -f /opt/bsl-ls/bsl-language-server.jar ]; do
@@ -13,9 +14,25 @@ done
 # Create log directory
 mkdir -p /home/user/.local/share/mcp-lsp-bridge/logs
 
+# State file for multi-project mode (persists the last-used project across restarts).
+STATE_PATH="${MCP_STATE_PATH:-/var/lib/mcp-lsp-bridge/state.json}"
+mkdir -p "$(dirname "$STATE_PATH")" 2>/dev/null || true
+
+# BSL LS config selection:
+#   - single-project (default): pass our pinned config via `-c`.
+#   - multi-project (MULTI_PROJECT=1): DROP `-c` so BSL LS honours per-workspace
+#     `<root>/.bsl-language-server.json` and the global `~/.bsl-language-server.json`.
+#     A CLI `-c` would override every per-project config (see design §8).
+if [ "${MULTI_PROJECT:-0}" = "1" ]; then
+    BSL_CONFIG_ARGS=""
+    echo "Multi-project mode: using per-project + global ~/.bsl-language-server.json (no -c)"
+else
+    BSL_CONFIG_ARGS="-c /etc/mcp-lsp-bridge/bsl-ls.json"
+fi
+
 # Start LSP Session Manager which:
 # 1. Spawns BSL LS in stdio mode
-# 2. Initializes LSP session ONCE
+# 2. Initializes LSP session ONCE (multi-project: with no workspace folders)
 # 3. Listens on TCP port 9999 for API requests
 # 4. Keeps the session alive and ready
 #
@@ -23,6 +40,7 @@ mkdir -p /home/user/.local/share/mcp-lsp-bridge/logs
 exec /usr/bin/lsp-session-manager \
     --port="${BSL_LS_PORT:-9999}" \
     --workspace="${WORKSPACE_ROOT:-/projects}" \
+    --state="${STATE_PATH}" \
     --command="java" \
     -- \
     -Xmx${MCP_LSP_BSL_JAVA_XMX:-6g} \
@@ -31,4 +49,4 @@ exec /usr/bin/lsp-session-manager \
     -XX:MaxGCPauseMillis=200 \
     -jar /opt/bsl-ls/bsl-language-server.jar \
     lsp \
-    -c /etc/mcp-lsp-bridge/bsl-ls.json
+    ${BSL_CONFIG_ARGS}

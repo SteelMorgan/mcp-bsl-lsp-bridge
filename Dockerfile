@@ -40,10 +40,18 @@ RUN mkdir -p /opt/bsl-ls \
 # === Final stage ===
 FROM debian:bookworm-slim
 
-# Install xz-utils first for unpacking s6-overlay, then other packages
-# Also install locales for UTF-8 support (critical for Cyrillic filenames and content)
+# Install xz-utils first for unpacking s6-overlay, then other packages.
+# Also install locales for UTF-8 support (critical for Cyrillic filenames and content).
+#
+# Java 21: BSL Language Server v1.0+ requires JDK 21 (bookworm only ships JDK 17),
+# so we pull Eclipse Temurin 21 from the Adoptium APT repository.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends xz-utils ca-certificates openjdk-17-jre-headless procps netcat-openbsd locales \
+  && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget gnupg \
+  && mkdir -p /etc/apt/keyrings \
+  && wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg \
+  && echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" > /etc/apt/sources.list.d/adoptium.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends temurin-21-jre \
   && rm -rf /var/lib/apt/lists/* \
   && sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen \
   && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
@@ -83,6 +91,17 @@ COPY docker/bsl-ls.json /home/user/.config/mcp-lsp-bridge/bsl-ls.json
 RUN mkdir -p /etc/mcp-lsp-bridge
 COPY docker/lsp_config.json /etc/mcp-lsp-bridge/lsp_config.json
 COPY docker/bsl-ls.json /etc/mcp-lsp-bridge/bsl-ls.json
+
+# Multi-project mode (MULTI_PROJECT=1) drops the BSL LS `-c` flag, so the global
+# config must live at ~/.bsl-language-server.json. Per-project overrides come from
+# each <project>/.bsl-language-server.json (mounted under /projects).
+COPY docker/bsl-ls.json /home/user/.bsl-language-server.json
+RUN chown user:user /home/user/.bsl-language-server.json
+
+# Persistent state directory for multi-project mode (mounted as the mcp-state
+# volume at runtime; created here so it exists and is writable on first boot).
+RUN mkdir -p /var/lib/mcp-lsp-bridge \
+  && chown -R user:user /var/lib/mcp-lsp-bridge
 
 # === s6-overlay service definitions ===
 

@@ -1,7 +1,7 @@
-name: ${MCP_CONTAINER_PREFIX}-${MCP_PROJECT_NAME}
+name: mcp-bsl-lsp
 
 services:
-  mcp-lsp:
+  lsp-gbig-pam:
     build:
       context: .
       dockerfile: Dockerfile
@@ -24,6 +24,13 @@ services:
       MCP_LSP_BSL_JAVA_XMX: ${MCP_LSP_BSL_JAVA_XMX:-6g}
       MCP_LSP_BSL_JAVA_XMS: ${MCP_LSP_BSL_JAVA_XMS:-2g}
       MCP_LSP_LOG_LEVEL: ${MCP_LSP_LOG_LEVEL:-debug}
+      # Multi-project mode: one BSL LS process serves many 1C configs mounted
+      # under PROJECTS_ROOT (e.g. /projects/projA, /projects/projB). On boot only
+      # the last-used project is warmed; others are added lazily on first use and
+      # stay warm until project_close or container shutdown. Requires BSL LS >= 1.0.
+      # Default 0 keeps the original single-project behavior.
+      MULTI_PROJECT: ${MULTI_PROJECT:-0}
+      MCP_STATE_PATH: ${MCP_STATE_PATH:-/var/lib/mcp-lsp-bridge/state.json}
       # File watcher configuration
       # Modes: off (manual tool only), polling (for Docker/Windows), fsnotify (Linux native), auto
       FILE_WATCHER_MODE: ${FILE_WATCHER_MODE:-polling}
@@ -31,7 +38,13 @@ services:
       FILE_WATCHER_WORKERS: ${FILE_WATCHER_WORKERS:-8}
 
     volumes:
+      # Mount the PARENT projects directory. In multi-project mode each child
+      # (e.g. projA/, projB/) is registered as its own workspace folder; in
+      # single-project mode this is just the one project. One path-mapping covers all.
       - "${HOST_PROJECTS_ROOT}:${PROJECTS_ROOT:-/projects}:${PROJECTS_MOUNT_MODE:-ro}"
+      # Persistent state for multi-project mode (last-used project + active list).
+      # Must NOT live under the read-only /projects mount.
+      - "mcp-state:/var/lib/mcp-lsp-bridge"
       # BSL LS is now bundled in the image (downloaded during build)
       # Uncomment below to override with a local version:
       # - "${BSL_LS_HOST_DIR}:/opt/bsl-ls:ro"
@@ -42,3 +55,8 @@ services:
       timeout: 10s
       start_period: 120s
       retries: 3
+
+volumes:
+  # Survives stop/start and rm/recreate so the last-used project can be
+  # pre-warmed after a restart.
+  mcp-state:
