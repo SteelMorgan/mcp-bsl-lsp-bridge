@@ -1590,13 +1590,21 @@ func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLin
 		return nil, fmt.Errorf("failed to get client for language %s: %w", *language, err)
 	}
 
-	err = b.ensureDocumentOpen(client, uri, string(*language))
+	// Normalize the raw path to a file:// URI (with proper percent-encoding) before
+	// talking to the LSP. ensureDocumentOpen and SemanticTokensRange MUST use the same
+	// URI: didOpen registers the document under the normalized URI, so a raw path in the
+	// range request would not correlate to the open document and BSL LS hangs until the
+	// adapter deadline (surfacing as "not supported"). Mirrors hover/symbol_impact which
+	// already normalize via NormalizeURIForLSP.
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	err = b.ensureDocumentOpen(client, normalizedURI, string(*language))
 	if err != nil {
 		// Continue anyway, as some servers might still work without explicit didOpen
-		logger.Error("SemanticTokens: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", uri, err))
+		logger.Error("SemanticTokens: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
 	}
 
-	tokens, err := client.SemanticTokensRange(uri, startLine, startCharacter, endLine, endCharacter)
+	tokens, err := client.SemanticTokensRange(normalizedURI, startLine, startCharacter, endLine, endCharacter)
 	if err != nil {
 		logger.Error(fmt.Sprintf("SemanticTokens: Failed to get raw semantic tokens from client: %v", err))
 		serverCommand := client.GetMetrics().GetCommand()
