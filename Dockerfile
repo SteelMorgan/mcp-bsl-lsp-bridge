@@ -24,8 +24,12 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 # Download BSL Language Server from GitHub releases
-# Use "latest" to always get the newest version, or specify version like "0.28.1"
-ARG BSL_LS_VERSION=latest
+# Pinned to 1.0.0-rc.1: this release advertises completionProvider/signatureHelpProvider
+# (0.29.0 / GitHub "latest" stable did NOT, which made completion/signature_help throw
+# UnsupportedOperationException and poison the session). The non-"latest" branch builds
+# the URL as .../releases/download/v${VERSION}/bsl-language-server-${VERSION}-exec.jar,
+# which matches the v1.0.0-rc.1 pre-release asset name.
+ARG BSL_LS_VERSION=1.0.0-rc.1
 RUN mkdir -p /opt/bsl-ls \
   && if [ "$BSL_LS_VERSION" = "latest" ]; then \
        BSL_LS_URL=$(wget -qO- https://api.github.com/repos/1c-syntax/bsl-language-server/releases/latest | grep -o '"browser_download_url": *"[^"]*-exec.jar"' | head -1 | cut -d'"' -f4); \
@@ -92,11 +96,12 @@ RUN mkdir -p /etc/mcp-lsp-bridge
 COPY docker/lsp_config.json /etc/mcp-lsp-bridge/lsp_config.json
 COPY docker/bsl-ls.json /etc/mcp-lsp-bridge/bsl-ls.json
 
-# Multi-project mode (MULTI_PROJECT=1) drops the BSL LS `-c` flag, so the global
-# config must live at ~/.bsl-language-server.json. Per-project overrides come from
-# each <project>/.bsl-language-server.json (mounted under /projects).
-COPY docker/bsl-ls.json /home/user/.bsl-language-server.json
-RUN chown user:user /home/user/.bsl-language-server.json
+# The global BSL LS config (language + optional v8platform.binPath) is no longer
+# baked here. It is GENERATED at runtime from env by docker/s6-rc.d/bsl-ls/run into
+# /etc/mcp-lsp-bridge/bsl-ls.global.json and pinned via
+# -Dapp.globalConfiguration.path, so the platform path is configurable per
+# deployment (and not tied to a specific OS user's HOME). The `-c` flag is gone;
+# per-project <project>/.bsl-language-server.json still override the global layer.
 
 # Persistent state directory for multi-project mode (mounted as the mcp-state
 # volume at runtime; created here so it exists and is writable on first boot).

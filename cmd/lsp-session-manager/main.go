@@ -170,6 +170,12 @@ type SessionManager struct {
 	args         []string
 	workspaceDir string
 
+	// configRoot is the directory actually handed to BSL LS as the workspace
+	// root. It equals workspaceDir unless auto-detection (single-project mode)
+	// found the real 1C configuration root deeper inside the passed path — see
+	// detectConfigurationRoot. Use rootDir() to read it with the fallback.
+	configRoot string
+
 	mu     sync.RWMutex
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
@@ -178,6 +184,17 @@ type SessionManager struct {
 	initialized  bool
 	initResult   json.RawMessage
 	capabilities json.RawMessage
+
+	// serverProviders holds the set of *Provider keys the BSL LS advertised in
+	// its initialize result (e.g. "callHierarchyProvider", "hoverProvider").
+	// Used to gate request forwarding: a method whose provider the server did
+	// NOT advertise must not be sent to the LSP process. BSL LS answers an
+	// unadvertised method (textDocument/completion, textDocument/signatureHelp)
+	// by throwing UnsupportedOperationException from the lsp4j default method,
+	// which kills its single StreamMessageProducer.listen loop and poisons the
+	// whole session — every subsequent request then hangs. Honouring the
+	// advertised capabilities keeps the session alive for the methods that work.
+	serverProviders map[string]bool
 
 	// Request/response handling
 	requestID int64
@@ -235,9 +252,125 @@ func NewSessionManager(command string, args []string, workspaceDir string) *Sess
 	}
 }
 
+// rootDir returns the directory BSL LS treats as the workspace root: the
+// auto-detected 1C configuration root when available, otherwise the raw
+// workspace passed on the command line.
+func (sm *SessionManager) rootDir() string {
+	if sm.configRoot != "" {
+		return sm.configRoot
+	}
+	return sm.workspaceDir
+}
+
+// detectConfigurationRoot finds the 1C configuration root beneath workspaceDir.
+//
+// The workspace is often passed as a PROJECT root that holds the real source
+// tree deeper down (e.g. <project>/src/xml/Configuration.xml) next to extension
+// sub-configurations (<project>/src/exts/*/Configuration.xml) and scratch copies
+// under tasks/. BSL LS, pointed at such a parent, discovers every
+// Configuration.xml and registers the extensions' common modules while the MAIN
+// configuration's modules drop out of the type index — breaking cross-module
+// resolution (signature help, call hierarchy) and producing false
+// QueryToMissingMetadata on objects that do exist. We therefore descend to the
+// single MAIN configuration root and hand that to BSL LS instead of the parent.
+//
+// A main configuration is a root Configuration.xml WITHOUT the
+// <ConfigurationExtensionPurpose> marker that every extension carries near the
+// top of its file. Returns (root, true) when the detected root differs from
+// workspaceDir; on any ambiguity (no main config found, or more than one at the
+// shallowest depth is handled by a deterministic tie-break) it falls back to
+// workspaceDir so the original behavior is preserved.
+func detectConfigurationRoot(workspaceDir string) (string, bool) {
+	base := filepath.Clean(workspaceDir)
+
+	// Already a main configuration root? keep it (handles a correctly-pointed
+	// workspace, e.g. .../src/xml).
+	if isMainConfigurationFile(filepath.Join(base, "Configuration.xml")) {
+		return base, false
+	}
+
+	const maxDepth = 5 // <project>/src/xml/Configuration.xml is depth 2; keep slack
+	var candidates []string
+	filepath.Walk(base, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip unreadable entries
+		}
+		if info.IsDir() {
+			if path == base {
+				return nil
+			}
+			name := info.Name()
+			// Hidden, dependency and scratch directories are never config roots;
+			// pruning them also keeps the scratch Configuration.xml copies under
+			// tasks/ and .review-sandboxes/ out of the candidate set.
+			if strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" ||
+				name == "tasks" || name == "build" || name == "out" || name == "bin" {
+				return filepath.SkipDir
+			}
+			rel, _ := filepath.Rel(base, path)
+			if strings.Count(rel, string(os.PathSeparator))+1 > maxDepth {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if info.Name() == "Configuration.xml" && isMainConfigurationFile(path) {
+			candidates = append(candidates, filepath.Dir(path))
+		}
+		return nil
+	})
+
+	if len(candidates) == 0 {
+		return base, false
+	}
+
+	// Prefer the shallowest candidate — the base configuration sits above any
+	// nested copy. Deterministic lexical tie-break for stability.
+	best := candidates[0]
+	bestDepth := strings.Count(best, string(os.PathSeparator))
+	for _, c := range candidates[1:] {
+		d := strings.Count(c, string(os.PathSeparator))
+		if d < bestDepth || (d == bestDepth && c < best) {
+			best, bestDepth = c, d
+		}
+	}
+	return best, best != base
+}
+
+// isMainConfigurationFile reports whether path is a root Configuration.xml of a
+// MAIN 1C configuration (not an extension). Only the head of the file is read:
+// the distinguishing <ConfigurationExtensionPurpose> property lives in the
+// Properties block near the top, well before the large ChildObjects list.
+func isMainConfigurationFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	buf := make([]byte, 128*1024)
+	n, _ := io.ReadFull(f, buf) // short read on small files is fine; n is exact
+	head := string(buf[:n])
+
+	if !strings.Contains(head, "<Configuration ") && !strings.Contains(head, "<Configuration>") {
+		return false // not a configuration root descriptor
+	}
+	// Extensions carry this marker; the base configuration never does.
+	return !strings.Contains(head, "ConfigurationExtensionPurpose")
+}
+
 // Start starts the LSP server and initializes the session
 func (sm *SessionManager) Start() error {
 	log.Println("Starting LSP server...")
+
+	// Resolve the real configuration root under the passed workspace (single
+	// project only — multi-project manages roots per project via ProjectManager).
+	sm.configRoot = sm.workspaceDir
+	if !sm.multiProject {
+		if root, changed := detectConfigurationRoot(sm.workspaceDir); changed {
+			log.Printf("Detected 1C configuration root: %s (passed workspace: %s)", root, sm.workspaceDir)
+			sm.configRoot = root
+		}
+	}
 
 	sm.cmd = exec.Command(sm.command, sm.args...)
 
@@ -354,7 +487,7 @@ func (sm *SessionManager) startPollingWatcher() error {
 	workers := GetPollingWorkers()
 
 	sm.pollingWatcher = NewPollingWatcher(
-		sm.workspaceDir,
+		sm.rootDir(),
 		interval,
 		workers,
 		func(changes []FileChange) error {
@@ -394,7 +527,7 @@ func (sm *SessionManager) startFsnotifyWatcher() error {
 	sm.watcherStop = make(chan struct{})
 
 	// Add workspace directory recursively
-	err = filepath.Walk(sm.workspaceDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(sm.rootDir(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil // Skip errors
 		}
@@ -414,7 +547,7 @@ func (sm *SessionManager) startFsnotifyWatcher() error {
 		return fmt.Errorf("failed to walk workspace: %w", err)
 	}
 
-	log.Printf("fsnotify watcher started for workspace: %s", sm.workspaceDir)
+	log.Printf("fsnotify watcher started for workspace: %s", sm.rootDir())
 
 	// Start watcher goroutine
 	go sm.runFsnotifyWatcher()
@@ -522,7 +655,7 @@ func (sm *SessionManager) runFsnotifyWatcher() {
 func (sm *SessionManager) initialize() error {
 	log.Println("Initializing LSP session...")
 
-	rootURI := utils.FilePathToURI(sm.workspaceDir)
+	rootURI := utils.FilePathToURI(sm.rootDir())
 
 	// Build workspace folders.
 	//
@@ -623,7 +756,25 @@ func (sm *SessionManager) initialize() error {
 	if err := json.Unmarshal(result, &initResp); err == nil {
 		sm.mu.Lock()
 		sm.capabilities = initResp.Capabilities
+		// Record which *Provider keys the server advertised, so handleAPIRequest
+		// can refuse unadvertised methods instead of forwarding them and
+		// poisoning the session (see serverProviders doc on the struct field).
+		providers := map[string]bool{}
+		var capsMap map[string]json.RawMessage
+		if json.Unmarshal(initResp.Capabilities, &capsMap) == nil {
+			for key, val := range capsMap {
+				if !strings.HasSuffix(key, "Provider") {
+					continue
+				}
+				// A provider counts as present unless it is explicitly false/null.
+				if s := strings.TrimSpace(string(val)); s != "false" && s != "null" {
+					providers[key] = true
+				}
+			}
+		}
+		sm.serverProviders = providers
 		sm.mu.Unlock()
+		log.Printf("Server advertised %d providers: %v", len(providers), providersList(providers))
 	}
 
 	log.Println("LSP session initialized successfully")
@@ -975,6 +1126,61 @@ func (sm *SessionManager) sendAPIError(conn net.Conn, id int64, code int, messag
 	conn.Write(append(respJSON, '\n'))
 }
 
+// methodProvider maps an LSP method to the serverCapabilities *Provider key that
+// must be advertised for the method to be safe to forward to BSL LS. An empty
+// string means "do not gate" (session-local, notification-style, or workspace
+// methods). Forwarding a method whose provider is absent makes BSL LS throw
+// UnsupportedOperationException and poison the session, so these are refused.
+func methodProvider(method string) string {
+	switch method {
+	case "textDocument/completion":
+		return "completionProvider"
+	case "textDocument/signatureHelp":
+		return "signatureHelpProvider"
+	case "textDocument/hover":
+		return "hoverProvider"
+	case "textDocument/definition":
+		return "definitionProvider"
+	case "textDocument/references":
+		return "referencesProvider"
+	case "textDocument/documentSymbol":
+		return "documentSymbolProvider"
+	case "textDocument/implementation":
+		return "implementationProvider"
+	case "textDocument/codeAction":
+		return "codeActionProvider"
+	case "textDocument/codeLens", "codeLens/resolve":
+		return "codeLensProvider"
+	case "textDocument/formatting":
+		return "documentFormattingProvider"
+	case "textDocument/rangeFormatting":
+		return "documentRangeFormattingProvider"
+	case "textDocument/rename", "textDocument/prepareRename":
+		return "renameProvider"
+	case "textDocument/prepareCallHierarchy",
+		"callHierarchy/incomingCalls", "callHierarchy/outgoingCalls":
+		return "callHierarchyProvider"
+	case "textDocument/selectionRange":
+		return "selectionRangeProvider"
+	case "textDocument/semanticTokens/range", "textDocument/semanticTokens/full":
+		return "semanticTokensProvider"
+	case "textDocument/inlayHint":
+		return "inlayHintProvider"
+	case "textDocument/diagnostic":
+		return "diagnosticProvider"
+	}
+	return ""
+}
+
+// providersList returns the provider keys as a slice (for logging).
+func providersList(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}
+
 // handleAPIRequest handles an API request from mcp-lsp-bridge
 func (sm *SessionManager) handleAPIRequest(method string, params json.RawMessage) (interface{}, error) {
 	timeout := 90 * time.Second
@@ -990,6 +1196,19 @@ func (sm *SessionManager) handleAPIRequest(method string, params json.RawMessage
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
+
+	// Capability gate: refuse any method whose provider the server did not
+	// advertise, instead of forwarding it and poisoning the session with an
+	// UnsupportedOperationException (see SessionManager.serverProviders). Gate
+	// only when we actually parsed providers (fail-open if the set is empty/nil).
+	if prov := methodProvider(method); prov != "" {
+		sm.mu.RLock()
+		gated := len(sm.serverProviders) > 0 && !sm.serverProviders[prov]
+		sm.mu.RUnlock()
+		if gated {
+			return nil, fmt.Errorf("method %s is not supported by the language server (no %s advertised)", method, prov)
+		}
+	}
 
 	switch method {
 	case "session/status":

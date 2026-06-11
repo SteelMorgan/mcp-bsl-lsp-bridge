@@ -692,6 +692,9 @@ func TestRenameSymbol(t *testing.T) {
 				// Reset mock expectations for each sub-test
 				mockClient.ExpectedCalls = nil
 				mockClient.Calls = nil
+				// Reset the open-document cache so each URI form re-opens the file:
+				// ensureDocumentOpen now skips didOpen for an already-open, unchanged doc.
+				bridge.openedDocs.Range(func(k, _ any) bool { bridge.openedDocs.Delete(k); return true })
 
 				ctx := context.Background()
 				mockClient.On("Context").Return(ctx)

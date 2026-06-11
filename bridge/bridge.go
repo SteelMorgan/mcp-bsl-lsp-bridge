@@ -749,15 +749,27 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, 
 		}
 	}
 
+	// absPath is already in the server filesystem namespace (container or local).
+	serverURI := utils.NormalizeURI(absPath)
+
+	// Open-document cache: skip didOpen when the document is already open and
+	// unchanged on disk. Re-opening forces a full DocumentContext recompute on the
+	// single-threaded BSL LS and stalls its stdin reader, making the next didOpen
+	// write block until the context deadline (see MCPLSPBridge.openedDocs).
+	var mtime int64
+	if fi, statErr := os.Stat(absPath); statErr == nil {
+		mtime = fi.ModTime().UnixNano()
+		if cached, ok := b.openedDocs.Load(serverURI); ok && cached.(int64) == mtime {
+			return nil
+		}
+	}
+
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
 	// Send textDocument/didOpen notification
-	// absPath is already in the server filesystem namespace (container or local).
-	serverURI := utils.NormalizeURI(absPath)
-
 	didOpenParams := protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
 			Uri:        protocol.DocumentUri(serverURI),
@@ -770,6 +782,12 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, 
 	err = client.SendNotification("textDocument/didOpen", didOpenParams)
 	if err != nil {
 		return fmt.Errorf("failed to send didOpen notification: %w", err)
+	}
+
+	// Remember the open document so subsequent tool calls reuse it instead of
+	// re-opening; re-open only when the file's mtime changes.
+	if mtime != 0 {
+		b.openedDocs.Store(serverURI, mtime)
 	}
 
 	logger.Debug(fmt.Sprintf("Document opened in LSP server: %s (language: %s)", uri, language))
@@ -1108,6 +1126,16 @@ func (b *MCPLSPBridge) MethodComplexity(uri string) ([]protocol.CodeLens, error)
 		if err := client.SendRequest("codeLens/resolve", lens, &r, 30*time.Second); err != nil {
 			logger.Warn(fmt.Sprintf("MethodComplexity: resolve failed for %v: %v", lens.Data, err))
 			continue
+		}
+		// BSL LS drops the top-level `data` on resolve: the {methodName, id} pair
+		// moves into command.arguments and the id mutates to a toggle command
+		// ("toggleCognitiveComplexityInlayHints"), so it no longer identifies the
+		// metric. foldComplexityRows reads methodName + metric id from lens.Data, so
+		// restore the pre-resolve data (which still carries the real methodName and
+		// id=cyclomaticComplexity|cognitiveComplexity). Without this the complexity
+		// table shows empty method names and "-" values (metric switch never matches).
+		if r.Data == nil {
+			r.Data = lens.Data
 		}
 		resolved = append(resolved, r)
 	}

@@ -31,6 +31,14 @@ services:
       # Default 0 keeps the original single-project behavior.
       MULTI_PROJECT: ${MULTI_PROJECT:-0}
       MCP_STATE_PATH: ${MCP_STATE_PATH:-/var/lib/mcp-lsp-bridge/state.json}
+      # 1C platform context (syntax-helper .hbk -> platform globals/types for
+      # hover, completion, signature_help). BSL_PLATFORM_BIN is the IN-CONTAINER
+      # path to the platform 'bin' dir; set it together with the read-only mount
+      # in docker-compose.platform.yml. Empty (default) -> BSL LS auto-detects an
+      # installed platform (incl. Windows). See docs/configuration.md.
+      BSL_PLATFORM_BIN: ${BSL_PLATFORM_BIN:-}
+      BSL_PLATFORM_VERSION: ${BSL_PLATFORM_VERSION:-}
+      BSL_LANGUAGE: ${BSL_LANGUAGE:-ru}
       # File watcher configuration
       # Modes: off (manual tool only), polling (for Docker/Windows), fsnotify (Linux native), auto
       FILE_WATCHER_MODE: ${FILE_WATCHER_MODE:-polling}
@@ -48,6 +56,12 @@ services:
       # BSL LS is now bundled in the image (downloaded during build)
       # Uncomment below to override with a local version:
       # - "${BSL_LS_HOST_DIR}:/opt/bsl-ls:ro"
+      # 1C platform context (.hbk) for platform globals/types in hover /
+      # completion / signature_help. The heavy platform is NOT baked into the
+      # image; mount only its dir read-only. Prefer the opt-in override file:
+      #   docker compose -f docker-compose.yml -f docker-compose.platform.yml up -d
+      # (set HOST_PLATFORM_DIR / BSL_PLATFORM_BIN in .env). Or inline here:
+      # - "${HOST_PLATFORM_DIR}:${BSL_PLATFORM_BIN}:ro"
 
     healthcheck:
       test: ["CMD", "sh", "-c", "nc -z localhost ${BSL_LS_PORT:-9999}"]
