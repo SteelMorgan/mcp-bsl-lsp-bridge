@@ -1,0 +1,27 @@
+# Opt-in override: provide the 1C platform context (syntax-helper .hbk) to BSL LS
+# WITHOUT baking the heavy platform into the image. Mounts only the platform
+# directory read-only and points BSL LS at it via BSL_PLATFORM_BIN.
+#
+# Usage (compose merges this on top of the base file; service volumes/env are merged):
+#   docker compose -f docker-compose.sandbox-volume.yml -f docker-compose.platform.yml up -d
+#   docker compose -f docker-compose.yml             -f docker-compose.platform.yml up -d
+#
+# Required .env values (see .env):
+#   HOST_PLATFORM_DIR    - dir ON THE DOCKER HOST holding shcntx_*.hbk / shlang_*.hbk
+#                          (the platform 'bin' dir, or a slim copy of just the .hbk).
+#   BSL_PLATFORM_BIN     - where it is mounted INSIDE the container (== binPath BSL LS uses).
+#   BSL_PLATFORM_VERSION - optional, sets v8platform.targetVersion.
+#
+# Leave this override OFF (and BSL_PLATFORM_BIN empty) to fall back to BSL LS
+# auto-discovery of an installed platform (incl. Windows).
+name: mcp-bsl-lsp
+
+services:
+  mcp-lsp:
+    environment:
+      BSL_PLATFORM_BIN: ${BSL_PLATFORM_BIN:?set BSL_PLATFORM_BIN in .env to the in-container platform bin path}
+      BSL_PLATFORM_VERSION: ${BSL_PLATFORM_VERSION:-}
+    volumes:
+      # Read-only mount of the platform syntax-helper files. Only this directory
+      # crosses into the container — the rest of the platform stays on the host.
+      - "${HOST_PLATFORM_DIR:?set HOST_PLATFORM_DIR in .env to the host platform dir with .hbk}:${BSL_PLATFORM_BIN}:ro"

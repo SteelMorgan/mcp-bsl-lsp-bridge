@@ -209,6 +209,16 @@ func (m *MockBridge) SelectionRange(uri string, positions []protocol.Position) (
 	return args.Get(0).([]protocol.SelectionRange), args.Error(1)
 }
 
+func (m *MockBridge) InlayHint(uri string, startLine, startCharacter, endLine, endCharacter uint32) ([]protocol.InlayHint, error) {
+	args := m.Called(uri, startLine, startCharacter, endLine, endCharacter)
+	return args.Get(0).([]protocol.InlayHint), args.Error(1)
+}
+
+func (m *MockBridge) GetCompletion(uri string, line, character uint32) (*protocol.CompletionList, error) {
+	args := m.Called(uri, line, character)
+	return args.Get(0).(*protocol.CompletionList), args.Error(1)
+}
+
 func (m *MockBridge) DocumentLink(uri string) ([]protocol.DocumentLink, error) {
 	args := m.Called(uri)
 	return args.Get(0).([]protocol.DocumentLink), args.Error(1)

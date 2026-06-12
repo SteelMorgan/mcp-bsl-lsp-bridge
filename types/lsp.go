@@ -55,7 +55,7 @@ type LanguageServerConfigProvider interface {
 	GetCommand() string
 	GetArgs() []string
 	GetInitializationOptions() map[string]interface{}
-	
+
 	// Connection mode support
 	GetMode() string // "stdio" (default), "tcp", "websocket", or "session"
 	GetHost() string // Host for TCP/WebSocket/Session (e.g., "localhost")
@@ -126,6 +126,8 @@ type LanguageClientInterface interface {
 	SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error)
 	SemanticTokens(uri string) (*protocol.SemanticTokens, error)
 	SemanticTokensRange(uri string, startLine, startCharacter, endLine, endCharacter uint32) (*protocol.SemanticTokens, error)
+	InlayHint(uri string, startLine, startCharacter, endLine, endCharacter uint32) ([]protocol.InlayHint, error)
+	Completion(uri string, line, character uint32) (*protocol.CompletionList, error)
 	DocumentDiagnostics(uri string, identifier string, previousResultId string) (*protocol.DocumentDiagnosticReport, error)
 }
 

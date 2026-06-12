@@ -29,6 +29,8 @@ type BridgeInterface interface {
 type InformationProvider interface {
 	SemanticTokens(uri string, targetTypes []string, startLine, startCharacter, endLine, endCharacter uint32) ([]types.TokenPosition, error)
 	GetCodeActions(uri string, line, character, endLine, endCharacter uint32) ([]protocol.CodeAction, error)
+	InlayHint(uri string, startLine, startCharacter, endLine, endCharacter uint32) ([]protocol.InlayHint, error)
+	GetCompletion(uri string, line, character uint32) (*protocol.CompletionList, error)
 }
 type CallHierarchyProvider interface {
 	PrepareCallHierarchy(uri string, line, character uint32) ([]protocol.CallHierarchyItem, error)

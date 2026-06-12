@@ -12,8 +12,9 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 	// New unified symbol exploration tool
 	tools.RegisterSymbolExploreTool(mcpServer, bridge)
 
-	// Disabling lesser used tools
-	// tools.RegisterAnalyzeCodeTool(mcpServer, bridge)
+	// Completion / API discovery (platform-aware with BSL LS type-system v2 + bsl-context)
+	tools.RegisterCompletionTool(mcpServer, bridge)
+	tools.RegisterAnalyzeCodeTool(mcpServer, bridge)
 	tools.RegisterProjectAnalysisTool(mcpServer, bridge)
 
 	// Language detection tools
@@ -32,10 +33,12 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 	tools.RegisterHoverTool(mcpServer, bridge)
 	tools.RegisterDefinitionTool(mcpServer, bridge)
 	tools.RegisterSelectionRangeTool(mcpServer, bridge)
-	// tools.RegisterSignatureHelpTool(mcpServer, bridge)  // BSL LS не поддерживает signature help
+	// Platform-aware features enabled with BSL LS type-system v2 + bsl-context:
+	tools.RegisterSignatureHelpTool(mcpServer, bridge)
+	tools.RegisterSemanticTokensTool(mcpServer, bridge)
+	tools.RegisterInlayHintsTool(mcpServer, bridge)
 	// tools.RegisterDiagnosticsTool(mcpServer, bridge)
 	// Hide IDE/UI-oriented tools that don't help an AI agent much:
-	// - semantic_tokens
 	// - folding_range
 	// - document_link
 	// - document_color
@@ -56,12 +59,20 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 	// Call hierarchy tools
 	tools.RegisterCallHierarchyTool(mcpServer, bridge)
 	tools.RegisterCallGraphTool(mcpServer, bridge)
+	// Combo: incoming callers + references + per-caller module-type classification (change-impact)
+	tools.RegisterSymbolImpactTool(mcpServer, bridge)
 
 	// Workspace analysis
 	// tools.RegisterWorkspaceDiagnosticsTool(mcpServer, bridge) // Too heavy/noisy for AI agent workflows
 
 	// Document diagnostics
 	tools.RegisterDocumentDiagnosticsTool(mcpServer, bridge)
+	// Targeted security/performance/SQL diagnostics (offline classification table)
+	tools.RegisterQualityDiagnosticsTool(mcpServer, bridge)
+	// Per-method cyclomatic + cognitive complexity (BSL LS complexity CodeLens)
+	tools.RegisterComplexityTool(mcpServer, bridge)
+	// Combo: complexity + quality_diagnostics merged per method, ranked by refactor priority
+	tools.RegisterModuleHealthTool(mcpServer, bridge)
 
 	// Workspace notifications and commands
 	// did_change_watched_files - needed for notifying LSP about new files (essential for call_graph)
@@ -76,4 +87,7 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 
 	// Server/client status (includes LSP $/progress)
 	tools.RegisterLSPStatusTool(mcpServer, bridge)
+
+	// Multi-project control (active only when daemon MULTI_PROJECT=1)
+	tools.RegisterProjectTools(mcpServer, bridge)
 }

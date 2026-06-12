@@ -1,0 +1,2152 @@
+{
+  "AllFunctionPathMustHaveReturn": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "UNPREDICTABLE",
+      "BADPRACTICE",
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "AssignAliasFieldsInQuery": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "SQL",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "AssignToReadOnlyProperty": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "ERROR"
+  },
+  "BadWords": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "DESIGN"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "BeginTransactionBeforeTryCatch": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "ERROR"
+  },
+  "CachedPublic": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "DESIGN"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CanonicalSpellingKeywords": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CodeAfterAsyncCall": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CodeBlockBeforeSub": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "CodeOutOfRegion": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CognitiveComplexity": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommandModuleExportMethods": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD",
+      "CLUMSY"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommentedCode": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommitTransactionOutsideTryCatch": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "ERROR"
+  },
+  "CommonModuleAssign": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "CommonModuleInvalidType": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "UNPREDICTABLE",
+      "DESIGN"
+    ],
+    "type": "ERROR"
+  },
+  "CommonModuleMissingAPI": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BRAINOVERLOAD",
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommonModuleNameCached": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommonModuleNameClient": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommonModuleNameClientServer": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommonModuleNameFullAccess": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "UNPREDICTABLE"
+    ],
+    "type": "SECURITY_HOTSPOT"
+  },
+  "CommonModuleNameGlobal": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommonModuleNameGlobalClient": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommonModuleNameServerCall": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommonModuleNameWords": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CommonModuleVariables": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "DESIGN"
+    ],
+    "type": "ERROR"
+  },
+  "CompilationDirectiveLost": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CompilationDirectiveNeedLess": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "CLUMSY",
+      "STANDARD",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "ConsecutiveEmptyLines": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CrazyMultilineString": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BADPRACTICE",
+      "SUSPICIOUS",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "CreateQueryInCycle": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "PERFORMANCE"
+    ],
+    "type": "ERROR"
+  },
+  "CyclomaticComplexity": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DataExchangeLoading": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "DeletingCollectionItem": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "DenyIncompleteValues": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DeprecatedAttributes8312": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "DEPRECATED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DeprecatedCurrentDate": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "DEPRECATED",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "DeprecatedFind": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "DEPRECATED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DeprecatedMessage": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "DEPRECATED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DeprecatedMethodCall": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "DEPRECATED",
+      "DESIGN"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DeprecatedTypeManagedForm": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD",
+      "DEPRECATED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DisableSafeMode": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "VULNERABILITY"
+  },
+  "DoubleNegatives": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BRAINOVERLOAD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DuplicateRegion": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DuplicateStringLiteral": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "DuplicatedInsertionIntoCollection": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BRAINOVERLOAD",
+      "SUSPICIOUS",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "EmptyCodeBlock": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BADPRACTICE",
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "EmptyRegion": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "EmptyStatement": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "ExcessiveAutoTestCheck": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "DEPRECATED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "ExecuteExternalCode": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "ERROR",
+      "STANDARD"
+    ],
+    "type": "VULNERABILITY"
+  },
+  "ExecuteExternalCodeInCommonModule": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "BADPRACTICE",
+      "STANDARD"
+    ],
+    "type": "SECURITY_HOTSPOT"
+  },
+  "ExportVariables": {
+    "quickfix": false,
+    "scopes": [
+      "ALL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "DESIGN",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "ExternalAppStarting": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "SECURITY_HOTSPOT"
+  },
+  "ExtraCommas": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "FieldsFromJoinsWithoutIsNull": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "SQL",
+      "SUSPICIOUS",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "FileSystemAccess": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "VULNERABILITY"
+  },
+  "ForbiddenMetadataName": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "STANDARD",
+      "SQL",
+      "DESIGN"
+    ],
+    "type": "ERROR"
+  },
+  "FormDataToValue": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "FullOuterJoinQuery": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SQL",
+      "STANDARD",
+      "PERFORMANCE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "FunctionNameStartsWithGet": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "FunctionOutParameter": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "DESIGN"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "FunctionReturnsSamePrimitive": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "DESIGN",
+      "BADPRACTICE"
+    ],
+    "type": "ERROR"
+  },
+  "FunctionShouldHaveReturn": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "GetFormMethod": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "GlobalContextMethodCollision8312": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "IdenticalExpressions": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "ERROR"
+  },
+  "IfConditionComplexity": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "IfElseDuplicatedCodeBlock": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "IfElseDuplicatedCondition": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "IfElseIfEndsWithElse": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "IncorrectLineBreak": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "IncorrectUseLikeInQuery": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "SQL",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "IncorrectUseOfStrTemplate": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "BRAINOVERLOAD",
+      "SUSPICIOUS",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "InternetAccess": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "VULNERABILITY"
+  },
+  "InvalidCharacterInFile": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "ERROR",
+      "STANDARD",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "IsInRoleMethod": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "JoinWithSubQuery": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SQL",
+      "STANDARD",
+      "PERFORMANCE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "JoinWithVirtualTable": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SQL",
+      "STANDARD",
+      "PERFORMANCE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "LatinAndCyrillicSymbolInWord": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BRAINOVERLOAD",
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "LineLength": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "LogicalOrInJoinQuerySection": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SQL",
+      "PERFORMANCE",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "LogicalOrInTheWhereSectionOfQuery": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SQL",
+      "PERFORMANCE",
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MagicDate": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BADPRACTICE",
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MagicNumber": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MetadataObjectNameLength": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "ERROR"
+  },
+  "MethodSize": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MissedRequiredParameter": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "MissingCodeTryCatchEx": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "ERROR"
+  },
+  "MissingCommonModuleMethod": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "MissingEventSubscriptionHandler": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "MissingParameterDescription": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MissingReturnedValueDescription": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MissingSpace": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MissingTempStorageDeletion": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "PERFORMANCE",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MissingTemporaryFileDeletion": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BADPRACTICE",
+      "STANDARD"
+    ],
+    "type": "ERROR"
+  },
+  "MissingVariablesDescription": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "MultilineStringInQuery": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "BADPRACTICE",
+      "SUSPICIOUS",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "MultilingualStringHasAllDeclaredLanguages": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "ERROR",
+      "LOCALIZE"
+    ],
+    "type": "ERROR"
+  },
+  "MultilingualStringUsingWithTemplate": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "ERROR",
+      "LOCALIZE"
+    ],
+    "type": "ERROR"
+  },
+  "NestedConstructorsInStructureDeclaration": {
+    "quickfix": false,
+    "scopes": [
+      "ALL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BADPRACTICE",
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "NestedFunctionInParameters": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BRAINOVERLOAD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "NestedStatements": {
+    "quickfix": false,
+    "scopes": [
+      "ALL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "BADPRACTICE",
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "NestedTernaryOperator": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "NonExportMethodsInApiRegion": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "NonStandardRegion": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "NumberOfOptionalParams": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "NumberOfParams": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "NumberOfValuesInStructureConstructor": {
+    "quickfix": false,
+    "scopes": [
+      "ALL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "OSUsersMethod": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "SECURITY_HOTSPOT"
+  },
+  "OneStatementPerLine": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "DESIGN"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "OrderOfParams": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "DESIGN"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "OrdinaryAppSupport": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "UNPREDICTABLE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "PairingBrokenTransaction": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "ERROR"
+  },
+  "ParseError": {
+    "quickfix": false,
+    "scopes": [
+      "ALL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "PrivilegedModuleMethodCall": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "SECURITY_HOTSPOT"
+  },
+  "ProcedureReturnsValue": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "ProtectedModule": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BADPRACTICE",
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "PublicMethodsDescription": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD",
+      "BRAINOVERLOAD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "QueryNestedFieldsByDot": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "SQL",
+      "PERFORMANCE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "QueryParseError": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "SQL",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "QueryToMissingMetadata": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "SUSPICIOUS",
+      "SQL"
+    ],
+    "type": "ERROR"
+  },
+  "RedundantAccessToObject": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD",
+      "CLUMSY"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "RefOveruse": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SQL",
+      "PERFORMANCE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "ReservedParameterNames": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "RewriteMethodParameter": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "SameMetadataObjectAndChildNames": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "SQL",
+      "DESIGN"
+    ],
+    "type": "ERROR"
+  },
+  "ScheduledJobHandler": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "SelectTopWithoutOrderBy": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "SQL",
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "SelfAssign": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "ERROR"
+  },
+  "SelfInsertion": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "UNPREDICTABLE",
+      "PERFORMANCE"
+    ],
+    "type": "ERROR"
+  },
+  "SemicolonPresence": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "ServerCallsInFormEvents": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "DESIGN"
+    ],
+    "type": "ERROR"
+  },
+  "ServerSideExportFormMethod": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR",
+      "UNPREDICTABLE",
+      "SUSPICIOUS"
+    ],
+    "type": "ERROR"
+  },
+  "SetPermissionsForNewObjects": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "DESIGN"
+    ],
+    "type": "VULNERABILITY"
+  },
+  "SetPrivilegedMode": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "SECURITY_HOTSPOT"
+  },
+  "SeveralCompilerDirectives": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "UNPREDICTABLE",
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "SpaceAtStartComment": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "StyleElementConstructors": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "ERROR"
+  },
+  "TempFilesDir": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "TernaryOperatorUsage": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "ThisObjectAssign": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "TimeoutsInExternalResources": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "UNPREDICTABLE",
+      "STANDARD"
+    ],
+    "type": "ERROR"
+  },
+  "TooManyReturns": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "BRAINOVERLOAD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "TransferringParametersBetweenClientAndServer": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BADPRACTICE",
+      "PERFORMANCE",
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "TryNumber": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "Typo": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UnaryPlusInConcatenation": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "SUSPICIOUS",
+      "BRAINOVERLOAD"
+    ],
+    "type": "ERROR"
+  },
+  "UnavailableMemberCall": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "ERROR"
+  },
+  "UnionAll": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "SQL",
+      "PERFORMANCE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UnknownMember": {
+    "quickfix": false,
+    "scopes": [
+      "ALL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "ERROR"
+  },
+  "UnknownPreprocessorSymbol": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "UnreachableCode": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "DESIGN",
+      "SUSPICIOUS"
+    ],
+    "type": "ERROR"
+  },
+  "UnsafeFindByCode": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "DESIGN",
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UnsafeSafeModeMethodCall": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "DEPRECATED",
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "UnusedLocalMethod": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "SUSPICIOUS",
+      "UNUSED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UnusedLocalVariable": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "BRAINOVERLOAD",
+      "BADPRACTICE",
+      "UNUSED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UnusedParameters": {
+    "quickfix": false,
+    "scopes": [
+      "OS"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "DESIGN",
+      "UNUSED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UsageWriteLogEvent": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UseLessForEach": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "CLUMSY"
+    ],
+    "type": "ERROR"
+  },
+  "UseSystemInformation": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "SUSPICIOUS"
+    ],
+    "type": "SECURITY_HOTSPOT"
+  },
+  "UselessTernaryOperator": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "BADPRACTICE",
+      "SUSPICIOUS"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UsingCancelParameter": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UsingExternalCodeTools": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "DESIGN"
+    ],
+    "type": "SECURITY_HOTSPOT"
+  },
+  "UsingFindElementByString": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE",
+      "PERFORMANCE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UsingGoto": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UsingHardcodeNetworkAddress": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "VULNERABILITY"
+  },
+  "UsingHardcodePath": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "ERROR"
+  },
+  "UsingHardcodeSecretInformation": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "VULNERABILITY"
+  },
+  "UsingLikeInQuery": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SQL",
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "UsingModalWindows": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UsingObjectNotAvailableUnix": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD",
+      "LOCKINOS"
+    ],
+    "type": "ERROR"
+  },
+  "UsingServiceTag": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "BADPRACTICE"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UsingSynchronousCalls": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "UsingThisForm": {
+    "quickfix": true,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MINOR",
+    "tags": [
+      "STANDARD",
+      "DEPRECATED"
+    ],
+    "type": "CODE_SMELL"
+  },
+  "VirtualTableCallWithoutParameters": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "MAJOR",
+    "tags": [
+      "SQL",
+      "STANDARD",
+      "PERFORMANCE"
+    ],
+    "type": "ERROR"
+  },
+  "WrongDataPathForFormElements": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "UNPREDICTABLE"
+    ],
+    "type": "ERROR"
+  },
+  "WrongHttpServiceHandler": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "SUSPICIOUS",
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "WrongUseFunctionProceedWithCall": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "BLOCKER",
+    "tags": [
+      "ERROR",
+      "SUSPICIOUS"
+    ],
+    "type": "ERROR"
+  },
+  "WrongUseOfRollbackTransactionMethod": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "ERROR"
+  },
+  "WrongWebServiceHandler": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "CRITICAL",
+    "tags": [
+      "SUSPICIOUS",
+      "ERROR"
+    ],
+    "type": "ERROR"
+  },
+  "YoLetterUsage": {
+    "quickfix": false,
+    "scopes": [
+      "BSL"
+    ],
+    "severity": "INFO",
+    "tags": [
+      "STANDARD"
+    ],
+    "type": "CODE_SMELL"
+  }
+}

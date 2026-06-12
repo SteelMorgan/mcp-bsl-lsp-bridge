@@ -3,15 +3,17 @@ package tools
 import (
 	"context"
 	"fmt"
-	"reflect"
+	"strings"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
-	"rockerboo/mcp-lsp-bridge/lsp"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/myleshyson/lsprotocol-go/protocol"
 )
+
+const maxCompletionItems = 100
 
 // RegisterAnalyzeCodeTool registers the analyze_code tool
 func RegisterAnalyzeCodeTool(mcpServer ToolServer, bridge interfaces.BridgeInterface) {
@@ -20,11 +22,11 @@ func RegisterAnalyzeCodeTool(mcpServer ToolServer, bridge interfaces.BridgeInter
 
 func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("analyze_code",
-			mcp.WithDescription("Analyze code for completion suggestions and insights"),
+			mcp.WithDescription("Get completion suggestions at a position (textDocument/completion). Useful for API discovery: which platform/module methods, properties and predefined values are available at the cursor. Returns the candidate list with type details."),
 			mcp.WithDestructiveHintAnnotation(false),
-			mcp.WithString("uri", mcp.Description("URI to the file location to analyze")),
-			mcp.WithNumber("line", mcp.Description("Line of the file to analyze")),
-			mcp.WithNumber("character", mcp.Description("Character of the line to analyze")),
+			mcp.WithString("uri", mcp.Description("URI to the file location to analyze"), mcp.Required()),
+			mcp.WithNumber("line", mcp.Description("Line of the file to analyze (0-based)"), mcp.Required()),
+			mcp.WithNumber("character", mcp.Description("Character of the line to analyze (0-based)"), mcp.Required()),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			uri, err := request.RequireString("uri")
 			if err != nil {
@@ -48,92 +50,51 @@ func AnalyzeCode(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandle
 				return result, nil
 			}
 
-			// Infer language from the file URI
-			language, err := bridge.InferLanguage(uri)
-			if err != nil {
-				logger.Error("analyze_code: Language inference failed", err)
-				return mcp.NewToolResultError("Could not infer language"), nil
-			}
-
-			// Get LSP client for the language
-			client, err := bridge.GetClientForLanguage(string(*language))
-			if err != nil {
-				logger.Error("analyze_code: Failed to get LSP client", err)
-				return mcp.NewToolResultError("Failed to get LSP client"), nil
-			}
-
-			if client == nil {
-				logger.Error("analyze_code: Failed to get LSP client", err)
-				return mcp.NewToolResultError("Failed to get LSP client"), nil
-			}
-
-			// Convert URI and cast client
-			lspClient, ok := client.(*lsp.LanguageClient)
-			if !ok {
-				logger.Error("analyze_code: Invalid LSP client type")
-				return mcp.NewToolResultError("Invalid LSP client type"), nil
-			}
-
-			// Perform code analysis
-			lineInt32, err := safeInt32(line)
+			lineU, err := safeUint32(line)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid line number: %v", err)), nil
 			}
-			characterInt32, err := safeInt32(character)
+			characterU, err := safeUint32(character)
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Invalid character position: %v", err)), nil
 			}
 
-			analyzeOpts := lsp.AnalyzeCodeOptions{
-				Uri:        uri,
-				Line:       lineInt32,
-				Character:  characterInt32,
-				LanguageId: string(*language),
-			}
-
-			result, err := lsp.AnalyzeCode(lspClient, analyzeOpts)
+			completion, err := bridge.GetCompletion(uri, lineU, characterU)
 			if err != nil {
-				logger.Error("analyze_code: Code analysis failed", err)
-				return mcp.NewToolResultError("Code analysis failed"), nil
+				logger.Error("analyze_code: completion request failed", err)
+				return mcp.NewToolResultError(fmt.Sprintf("Completion request failed: %v", err)), nil
 			}
 
-			// Log analysis details
-			logger.Info("analyze_code: Successfully analyzed code",
+			logger.Info("analyze_code: completion analyzed",
 				fmt.Sprintf("URI: %s, Line: %d, Character: %d", uri, line, character),
 			)
 
-			// Count completion suggestions by checking the length of the CompletionResponse
-			completionCount := 0
-
-			if result.Completion != nil {
-				// Use reflection to handle different CompletionResponse types
-				completionValue := reflect.ValueOf(result.Completion)
-				if completionValue.Kind() == reflect.Ptr {
-					completionValue = completionValue.Elem()
-				}
-
-				// Try to get the items or suggestions
-				itemsField := completionValue.FieldByName("Items")
-				if itemsField.IsValid() {
-					completionCount = int(itemsField.Len())
-				}
-			}
-
-			// Prepare result summary
-			summary := fmt.Sprintf(
-				"Analysis Results:\n"+
-					"Hover: %v\n"+
-					"Completion Suggestions: %d\n"+
-					"Signature Help: %v\n"+
-					"Diagnostics: %d\n"+
-					"Code Actions: %d",
-				result.Hover != nil,
-				completionCount,
-				result.SignatureHelp != nil,
-				len(result.Diagnostics),
-				len(result.CodeActions),
-			)
-
-			return mcp.NewToolResultText(summary), nil
+			return mcp.NewToolResultText(formatCompletion(completion)), nil
 		}
+}
+
+func formatCompletion(list *protocol.CompletionList) string {
+	if list == nil || len(list.Items) == 0 {
+		return "No completion suggestions at this position."
+	}
+
+	var b strings.Builder
+	total := len(list.Items)
+	shown := total
+	if shown > maxCompletionItems {
+		shown = maxCompletionItems
+	}
+
+	fmt.Fprintf(&b, "Completion suggestions: %d (showing %d):\n", total, shown)
+	for _, item := range list.Items[:shown] {
+		fmt.Fprintf(&b, "  - %s", item.Label)
+		if item.Detail != "" {
+			fmt.Fprintf(&b, "  : %s", item.Detail)
+		}
+		b.WriteString("\n")
+	}
+	if total > shown {
+		fmt.Fprintf(&b, "  ... and %d more (refine position to narrow results)\n", total-shown)
+	}
+	return b.String()
 }

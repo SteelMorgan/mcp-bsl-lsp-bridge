@@ -330,9 +330,74 @@ func (sa *SessionAdapter) Implementation(uri string, line, character uint32) ([]
 	return sa.References(uri, line, character, true)
 }
 
-// SignatureHelp - not implemented yet
+// SignatureHelp forwards textDocument/signatureHelp through the Session Manager.
 func (sa *SessionAdapter) SignatureHelp(uri string, line, character uint32) (*protocol.SignatureHelp, error) {
-	return nil, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{"uri": uri},
+		"position":     map[string]interface{}{"line": line, "character": character},
+	}
+
+	var raw json.RawMessage
+	if err := sa.client.Call(ctx, "textDocument/signatureHelp", params, &raw); err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+
+	var result protocol.SignatureHelp
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal signature help: %w", err)
+	}
+	return &result, nil
+}
+
+// InlayHint forwards textDocument/inlayHint through the Session Manager.
+func (sa *SessionAdapter) InlayHint(uri string, startLine, startCharacter, endLine, endCharacter uint32) ([]protocol.InlayHint, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{"uri": uri},
+		"range": map[string]interface{}{
+			"start": map[string]interface{}{"line": startLine, "character": startCharacter},
+			"end":   map[string]interface{}{"line": endLine, "character": endCharacter},
+		},
+	}
+
+	var raw json.RawMessage
+	if err := sa.client.Call(ctx, "textDocument/inlayHint", params, &raw); err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+
+	var result []protocol.InlayHint
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal inlay hints: %w", err)
+	}
+	return result, nil
+}
+
+// Completion forwards textDocument/completion through the Session Manager.
+func (sa *SessionAdapter) Completion(uri string, line, character uint32) (*protocol.CompletionList, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{"uri": uri},
+		"position":     map[string]interface{}{"line": line, "character": character},
+	}
+
+	var raw json.RawMessage
+	if err := sa.client.Call(ctx, "textDocument/completion", params, &raw); err != nil {
+		return nil, err
+	}
+	return parseCompletionResult(raw)
 }
 
 // CodeActions - not implemented yet
@@ -434,9 +499,32 @@ func (sa *SessionAdapter) SemanticTokens(uri string) (*protocol.SemanticTokens, 
 	return nil, nil
 }
 
-// SemanticTokensRange - not implemented
+// SemanticTokensRange forwards textDocument/semanticTokens/range through the Session Manager.
 func (sa *SessionAdapter) SemanticTokensRange(uri string, startLine, startCharacter, endLine, endCharacter uint32) (*protocol.SemanticTokens, error) {
-	return nil, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{"uri": uri},
+		"range": map[string]interface{}{
+			"start": map[string]interface{}{"line": startLine, "character": startCharacter},
+			"end":   map[string]interface{}{"line": endLine, "character": endCharacter},
+		},
+	}
+
+	var raw json.RawMessage
+	if err := sa.client.Call(ctx, "textDocument/semanticTokens/range", params, &raw); err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+
+	var result protocol.SemanticTokens
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal semantic tokens: %w", err)
+	}
+	return &result, nil
 }
 
 // PrepareRename - not implemented yet
@@ -464,9 +552,34 @@ func (sa *SessionAdapter) FoldingRange(uri string) ([]protocol.FoldingRange, err
 	return nil, nil
 }
 
-// SelectionRange - not implemented yet
+// SelectionRange forwards textDocument/selectionRange through the Session Manager.
 func (sa *SessionAdapter) SelectionRange(uri string, positions []protocol.Position) ([]protocol.SelectionRange, error) {
-	return nil, nil
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	posParams := make([]map[string]interface{}, 0, len(positions))
+	for _, p := range positions {
+		posParams = append(posParams, map[string]interface{}{"line": p.Line, "character": p.Character})
+	}
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{"uri": uri},
+		"positions":    posParams,
+	}
+
+	var raw json.RawMessage
+	if err := sa.client.Call(ctx, "textDocument/selectionRange", params, &raw); err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+
+	var result []protocol.SelectionRange
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal selection ranges: %w", err)
+	}
+	return result, nil
 }
 
 // DocumentLink - not implemented yet
@@ -561,9 +674,39 @@ func (sa *SessionAdapter) SetupSemanticTokens() error {
 	return nil
 }
 
-// TokenParser returns semantic token parser (nil for now)
+// TokenParser builds a semantic token parser from the server's advertised legend
+// (semanticTokensProvider.legend), fetched from the Session Manager capabilities.
+// Returns nil on any failure so the bridge can fall back to a generic legend.
 func (sa *SessionAdapter) TokenParser() types.SemanticTokensParserProvider {
-	return nil
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var caps json.RawMessage
+	if err := sa.client.Call(ctx, "session/capabilities", map[string]interface{}{}, &caps); err != nil {
+		logger.Debug(fmt.Sprintf("TokenParser: failed to fetch capabilities: %v", err))
+		return nil
+	}
+
+	var parsed struct {
+		SemanticTokensProvider struct {
+			Legend struct {
+				TokenTypes     []string `json:"tokenTypes"`
+				TokenModifiers []string `json:"tokenModifiers"`
+			} `json:"legend"`
+		} `json:"semanticTokensProvider"`
+	}
+	if err := json.Unmarshal(caps, &parsed); err != nil {
+		logger.Debug(fmt.Sprintf("TokenParser: failed to parse capabilities: %v", err))
+		return nil
+	}
+
+	legend := parsed.SemanticTokensProvider.Legend
+	if len(legend.TokenTypes) == 0 {
+		// Server didn't advertise a legend; let the bridge use its fallback.
+		return nil
+	}
+
+	return NewSemanticTokenParser(legend.TokenTypes, legend.TokenModifiers)
 }
 
 // sessionMetrics implements ClientMetricsProvider for SessionAdapter
@@ -618,6 +761,86 @@ type IndexingStatus struct {
 	ETASeconds     int    `json:"eta_seconds,omitempty"`
 	ElapsedSeconds int    `json:"elapsed_seconds,omitempty"`
 	Message        string `json:"message,omitempty"`
+}
+
+// ProjectStatus is the per-project view exposed in multi-project mode.
+type ProjectStatus struct {
+	Root     string `json:"root"`
+	State    string `json:"state"` // "indexing" | "ready" | "closing"
+	LastUsed bool   `json:"last_used"`
+}
+
+// MultiProjectEnabled reports whether the daemon is running in multi-project
+// mode (MULTI_PROJECT=1). Returns false if the status cannot be read.
+func (sa *SessionAdapter) MultiProjectEnabled() bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	status, err := sa.client.GetStatus(ctx)
+	if err != nil {
+		return false
+	}
+	v, _ := status["multiProject"].(bool)
+	return v
+}
+
+// GetProjects returns the per-project registry from the daemon. Empty if not in
+// multi-project mode or the status cannot be read.
+func (sa *SessionAdapter) GetProjects() []ProjectStatus {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	status, err := sa.client.GetStatus(ctx)
+	if err != nil {
+		return nil
+	}
+	return parseProjects(status["projects"])
+}
+
+// parseProjects converts the loosely-typed JSON "projects" array into []ProjectStatus.
+func parseProjects(raw interface{}) []ProjectStatus {
+	arr, ok := raw.([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]ProjectStatus, 0, len(arr))
+	for _, item := range arr {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ps := ProjectStatus{}
+		if v, ok := m["root"].(string); ok {
+			ps.Root = v
+		}
+		if v, ok := m["state"].(string); ok {
+			ps.State = v
+		}
+		if v, ok := m["last_used"].(bool); ok {
+			ps.LastUsed = v
+		}
+		out = append(out, ps)
+	}
+	return out
+}
+
+// ProjectAdd registers (or warms) a project in multi-project mode.
+func (sa *SessionAdapter) ProjectAdd(root string) (map[string]interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return sa.client.ProjectAdd(ctx, root)
+}
+
+// ProjectClose unregisters a project in multi-project mode.
+func (sa *SessionAdapter) ProjectClose(root string) (map[string]interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	return sa.client.ProjectClose(ctx, root)
+}
+
+// ProjectList returns all registered projects in multi-project mode.
+func (sa *SessionAdapter) ProjectList() (map[string]interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return sa.client.ProjectList(ctx)
 }
 
 // GetSessionStatus returns the full session status including indexing progress

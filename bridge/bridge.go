@@ -696,6 +696,10 @@ func (b *MCPLSPBridge) GetHoverInformation(uri string, line, character uint32) (
 // ensureDocumentOpen sends a textDocument/didOpen notification to the language server
 // This is often required before other document operations can be performed
 func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, uri, language string) error {
+	// Multi-project mode: make sure the project owning this URI is registered
+	// with the daemon before we open the document. Best-effort and cheap (cached).
+	b.ensureProjectForURI(uri)
+
 	// Read the file content. Accept file URI or raw path.
 	// If running in container mode, map host paths to container paths before any fs operations.
 	filePath := utils.URIToFilePath(uri)
@@ -745,15 +749,27 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, 
 		}
 	}
 
+	// absPath is already in the server filesystem namespace (container or local).
+	serverURI := utils.NormalizeURI(absPath)
+
+	// Open-document cache: skip didOpen when the document is already open and
+	// unchanged on disk. Re-opening forces a full DocumentContext recompute on the
+	// single-threaded BSL LS and stalls its stdin reader, making the next didOpen
+	// write block until the context deadline (see MCPLSPBridge.openedDocs).
+	var mtime int64
+	if fi, statErr := os.Stat(absPath); statErr == nil {
+		mtime = fi.ModTime().UnixNano()
+		if cached, ok := b.openedDocs.Load(serverURI); ok && cached.(int64) == mtime {
+			return nil
+		}
+	}
+
 	content, err := os.ReadFile(absPath)
 	if err != nil {
 		return fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 
 	// Send textDocument/didOpen notification
-	// absPath is already in the server filesystem namespace (container or local).
-	serverURI := utils.NormalizeURI(absPath)
-
 	didOpenParams := protocol.DidOpenTextDocumentParams{
 		TextDocument: protocol.TextDocumentItem{
 			Uri:        protocol.DocumentUri(serverURI),
@@ -766,6 +782,12 @@ func (b *MCPLSPBridge) ensureDocumentOpen(client types.LanguageClientInterface, 
 	err = client.SendNotification("textDocument/didOpen", didOpenParams)
 	if err != nil {
 		return fmt.Errorf("failed to send didOpen notification: %w", err)
+	}
+
+	// Remember the open document so subsequent tool calls reuse it instead of
+	// re-opening; re-open only when the file's mtime changes.
+	if mtime != 0 {
+		b.openedDocs.Store(serverURI, mtime)
 	}
 
 	logger.Debug(fmt.Sprintf("Document opened in LSP server: %s (language: %s)", uri, language))
@@ -1032,6 +1054,119 @@ func (b *MCPLSPBridge) SelectionRange(uri string, positions []protocol.Position)
 	}
 
 	return ranges, nil
+}
+
+// InlayHint returns inlay hints (parameter-name / type annotations) for a range.
+func (b *MCPLSPBridge) InlayHint(uri string, startLine, startCharacter, endLine, endCharacter uint32) ([]protocol.InlayHint, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("InlayHint: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	hints, err := client.InlayHint(normalizedURI, startLine, startCharacter, endLine, endCharacter)
+	if err != nil {
+		return nil, fmt.Errorf("inlay hint request failed: %w", err)
+	}
+
+	return hints, nil
+}
+
+// MethodComplexity returns resolved complexity CodeLenses (cyclomatic + cognitive)
+// for every method in the document. BSL LS exposes complexity only through CodeLens,
+// which is a two-step protocol: textDocument/codeLens returns lenses carrying range+data
+// (no title), then codeLens/resolve fills command.title with the metric value. The caller
+// parses data.id (cyclomaticComplexity|cognitiveComplexity) and the trailing integer of
+// the resolved title. Requires the complexity CodeLens enabled in the BSL LS config
+// (codeLens.parameters.cyclomaticComplexity / cognitiveComplexity, on by default).
+func (b *MCPLSPBridge) MethodComplexity(uri string) ([]protocol.CodeLens, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("MethodComplexity: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	params := map[string]interface{}{
+		"textDocument": map[string]interface{}{"uri": normalizedURI},
+	}
+
+	var lenses []protocol.CodeLens
+	if err := client.SendRequest("textDocument/codeLens", params, &lenses, 60*time.Second); err != nil {
+		return nil, fmt.Errorf("codeLens request failed: %w", err)
+	}
+
+	resolved := make([]protocol.CodeLens, 0, len(lenses))
+	for _, lens := range lenses {
+		// Already resolved (server returned a title eagerly) - keep as is.
+		if lens.Command != nil && lens.Command.Title != "" {
+			resolved = append(resolved, lens)
+			continue
+		}
+		var r protocol.CodeLens
+		if err := client.SendRequest("codeLens/resolve", lens, &r, 30*time.Second); err != nil {
+			logger.Warn(fmt.Sprintf("MethodComplexity: resolve failed for %v: %v", lens.Data, err))
+			continue
+		}
+		// BSL LS drops the top-level `data` on resolve: the {methodName, id} pair
+		// moves into command.arguments and the id mutates to a toggle command
+		// ("toggleCognitiveComplexityInlayHints"), so it no longer identifies the
+		// metric. foldComplexityRows reads methodName + metric id from lens.Data, so
+		// restore the pre-resolve data (which still carries the real methodName and
+		// id=cyclomaticComplexity|cognitiveComplexity). Without this the complexity
+		// table shows empty method names and "-" values (metric switch never matches).
+		if r.Data == nil {
+			r.Data = lens.Data
+		}
+		resolved = append(resolved, r)
+	}
+
+	return resolved, nil
+}
+
+// GetCompletion returns completion suggestions at a position.
+func (b *MCPLSPBridge) GetCompletion(uri string, line, character uint32) (*protocol.CompletionList, error) {
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	language, err := b.InferLanguage(normalizedURI)
+	if err != nil {
+		return nil, fmt.Errorf("failed to infer language: %w", err)
+	}
+
+	client, err := b.GetClientForLanguage(string(*language))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get client for language %s: %w", string(*language), err)
+	}
+
+	if err := b.ensureDocumentOpen(client, normalizedURI, string(*language)); err != nil {
+		logger.Error("GetCompletion: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
+	}
+
+	completion, err := client.Completion(normalizedURI, line, character)
+	if err != nil {
+		return nil, fmt.Errorf("completion request failed: %w", err)
+	}
+
+	return completion, nil
 }
 
 // DocumentLink returns document links for a document.
@@ -1455,13 +1590,21 @@ func (b *MCPLSPBridge) SemanticTokens(uri string, targetTypes []string, startLin
 		return nil, fmt.Errorf("failed to get client for language %s: %w", *language, err)
 	}
 
-	err = b.ensureDocumentOpen(client, uri, string(*language))
+	// Normalize the raw path to a file:// URI (with proper percent-encoding) before
+	// talking to the LSP. ensureDocumentOpen and SemanticTokensRange MUST use the same
+	// URI: didOpen registers the document under the normalized URI, so a raw path in the
+	// range request would not correlate to the open document and BSL LS hangs until the
+	// adapter deadline (surfacing as "not supported"). Mirrors hover/symbol_impact which
+	// already normalize via NormalizeURIForLSP.
+	normalizedURI := b.NormalizeURIForLSP(uri)
+
+	err = b.ensureDocumentOpen(client, normalizedURI, string(*language))
 	if err != nil {
 		// Continue anyway, as some servers might still work without explicit didOpen
-		logger.Error("SemanticTokens: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", uri, err))
+		logger.Error("SemanticTokens: Failed to open document", fmt.Sprintf("URI: %s, Error: %v", normalizedURI, err))
 	}
 
-	tokens, err := client.SemanticTokensRange(uri, startLine, startCharacter, endLine, endCharacter)
+	tokens, err := client.SemanticTokensRange(normalizedURI, startLine, startCharacter, endLine, endCharacter)
 	if err != nil {
 		logger.Error(fmt.Sprintf("SemanticTokens: Failed to get raw semantic tokens from client: %v", err))
 		serverCommand := client.GetMetrics().GetCommand()

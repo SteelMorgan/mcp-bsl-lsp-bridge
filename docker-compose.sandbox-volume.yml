@@ -13,22 +13,20 @@ services:
     container_name: ${MCP_CONTAINER_PREFIX:-mcp-lsp}-${MCP_PROJECT_NAME:-bridge}
     restart: unless-stopped
 
-    mem_limit: ${CONTAINER_MEMORY:-8g}
+    mem_limit: ${CONTAINER_MEMORY:-7g}
     cpus: ${CONTAINER_CPUS:-16}
 
     environment:
-      HOST_PROJECTS_ROOT: ${HOST_PROJECTS_ROOT}
-      PROJECTS_ROOT: ${PROJECTS_ROOT:-/projects}
-      WORKSPACE_ROOT: ${WORKSPACE_ROOT:-/projects}
+      # Note: HOST_PROJECTS_ROOT is not used in this mode (named volume mount)
+      PROJECTS_ROOT: ${PROJECTS_ROOT:-/workspaces/work}
+      WORKSPACE_ROOT: ${WORKSPACE_ROOT:-/workspaces/work}
       BSL_LS_PORT: ${BSL_LS_PORT:-9999}
       MCP_LSP_BSL_JAVA_XMX: ${MCP_LSP_BSL_JAVA_XMX:-6g}
       MCP_LSP_BSL_JAVA_XMS: ${MCP_LSP_BSL_JAVA_XMS:-2g}
       MCP_LSP_LOG_LEVEL: ${MCP_LSP_LOG_LEVEL:-debug}
-      # Multi-project mode: one BSL LS process serves many 1C configs mounted
-      # under PROJECTS_ROOT (e.g. /projects/projA, /projects/projB). On boot only
-      # the last-used project is warmed; others are added lazily on first use and
-      # stay warm until project_close or container shutdown. Requires BSL LS >= 1.0.
-      # Default 0 keeps the original single-project behavior.
+      # Multi-project mode (see docs/configuration.md). Requires BSL LS >= 1.0.
+      # PROJECTS_ROOT must point at the PARENT holding projA/, projB/ … Default 0
+      # keeps single-project behavior.
       MULTI_PROJECT: ${MULTI_PROJECT:-0}
       MCP_STATE_PATH: ${MCP_STATE_PATH:-/var/lib/mcp-lsp-bridge/state.json}
       # 1C platform context (syntax-helper .hbk -> platform globals/types for
@@ -43,25 +41,15 @@ services:
       # Modes: off (manual tool only), polling (for Docker/Windows), fsnotify (Linux native), auto
       FILE_WATCHER_MODE: ${FILE_WATCHER_MODE:-polling}
       FILE_WATCHER_INTERVAL: ${FILE_WATCHER_INTERVAL:-30s}
-      FILE_WATCHER_WORKERS: ${FILE_WATCHER_WORKERS:-8}
+      FILE_WATCHER_WORKERS: ${FILE_WATCHER_WORKERS:-4}
 
     volumes:
-      # Mount the PARENT projects directory. In multi-project mode each child
-      # (e.g. projA/, projB/) is registered as its own workspace folder; in
-      # single-project mode this is just the one project. One path-mapping covers all.
-      - "${HOST_PROJECTS_ROOT}:${PROJECTS_ROOT:-/projects}:${PROJECTS_MOUNT_MODE:-ro}"
+      - "projects-code:${PROJECTS_ROOT:-/workspaces/work}:${PROJECTS_MOUNT_MODE:-rw}"
       # Persistent state for multi-project mode (last-used project + active list).
-      # Must NOT live under the read-only /projects mount.
       - "mcp-state:/var/lib/mcp-lsp-bridge"
       # BSL LS is now bundled in the image (downloaded during build)
       # Uncomment below to override with a local version:
       # - "${BSL_LS_HOST_DIR}:/opt/bsl-ls:ro"
-      # 1C platform context (.hbk) for platform globals/types in hover /
-      # completion / signature_help. The heavy platform is NOT baked into the
-      # image; mount only its dir read-only. Prefer the opt-in override file:
-      #   docker compose -f docker-compose.yml -f docker-compose.platform.yml up -d
-      # (set HOST_PLATFORM_DIR / BSL_PLATFORM_BIN in .env). Or inline here:
-      # - "${HOST_PLATFORM_DIR}:${BSL_PLATFORM_BIN}:ro"
 
     healthcheck:
       test: ["CMD", "sh", "-c", "nc -z localhost ${BSL_LS_PORT:-9999}"]
@@ -71,6 +59,8 @@ services:
       retries: 3
 
 volumes:
-  # Survives stop/start and rm/recreate so the last-used project can be
-  # pre-warmed after a restart.
+  projects-code:
+    external: true
+    name: ${PROJECTS_VOLUME_NAME:-agent-work-sandbox-1c}
+  # Persistent multi-project state (survives stop/start and rm/recreate).
   mcp-state:

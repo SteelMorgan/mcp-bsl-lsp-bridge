@@ -74,8 +74,21 @@ cp env.example .env
 
 Отредактируй `.env` — минимум нужно указать:
 - `MCP_PROJECT_NAME` — имя проекта (будет частью имени контейнера)
-- `HOST_PROJECTS_ROOT` — путь к коду 1С на хосте
-- `WORKSPACE_ROOT` — путь внутри контейнера к каталогу с кодом
+- `WORKSPACE_ROOT` — путь внутри контейнера к каталогу с кодом (пример ниже)
+
+#### Выбор режима монтирования кода (host vs sandbox)
+
+Этот проект поддерживает **2 способа подключить код 1С**. Выбираешь **один**.
+
+**1) Host filesystem (bind mount)** — код 1С лежит на хосте Docker (Windows/Linux/macOS).
+
+- В `.env` укажи `HOST_PROJECTS_ROOT` (путь на хосте Docker) и при необходимости `PROJECTS_ROOT` (как каталог будет виден внутри контейнера).
+- Запуск: `docker-compose.yml`
+
+**2) Sandbox workspace volume (named volume)** — код 1С живёт в external named volume песочницы (Dev Containers / отдельный sandbox-контейнер).
+
+- В `.env` укажи `PROJECTS_VOLUME_NAME` (например `agent-work-sandbox-1c`) и выставь `PROJECTS_ROOT` так, как тебе удобно видеть workspace внутри контейнера (обычно `/workspaces/work`, чтобы совпадало с путями в IDE).
+- Запуск: `docker-compose.sandbox-volume.yml`
 
 #### Настройка WORKSPACE_ROOT
 
@@ -103,9 +116,18 @@ BSL LS проиндексирует все подкаталоги и будет 
 
 ### 3. Собери и запусти контейнер
 
+#### Host filesystem (bind mount)
+
 ```bash
-docker compose build
-docker compose up -d
+docker compose -f docker-compose.yml build
+docker compose -f docker-compose.yml up -d
+```
+
+#### Sandbox workspace volume (named volume)
+
+```bash
+docker compose -f docker-compose.sandbox-volume.yml build
+docker compose -f docker-compose.sandbox-volume.yml up -d
 ```
 
 Имя контейнера: `${MCP_CONTAINER_PREFIX}-${MCP_PROJECT_NAME}` (например `mcp-lsp-demo`)
@@ -150,6 +172,8 @@ docker compose up -d
 | `symbol_explore` | Детальный поиск с кодом и документацией | Нужна полная информация о символе |
 | `definition` | Перейти к определению | "Где объявлена эта процедура?" |
 | `hover` | Документация и сигнатура | "Какие параметры у функции?" |
+| `completion` | Члены типа после точки + возвращаемые типы (Type System v2): реквизиты/ТЧ объекта, значения перечисления, предопределённые | "Какие ТЧ у документа?", проверка типа в цепочке `a.b.c` |
+| `signature_help` | Параметры и перегрузки вызываемого метода в точке вызова | "Что передавать в эту функцию БСП?" |
 | `get_range_content` | Получить фрагмент кода | Извлечь код по координатам |
 
 ### Анализ зависимостей
@@ -158,12 +182,16 @@ docker compose up -d
 |------|------------|-------------------|
 | `call_hierarchy` | Кто вызывает / что вызывает (1 уровень) | Быстро понять связи |
 | `call_graph` | Полный граф вызовов | Глубокий анализ перед рефакторингом |
+| `symbol_impact` | Комбо: входящие вызовы + ссылки + классификация вызывающих по типу модуля | Оценить радиус правки процедуры за один вызов |
 
 ### Диагностика и проверка кода
 
 | Tool | Что делает | Когда использовать |
 |------|------------|-------------------|
 | `document_diagnostics` | Синтаксические ошибки, предупреждения, стилистика | Проверка кода перед коммитом, поиск ошибок |
+| `quality_diagnostics` | Прицельно security / performance / sql (оффлайн-классификация) | Самопроверка на риски перед коммитом |
+| `complexity` | Цикломатическая + когнитивная сложность по методам | "Пора рефакторить?" (cyclomatic > 20 / cognitive > 15) |
+| `module_health` | Комбо: complexity + quality_diagnostics, сведённые по методам и ранжированные | Триаж модуля целиком «что чинить первым» за один вызов |
 | `code_actions` | Автоматические исправления | Quick-fix для найденных ошибок |
 
 > **`document_diagnostics`** — основной инструмент для синтаксического контроля. Возвращает все диагностики BSL LS: синтаксические ошибки, неиспользуемые переменные, deprecated методы, нарушения стиля и т.д.

@@ -3,12 +3,14 @@ package tools
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
 // RegisterSignatureHelpTool registers the signature help tool
@@ -66,10 +68,32 @@ func SignatureHelpTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.Tool
 			}
 
 			// Format and return result
-			if result == nil {
+			if result == nil || len(result.Signatures) == 0 {
 				return mcp.NewToolResultText("No signature help available"), nil
 			}
 
-			return mcp.NewToolResultText(fmt.Sprintf("Signature help result: %v", result)), nil
+			return mcp.NewToolResultText(formatSignatureHelp(result)), nil
 		}
+}
+
+func formatSignatureHelp(sh *protocol.SignatureHelp) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Signatures: %d (active: %d)\n", len(sh.Signatures), sh.ActiveSignature)
+	if sh.ActiveParameter != nil {
+		fmt.Fprintf(&b, "Active parameter: %d\n", *sh.ActiveParameter)
+	}
+	for i, sig := range sh.Signatures {
+		fmt.Fprintf(&b, "  [%d] %s\n", i, sig.Label)
+		for _, p := range sig.Parameters {
+			fmt.Fprintf(&b, "        - %s\n", parameterLabelString(p.Label))
+		}
+	}
+	return b.String()
+}
+
+func parameterLabelString(label protocol.Or2[string, protocol.Tuple[uint32, uint32]]) string {
+	if s, ok := label.Value.(string); ok {
+		return s
+	}
+	return fmt.Sprintf("%v", label.Value)
 }
