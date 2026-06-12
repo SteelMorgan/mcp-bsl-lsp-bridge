@@ -3,6 +3,7 @@ exec 2>&1
 
 echo "Starting LSP Session Manager for BSL Language Server..."
 echo "Workspace: ${WORKSPACE_ROOT:-/projects}"
+echo "Multi-project: ${MULTI_PROJECT:-0}"
 
 # Wait for BSL LS JAR to be mounted
 while [ ! -f /opt/bsl-ls/bsl-language-server.jar ]; do
@@ -13,22 +14,75 @@ done
 # Create log directory
 mkdir -p /home/user/.local/share/mcp-lsp-bridge/logs
 
+# State file for multi-project mode (persists the last-used project across restarts).
+STATE_PATH="${MCP_STATE_PATH:-/var/lib/mcp-lsp-bridge/state.json}"
+mkdir -p "$(dirname "$STATE_PATH")" 2>/dev/null || true
+
+# --- Global BSL LS configuration -------------------------------------------
+# We DO NOT pass `-c` anymore (it was the single-project flag). `-c` maps to BSL LS
+# `app.configuration.path` (the LOCAL config) and overrides BOTH the global config
+# AND every per-project `<root>/.bsl-language-server.json` — which breaks
+# multi-project. Instead we generate the GLOBAL layer
+# (`app.globalConfiguration.path`, default `${user.home}/.bsl-language-server.json`)
+# and pin it via a JVM system property so it does not depend on which OS user / HOME
+# the process runs as. Per-project configs still override this global layer.
+#
+# Platform context (syntax-helper .hbk -> global methods/types for hover,
+# completion, signature_help):
+#   BSL_PLATFORM_BIN     - dir with shcntx_*.hbk / shlang_*.hbk. When set AND it
+#                          exists -> written as v8platform.binPath (EXPLICIT path,
+#                          takes priority over auto-discovery). Mount it read-only
+#                          (see docker-compose.platform.yml) so the heavy platform
+#                          is NOT baked into the image.
+#   BSL_PLATFORM_VERSION - optional v8platform.targetVersion.
+#   When BSL_PLATFORM_BIN is unset/missing -> the v8platform block is omitted and
+#   BSL LS auto-detects the most recent installed platform (incl. Windows
+#   ProgramFiles). Auto-discovery is preserved.
+#   BSL_LANGUAGE         - diagnostic message language (default ru).
+GLOBAL_CFG="/etc/mcp-lsp-bridge/bsl-ls.global.json"
+mkdir -p "$(dirname "$GLOBAL_CFG")" 2>/dev/null || true
+BSL_LANG="${BSL_LANGUAGE:-ru}"
+
+if [ -n "${BSL_PLATFORM_BIN:-}" ] && [ -d "${BSL_PLATFORM_BIN}" ]; then
+    echo "Platform context: explicit binPath=${BSL_PLATFORM_BIN} (priority over auto-discovery)"
+    if [ -n "${BSL_PLATFORM_VERSION:-}" ]; then
+        printf '{\n  "language": "%s",\n  "v8platform": {\n    "enabled": true,\n    "targetVersion": "%s",\n    "binPath": "%s"\n  }\n}\n' \
+            "$BSL_LANG" "$BSL_PLATFORM_VERSION" "$BSL_PLATFORM_BIN" > "$GLOBAL_CFG"
+    else
+        printf '{\n  "language": "%s",\n  "v8platform": {\n    "enabled": true,\n    "binPath": "%s"\n  }\n}\n' \
+            "$BSL_LANG" "$BSL_PLATFORM_BIN" > "$GLOBAL_CFG"
+    fi
+else
+    if [ -n "${BSL_PLATFORM_BIN:-}" ]; then
+        echo "Platform context: BSL_PLATFORM_BIN=${BSL_PLATFORM_BIN} not found -> auto-discovery"
+    else
+        echo "Platform context: auto-discovery (BSL_PLATFORM_BIN unset)"
+    fi
+    printf '{\n  "language": "%s"\n}\n' "$BSL_LANG" > "$GLOBAL_CFG"
+fi
+echo "Generated global BSL LS config: $GLOBAL_CFG"
+cat "$GLOBAL_CFG"
+
 # Start LSP Session Manager which:
 # 1. Spawns BSL LS in stdio mode
-# 2. Initializes LSP session ONCE
+# 2. Initializes LSP session ONCE (multi-project: with no workspace folders)
 # 3. Listens on TCP port 9999 for API requests
 # 4. Keeps the session alive and ready
 #
-# Arguments after "--" are passed directly to the LSP command
+# Arguments after "--" are passed directly to the LSP command.
+# -Dapp.globalConfiguration.path pins the generated global config deterministically
+# (a Spring Boot system property overrides the ${user.home} default in
+# application.properties).
 exec /usr/bin/lsp-session-manager \
-    --port=${BSL_LS_PORT:-9999} \
-    --workspace=${WORKSPACE_ROOT:-/projects} \
-    --command=java \
+    --port="${BSL_LS_PORT:-9999}" \
+    --workspace="${WORKSPACE_ROOT:-/projects}" \
+    --state="${STATE_PATH}" \
+    --command="java" \
     -- \
     -Xmx${MCP_LSP_BSL_JAVA_XMX:-6g} \
     -Xms${MCP_LSP_BSL_JAVA_XMS:-2g} \
     -XX:+UseG1GC \
     -XX:MaxGCPauseMillis=200 \
+    -Dapp.globalConfiguration.path="${GLOBAL_CFG}" \
     -jar /opt/bsl-ls/bsl-language-server.jar \
-    lsp \
-    -c /etc/mcp-lsp-bridge/bsl-ls.json
+    lsp

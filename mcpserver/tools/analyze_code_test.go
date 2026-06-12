@@ -7,7 +7,6 @@ import (
 
 	"rockerboo/mcp-lsp-bridge/lsp"
 	"rockerboo/mcp-lsp-bridge/mocks"
-	"rockerboo/mcp-lsp-bridge/types"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/mcptest"
@@ -15,61 +14,10 @@ import (
 	"github.com/myleshyson/lsprotocol-go/protocol"
 )
 
-func TestAnalyzeCodeTool_Success(t *testing.T) {
-	bridge := &mocks.MockBridge{}
-	uri := "file:///test.go"
-	mockLanguage := types.Language("go")
-	mockClient := &mocks.MockLanguageClient{}
-
-	// Set up mock expectations
-	bridge.On("InferLanguage", uri).Return(&mockLanguage, nil)
-
-	bridge.On("GetClientForLanguage", string(mockLanguage)).Return(
-		types.LanguageClientInterface(mockClient), nil)
+func callAnalyzeCode(t *testing.T, bridge *mocks.MockBridge, uri string) *mcp.CallToolResult {
+	t.Helper()
 
 	tool, handler := AnalyzeCode(bridge)
-	// Create MCP server and register tool
-	mcpServer, err := mcptest.NewServer(t, server.ServerTool{
-		Tool:    tool,
-		Handler: handler,
-	})
-	if err != nil {
-		t.Fatalf("Could not start MCP server: %v", err)
-	}
-
-	ctx := context.Background()
-	result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
-		Request: mcp.Request{Method: "tools/call"},
-		Params: mcp.CallToolParams{
-			Name: "analyze_code",
-			Arguments: map[string]any{
-				"uri":       "file:///test.go",
-				"line":      10,
-				"character": 5,
-			},
-		},
-	})
-
-	if err != nil {
-		t.Errorf("Error: %v", err)
-	}
-
-	if result == nil {
-		t.Error("Expected result but got nil")
-	}
-
-	bridge.AssertExpectations(t)
-}
-
-func TestAnalyzeCodeTool_LanguageInferenceFailure(t *testing.T) {
-	bridge := &mocks.MockBridge{}
-	uri := "file:///unknown.xyz"
-
-	// Set up mock to return error
-	bridge.On("InferLanguage", uri).Return((*types.Language)(nil), errors.New("unsupported file type"))
-
-	tool, handler := AnalyzeCode(bridge)
-	// Create MCP server and register tool
 	mcpServer, err := mcptest.NewServer(t, server.ServerTool{
 		Tool:    tool,
 		Handler: handler,
@@ -90,58 +38,47 @@ func TestAnalyzeCodeTool_LanguageInferenceFailure(t *testing.T) {
 			},
 		},
 	})
-
 	if err != nil {
 		t.Errorf("Error: %v", err)
 	}
-
 	if result == nil {
 		t.Error("Expected result but got nil")
 	}
+	return result
+}
 
+func TestAnalyzeCodeTool_Success(t *testing.T) {
+	bridge := &mocks.MockBridge{}
+	uri := "file:///test.bsl"
+
+	bridge.On("GetCompletion", uri, uint32(10), uint32(5)).Return(
+		&protocol.CompletionList{Items: []protocol.CompletionItem{
+			{Label: "Найти", Detail: "Method"},
+		}}, nil)
+
+	callAnalyzeCode(t, bridge, uri)
 	bridge.AssertExpectations(t)
 }
 
-func TestAnalyzeCodeTool_ClientCreationFailure(t *testing.T) {
+func TestAnalyzeCodeTool_Empty(t *testing.T) {
 	bridge := &mocks.MockBridge{}
-	uri := "file:///test.go"
-	mockLanguage := types.Language("unsupported")
+	uri := "file:///test.bsl"
 
-	// Set up mocks - language inference succeeds, client creation fails
-	bridge.On("InferLanguage", uri).Return(&mockLanguage, nil)
-	bridge.On("GetClientForLanguage", string(mockLanguage)).Return((types.LanguageClientInterface)(nil), errors.New("unsupported language"))
+	bridge.On("GetCompletion", uri, uint32(10), uint32(5)).Return(
+		&protocol.CompletionList{Items: []protocol.CompletionItem{}}, nil)
 
-	tool, handler := AnalyzeCode(bridge)
-	// Create MCP server and register tool
-	mcpServer, err := mcptest.NewServer(t, server.ServerTool{
-		Tool:    tool,
-		Handler: handler,
-	})
-	if err != nil {
-		t.Fatalf("Could not start MCP server: %v", err)
-	}
+	callAnalyzeCode(t, bridge, uri)
+	bridge.AssertExpectations(t)
+}
 
-	ctx := context.Background()
-	result, err := mcpServer.Client().CallTool(ctx, mcp.CallToolRequest{
-		Request: mcp.Request{Method: "tools/call"},
-		Params: mcp.CallToolParams{
-			Name: "analyze_code",
-			Arguments: map[string]any{
-				"uri":       "file:///test.go",
-				"line":      10,
-				"character": 5,
-			},
-		},
-	})
+func TestAnalyzeCodeTool_CompletionError(t *testing.T) {
+	bridge := &mocks.MockBridge{}
+	uri := "file:///test.bsl"
 
-	if err != nil {
-		t.Errorf("Error: %v", err)
-	}
+	bridge.On("GetCompletion", uri, uint32(10), uint32(5)).Return(
+		(*protocol.CompletionList)(nil), errors.New("completion failed"))
 
-	if result == nil {
-		t.Error("Expected result but got nil")
-	}
-
+	callAnalyzeCode(t, bridge, uri)
 	bridge.AssertExpectations(t)
 }
 

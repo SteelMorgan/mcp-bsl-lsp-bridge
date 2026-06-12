@@ -44,11 +44,13 @@ type IndexingProgress struct {
 }
 
 type LSPStatus struct {
-	Ready    bool              `json:"ready"`
-	State    string            `json:"state"`
-	Activity []LSPActivity     `json:"activity"`
-	Clients  []LSPClientStatus `json:"clients,omitempty"`
-	Indexing *IndexingProgress `json:"indexing,omitempty"`
+	Ready        bool                `json:"ready"`
+	State        string              `json:"state"`
+	Activity     []LSPActivity       `json:"activity"`
+	Clients      []LSPClientStatus   `json:"clients,omitempty"`
+	Indexing     *IndexingProgress   `json:"indexing,omitempty"`
+	MultiProject bool                `json:"multi_project,omitempty"`
+	Projects     []lsp.ProjectStatus `json:"projects,omitempty"`
 }
 
 type LSPStatusResponse struct {
@@ -139,6 +141,17 @@ func BuildLSPStatus(bridge interfaces.BridgeInterface) (LSPStatus, error) {
 			LastError:      lastError,
 			ActiveProgress: activeCount,
 		})
+
+		// Multi-project: surface the per-project registry so callers can see
+		// which configurations are ready vs. still indexing.
+		if !status.MultiProject {
+			if sa, ok := client.(*lsp.SessionAdapter); ok {
+				if projs := sa.GetProjects(); len(projs) > 0 {
+					status.MultiProject = true
+					status.Projects = projs
+				}
+			}
+		}
 
 		// Try to get indexing status from SessionAdapter
 		if status.Indexing == nil {

@@ -346,6 +346,27 @@ func (sc *SessionClient) WorkspaceSymbol(ctx context.Context, query string) (jso
 	return result, err
 }
 
+// ProjectAdd registers (or warms) a project in multi-project mode.
+func (sc *SessionClient) ProjectAdd(ctx context.Context, root string) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	err := sc.Call(ctx, "project/add", map[string]interface{}{"root": root}, &result)
+	return result, err
+}
+
+// ProjectClose unregisters a project in multi-project mode.
+func (sc *SessionClient) ProjectClose(ctx context.Context, root string) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	err := sc.Call(ctx, "project/close", map[string]interface{}{"root": root}, &result)
+	return result, err
+}
+
+// ProjectList returns all registered projects in multi-project mode.
+func (sc *SessionClient) ProjectList(ctx context.Context) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	err := sc.Call(ctx, "project/list", nil, &result)
+	return result, err
+}
+
 // Call makes a JSON-RPC call to Session Manager
 func (sc *SessionClient) Call(ctx context.Context, method string, params interface{}, result interface{}) error {
 	// Check connection and try to reconnect if needed
