@@ -14,10 +14,10 @@
 #
 # Leave this override OFF (and BSL_PLATFORM_BIN empty) to fall back to BSL LS
 # auto-discovery of an installed platform (incl. Windows).
-name: mcp-bsl-lsp
+name: 1c-dev
 
 services:
-  lsp-gbig-pam:
+  mcp-bsl-rlm:
     environment:
       BSL_PLATFORM_BIN: ${BSL_PLATFORM_BIN:?set BSL_PLATFORM_BIN in .env to the in-container platform bin path}
       BSL_PLATFORM_VERSION: ${BSL_PLATFORM_VERSION:-}

@@ -49,8 +49,9 @@ FROM debian:bookworm-slim
 #
 # Java 21: BSL Language Server v1.0+ requires JDK 21 (bookworm only ships JDK 17),
 # so we pull Eclipse Temurin 21 from the Adoptium APT repository.
+ARG RLM_TOOLS_BSL_VERSION=1.26.0
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget gnupg \
+  && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget gnupg python3 python3-venv git \
   && mkdir -p /etc/apt/keyrings \
   && wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg \
   && echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" > /etc/apt/sources.list.d/adoptium.list \
@@ -60,6 +61,12 @@ RUN apt-get update \
   && sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen \
   && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
   && locale-gen
+
+# Install upstream rlm-tools-bsl as a pinned runtime package. We do not vendor or
+# fork its Python implementation; local code only supervises/proxies it.
+RUN python3 -m venv /opt/rlm-tools-bsl \
+  && /opt/rlm-tools-bsl/bin/pip install --no-cache-dir --upgrade pip \
+  && /opt/rlm-tools-bsl/bin/pip install --no-cache-dir "rlm-tools-bsl==${RLM_TOOLS_BSL_VERSION}"
 
 # Install s6-overlay for process supervision
 ARG S6_OVERLAY_VERSION=3.1.6.2
@@ -86,6 +93,7 @@ RUN java -jar /opt/bsl-ls/bsl-language-server.jar --version 2>/dev/null | grep -
 
 # Default locations used by the bridge
 RUN mkdir -p /home/user/.config/mcp-lsp-bridge /home/user/.local/share/mcp-lsp-bridge/logs \
+    /home/user/.config/rlm-tools-bsl/logs /home/user/.cache/rlm-tools-bsl \
   && chown -R user:user /home/user/.config /home/user/.local
 
 COPY docker/lsp_config.json /home/user/.config/mcp-lsp-bridge/lsp_config.json
@@ -122,6 +130,11 @@ RUN find /etc/s6-overlay/s6-rc.d -type f -exec sed -i 's/\r$//' {} \; \
 ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
+ENV PATH="/opt/rlm-tools-bsl/bin:${PATH}"
+ENV RLM_TRANSPORT=streamable-http
+ENV RLM_HOST=127.0.0.1
+ENV RLM_PORT=9000
+ENV RLM_MCP_URL=http://127.0.0.1:9000/mcp
 
 # UTF-8 locale for Cyrillic support
 ENV LANG=ru_RU.UTF-8

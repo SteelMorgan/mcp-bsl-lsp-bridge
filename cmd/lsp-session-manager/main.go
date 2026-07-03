@@ -223,6 +223,7 @@ type SessionManager struct {
 	watcherStop    chan struct{}
 	pollingWatcher *PollingWatcher
 	watcherMode    FileWatcherMode
+	rlmIndex       *RLMIndexManager
 
 	// Multi-project mode (MULTI_PROJECT=1). When disabled, pm is nil and the
 	// daemon keeps its original single-workspace behavior.
@@ -243,13 +244,15 @@ type lspResponse struct {
 
 // NewSessionManager creates a new session manager
 func NewSessionManager(command string, args []string, workspaceDir string) *SessionManager {
-	return &SessionManager{
+	sm := &SessionManager{
 		command:      command,
 		args:         args,
 		workspaceDir: workspaceDir,
 		pending:      make(map[int64]chan lspResponse),
 		openDocs:     make(map[string]bool),
 	}
+	sm.rlmIndex = NewRLMIndexManager(sm)
+	return sm
 }
 
 // rootDir returns the directory BSL LS treats as the workspace root: the
@@ -370,6 +373,7 @@ func (sm *SessionManager) Start() error {
 			log.Printf("Detected 1C configuration root: %s (passed workspace: %s)", root, sm.workspaceDir)
 			sm.configRoot = root
 		}
+		sm.enqueueRLMEnsure(sm.configRoot)
 	}
 
 	sm.cmd = exec.Command(sm.command, sm.args...)
@@ -437,6 +441,9 @@ func (sm *SessionManager) Stop() {
 	if sm.pollingWatcher != nil {
 		sm.pollingWatcher.Stop()
 	}
+	if sm.rlmIndex != nil {
+		sm.rlmIndex.Stop()
+	}
 	if sm.watcherStop != nil {
 		close(sm.watcherStop)
 	}
@@ -491,6 +498,12 @@ func (sm *SessionManager) startPollingWatcher() error {
 		interval,
 		workers,
 		func(changes []FileChange) error {
+			sm.enqueueRLMChanges(changes)
+
+			changes = filterLSPFileChanges(changes)
+			if len(changes) == 0 {
+				return nil
+			}
 			// Convert to LSP format and send notification
 			lspChanges := make([]map[string]interface{}, len(changes))
 			for i, c := range changes {
@@ -576,9 +589,10 @@ func (sm *SessionManager) runFsnotifyWatcher() {
 				return
 			}
 
-			// Only process .bsl and .os files
+			// Process source files relevant to either BSL LS or RLM. New
+			// directories are still added to the recursive watcher.
 			ext := strings.ToLower(filepath.Ext(event.Name))
-			if ext != ".bsl" && ext != ".os" {
+			if !isWatchedSourceExtension(ext) {
 				// Check if it's a new directory to watch
 				if event.Has(fsnotify.Create) {
 					if info, err := os.Stat(event.Name); err == nil && info.IsDir() {
@@ -629,14 +643,27 @@ func (sm *SessionManager) runFsnotifyWatcher() {
 				pendingChanges = make(map[string]int) // Clear pending
 				pendingMu.Unlock()
 
-				// Send didChangeWatchedFiles notification
-				params := map[string]interface{}{
-					"changes": changes,
+				fileChanges := make([]FileChange, 0, len(changes))
+				for _, c := range changes {
+					if uri, ok := c["uri"].(string); ok {
+						if changeType, ok := c["type"].(int); ok {
+							fileChanges = append(fileChanges, FileChange{URI: uri, Type: changeType})
+						}
+					}
 				}
-				if err := sm.sendNotification("workspace/didChangeWatchedFiles", params); err != nil {
-					log.Printf("Error sending didChangeWatchedFiles: %v", err)
-				} else {
-					log.Printf("Sent didChangeWatchedFiles with %d changes", len(changes))
+				sm.enqueueRLMChanges(fileChanges)
+
+				lspChanges := filterLSPChangeMaps(changes)
+				if len(lspChanges) > 0 {
+					// Send didChangeWatchedFiles notification
+					params := map[string]interface{}{
+						"changes": lspChanges,
+					}
+					if err := sm.sendNotification("workspace/didChangeWatchedFiles", params); err != nil {
+						log.Printf("Error sending didChangeWatchedFiles: %v", err)
+					} else {
+						log.Printf("Sent didChangeWatchedFiles with %d changes", len(lspChanges))
+					}
 				}
 			} else {
 				pendingMu.Unlock()

@@ -90,4 +90,7 @@ func RegisterAllTools(mcpServer tools.ToolServer, bridge interfaces.BridgeInterf
 
 	// Multi-project control (active only when daemon MULTI_PROJECT=1)
 	tools.RegisterProjectTools(mcpServer, bridge)
+
+	// Upstream rlm-tools-bsl static search/navigation tools (thin local proxy).
+	tools.RegisterRLMTools(mcpServer, bridge)
 }

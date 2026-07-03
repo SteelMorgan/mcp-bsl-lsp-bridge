@@ -1,16 +1,17 @@
-name: mcp-bsl-lsp
+name: 1c-dev
 
 services:
-  lsp-gbig-pam:
+  mcp-bsl-rlm:
     build:
       context: .
       dockerfile: Dockerfile
       args:
         # BSL LS version: "latest" for newest, or specific like "0.28.1"
         BSL_LS_VERSION: ${BSL_LS_VERSION:-latest}
-    image: mcp-lsp-bridge-bsl:${MCP_LSP_BRIDGE_TAG:-latest}
+        RLM_TOOLS_BSL_VERSION: ${RLM_TOOLS_BSL_VERSION:-1.26.0}
+    image: mcp-bsl-rlm:${MCP_BSL_RLM_TAG:-latest}
 
-    container_name: ${MCP_CONTAINER_PREFIX:-mcp-lsp}-${MCP_PROJECT_NAME:-bridge}
+    container_name: ${MCP_CONTAINER_NAME:-mcp-bsl-rlm}
     restart: unless-stopped
 
     mem_limit: ${CONTAINER_MEMORY:-8g}
@@ -44,13 +45,25 @@ services:
       FILE_WATCHER_MODE: ${FILE_WATCHER_MODE:-polling}
       FILE_WATCHER_INTERVAL: ${FILE_WATCHER_INTERVAL:-30s}
       FILE_WATCHER_WORKERS: ${FILE_WATCHER_WORKERS:-8}
+      # RLM static index/search layer. The upstream rlm-tools-bsl MCP server runs
+      # inside the same container; the Go MCP bridge exposes thin proxy tools.
+      RLM_TOOLS_ENABLED: ${RLM_TOOLS_ENABLED:-1}
+      RLM_HOST: ${RLM_HOST:-127.0.0.1}
+      RLM_PORT: ${RLM_PORT:-9000}
+      RLM_MCP_URL: ${RLM_MCP_URL:-http://127.0.0.1:9000/mcp}
+      RLM_INDEX_ENABLED: ${RLM_INDEX_ENABLED:-1}
+      RLM_INDEX_BUILD_ON_START: ${RLM_INDEX_BUILD_ON_START:-1}
+      RLM_INDEX_UPDATE_ON_CHANGE: ${RLM_INDEX_UPDATE_ON_CHANGE:-1}
+      RLM_INDEX_DEBOUNCE: ${RLM_INDEX_DEBOUNCE:-10s}
+      RLM_INDEX_TIMEOUT: ${RLM_INDEX_TIMEOUT:-30m}
+      RLM_INDEX_DIR: ${RLM_INDEX_DIR:-/var/lib/mcp-lsp-bridge/rlm-index}
 
     volumes:
       # Mount the PARENT projects directory. In multi-project mode each child
       # (e.g. projA/, projB/) is registered as its own workspace folder; in
       # single-project mode this is just the one project. One path-mapping covers all.
       - "${HOST_PROJECTS_ROOT}:${PROJECTS_ROOT:-/projects}:${PROJECTS_MOUNT_MODE:-ro}"
-      # Persistent state for multi-project mode (last-used project + active list).
+      # Persistent state for multi-project mode and RLM indexes.
       # Must NOT live under the read-only /projects mount.
       - "mcp-state:/var/lib/mcp-lsp-bridge"
       # BSL LS is now bundled in the image (downloaded during build)

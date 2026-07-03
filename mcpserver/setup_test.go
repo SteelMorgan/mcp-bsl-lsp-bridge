@@ -28,8 +28,8 @@ func TestMCPServerSetup(t *testing.T) {
 			t.Fatal("Could not access server name")
 		}
 
-		if nameField.String() != "mcp-lsp-bridge" {
-			t.Errorf("Expected server name 'mcp-lsp-bridge', got %s", nameField.String())
+		if nameField.String() != "mcp-bsl-rlm" {
+			t.Errorf("Expected server name 'mcp-bsl-rlm', got %s", nameField.String())
 		}
 
 		// Check version

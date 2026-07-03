@@ -65,6 +65,7 @@ func (sm *SessionManager) warmupProject(root string) {
 	log.Printf("warmup: indexing project %s ...", root)
 	sm.waitForIndexingIdle(10*time.Second, 30*time.Minute)
 	sm.pm.MarkReady(root)
+	sm.enqueueRLMEnsure(root)
 	log.Printf("warmup: project %s is ready", root)
 }
 

@@ -1,0 +1,24 @@
+#!/bin/sh
+exec 2>&1
+
+if [ "${RLM_TOOLS_ENABLED:-1}" = "0" ]; then
+    echo "rlm-tools-bsl service disabled (RLM_TOOLS_ENABLED=0)"
+    exec sleep infinity
+fi
+
+echo "Starting rlm-tools-bsl MCP server..."
+echo "RLM endpoint: ${RLM_HOST:-127.0.0.1}:${RLM_PORT:-9000}"
+
+RLM_INDEX_DIR="${RLM_INDEX_DIR:-/var/lib/mcp-lsp-bridge/rlm-index}"
+mkdir -p /home/user/.config/rlm-tools-bsl/logs /home/user/.cache/rlm-tools-bsl "$RLM_INDEX_DIR"
+chown -R user:user /home/user/.config/rlm-tools-bsl /home/user/.cache/rlm-tools-bsl "$RLM_INDEX_DIR" 2>/dev/null || true
+
+export HOME=/home/user
+export XDG_CONFIG_HOME=/home/user/.config
+export XDG_CACHE_HOME=/home/user/.cache
+export XDG_DATA_HOME=/home/user/.local/share
+
+exec s6-setuidgid user rlm-tools-bsl \
+    --transport="${RLM_TRANSPORT:-streamable-http}" \
+    --host="${RLM_HOST:-127.0.0.1}" \
+    --port="${RLM_PORT:-9000}"
