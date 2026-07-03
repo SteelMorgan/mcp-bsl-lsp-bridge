@@ -49,7 +49,7 @@ FROM debian:bookworm-slim
 #
 # Java 21: BSL Language Server v1.0+ requires JDK 21 (bookworm only ships JDK 17),
 # so we pull Eclipse Temurin 21 from the Adoptium APT repository.
-ARG RLM_TOOLS_BSL_VERSION=1.26.0
+ARG RLM_TOOLS_BSL_VERSION=latest
 RUN apt-get update \
   && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget gnupg python3 python3-venv git \
   && mkdir -p /etc/apt/keyrings \
@@ -62,11 +62,15 @@ RUN apt-get update \
   && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
   && locale-gen
 
-# Install upstream rlm-tools-bsl as a pinned runtime package. We do not vendor or
-# fork its Python implementation; local code only supervises/proxies it.
+# Install upstream rlm-tools-bsl as a runtime package. "latest" follows PyPI at
+# build time; explicit versions keep reproducible builds when needed.
 RUN python3 -m venv /opt/rlm-tools-bsl \
   && /opt/rlm-tools-bsl/bin/pip install --no-cache-dir --upgrade pip \
-  && /opt/rlm-tools-bsl/bin/pip install --no-cache-dir "rlm-tools-bsl==${RLM_TOOLS_BSL_VERSION}"
+  && if [ "$RLM_TOOLS_BSL_VERSION" = "latest" ]; then \
+       /opt/rlm-tools-bsl/bin/pip install --no-cache-dir rlm-tools-bsl; \
+     else \
+       /opt/rlm-tools-bsl/bin/pip install --no-cache-dir "rlm-tools-bsl==${RLM_TOOLS_BSL_VERSION}"; \
+     fi
 
 # Install s6-overlay for process supervision
 ARG S6_OVERLAY_VERSION=3.1.6.2

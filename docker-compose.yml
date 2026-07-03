@@ -6,9 +6,10 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # BSL LS version: "latest" for newest, or specific like "0.28.1"
+        # BSL LS >= 1.0 requires Java 21 and advertises completion/signature providers.
+        # "latest" is resolved from GitHub Releases at build time.
         BSL_LS_VERSION: ${BSL_LS_VERSION:-latest}
-        RLM_TOOLS_BSL_VERSION: ${RLM_TOOLS_BSL_VERSION:-1.26.0}
+        RLM_TOOLS_BSL_VERSION: ${RLM_TOOLS_BSL_VERSION:-latest}
     image: mcp-bsl-rlm:${MCP_BSL_RLM_TAG:-latest}
 
     container_name: ${MCP_CONTAINER_NAME:-mcp-bsl-rlm}

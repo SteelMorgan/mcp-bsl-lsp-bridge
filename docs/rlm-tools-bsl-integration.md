@@ -4,10 +4,10 @@ This repository integrates upstream `Dach-Coin/rlm-tools-bsl` as a runtime depen
 
 ## Borrowing Boundary
 
-Pinned upstream package:
+Upstream package:
 
 - Docker build arg: `RLM_TOOLS_BSL_VERSION`
-- Default version: `1.26.0`
+- Default version: `latest` (resolved from PyPI at image build time)
 - Installed into `/opt/rlm-tools-bsl` Python venv
 - Runtime binaries used:
   - `rlm-tools-bsl`
@@ -21,7 +21,7 @@ Local code owns only:
 - file watcher integration that schedules `rlm-bsl-index index build/update`;
 - operational defaults in `docker-compose*.yml`.
 
-Local code must not copy or modify upstream Python helpers, parsers, sandbox code, index schema, or business recipes. When upstream changes those internals, update `RLM_TOOLS_BSL_VERSION` and test behavior through the public tools.
+Local code must not copy or modify upstream Python helpers, parsers, sandbox code, index schema, or business recipes. When upstream changes those internals, rebuild with `RLM_TOOLS_BSL_VERSION=latest` or pin a tested version explicitly, then test behavior through the public tools.
 
 ## Runtime Processes
 
@@ -132,7 +132,7 @@ Overlap is intentional but not a hard conflict:
 
 ## Updating Upstream
 
-1. Change `RLM_TOOLS_BSL_VERSION`.
+1. Set `RLM_TOOLS_BSL_VERSION=latest` or pin a specific tested version.
 2. Rebuild the image.
 3. Verify `rlm-tools-bsl /health`.
 4. Verify proxied MCP calls: `rlm_help`, `rlm_projects(action=list)`, `rlm_index(action=info, path=...)`.
