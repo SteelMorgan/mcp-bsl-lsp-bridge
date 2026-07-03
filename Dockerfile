@@ -17,19 +17,15 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/lsp-session
 
 
 # === Separate stage for BSL LS download (cached independently) ===
-FROM debian:bookworm-slim AS bsl-ls-downloader
+FROM debian:trixie-slim AS bsl-ls-downloader
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends wget ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# Download BSL Language Server from GitHub releases
-# Pinned to 1.0.0-rc.1: this release advertises completionProvider/signatureHelpProvider
-# (0.29.0 / GitHub "latest" stable did NOT, which made completion/signature_help throw
-# UnsupportedOperationException and poison the session). The non-"latest" branch builds
-# the URL as .../releases/download/v${VERSION}/bsl-language-server-${VERSION}-exec.jar,
-# which matches the v1.0.0-rc.1 pre-release asset name.
-ARG BSL_LS_VERSION=1.0.0-rc.1
+# Download BSL Language Server from GitHub releases. "latest" follows the newest
+# stable release; explicit versions keep reproducible builds when needed.
+ARG BSL_LS_VERSION=latest
 RUN mkdir -p /opt/bsl-ls \
   && if [ "$BSL_LS_VERSION" = "latest" ]; then \
        BSL_LS_URL=$(wget -qO- https://api.github.com/repos/1c-syntax/bsl-language-server/releases/latest | grep -o '"browser_download_url": *"[^"]*-exec.jar"' | head -1 | cut -d'"' -f4); \
@@ -42,21 +38,13 @@ RUN mkdir -p /opt/bsl-ls \
 
 
 # === Final stage ===
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Install xz-utils first for unpacking s6-overlay, then other packages.
 # Also install locales for UTF-8 support (critical for Cyrillic filenames and content).
-#
-# Java 21: BSL Language Server v1.0+ requires JDK 21 (bookworm only ships JDK 17),
-# so we pull Eclipse Temurin 21 from the Adoptium APT repository.
 ARG RLM_TOOLS_BSL_VERSION=latest
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget gnupg python3 python3-venv git \
-  && mkdir -p /etc/apt/keyrings \
-  && wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg \
-  && echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" > /etc/apt/sources.list.d/adoptium.list \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends temurin-21-jre \
+  && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget python3 python3-venv git openjdk-21-jre-headless \
   && rm -rf /var/lib/apt/lists/* \
   && sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen \
   && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
