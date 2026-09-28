@@ -68,7 +68,7 @@ func SetupMCPServer(bridge interfaces.BridgeInterface) *server.MCPServer {
 	})
 
 	mcpServer := server.NewMCPServer(
-		"mcp-lsp-bridge",
+		"mcp-bsl-rlm",
 		"1.0.0",
 		server.WithToolCapabilities(true),
 		server.WithLogging(),
@@ -90,6 +90,28 @@ The bridge offers robust tools for:
     *   **Formatting**: Standardize code style.
     *   **Navigation**: Trace implementations and function call hierarchies.
 4.  **Resource Management**: Disconnect language servers when analysis is complete.
+
+## 1C/BSL Project Discovery
+For 1C/BSL codebases, use the rlm-tools-bsl capability whenever the task requires
+discovering project-wide context, even if the user did not explicitly ask to search.
+Start with rlm_start, then use rlm_execute for batched helper calls. Pass domains
+to rlm_start (keys: документ, структура, код, связи, расширения, поиск, весь каталог;
+[] = core helpers only): поиск/код to find an implementation, код for callers,
+связи/структура for impact of an object change, документ for posting and register
+movements. When omitted, the bridge sends its default (поиск, код). Load more
+domains later with rlm_execute(domains=[...]); rlm_help is optional, not a required
+first step. Helper contracts: find_attributes/find_predefined take the exact object
+name (not a substring) and find_common_modules returns a page (total may exceed the
+returned list). This applies
+before using broad filesystem search/read tools such as Claude Code Grep, Glob,
+Read over many files, shell rg/grep/find, or manual recursive file reads.
+
+Use rlm_start before those raw tools when you need to understand or locate BSL
+modules, procedures, functions, metadata objects, references/usages, call paths,
+forms, rights, queries, XML/MDO content, extensions, or business mechanisms across
+the 1C project. Use BSL LS tools first only for cursor-position operations such as
+hover, definition, signature help, completion, diagnostics, code actions, rename,
+semantic tokens, complexity, or call hierarchy from a known uri/line/character.
 
 ## Multi-Language Support
 The bridge automatically detects file types and connects to appropriate language servers. It supports fallback mechanisms and provides actionable error messages.`),

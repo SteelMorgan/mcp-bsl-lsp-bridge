@@ -62,8 +62,8 @@ MCP-сервер, который даёт ИИ-агентам (Cursor, Claude Co
 ### 1. Клонируй репозиторий
 
 ```bash
-git clone https://github.com/SteelMorgan/mcp-bsl-lsp-bridge.git
-cd mcp-bsl-lsp-bridge
+git clone https://github.com/SteelMorgan/mcp-bsl-lsp-bridge.git mcp-bsl-rlm
+cd mcp-bsl-rlm
 ```
 
 ### 2. Настрой окружение
@@ -130,7 +130,7 @@ docker compose -f docker-compose.sandbox-volume.yml build
 docker compose -f docker-compose.sandbox-volume.yml up -d
 ```
 
-Имя контейнера: `${MCP_CONTAINER_PREFIX}-${MCP_PROJECT_NAME}` (например `mcp-lsp-demo`)
+Имя контейнера: `${MCP_CONTAINER_PREFIX}-${MCP_PROJECT_NAME}` (по умолчанию `1c-dev-mcp-bsl-rlm`)
 
 ### 4. Подключи MCP в IDE
 
@@ -145,7 +145,7 @@ docker compose -f docker-compose.sandbox-volume.yml up -d
       "args": [
         "exec",
         "-i",
-        "mcp-lsp-demo",
+        "1c-dev-mcp-bsl-rlm",
         "mcp-lsp-bridge"
       ],
       "env": {}
@@ -154,7 +154,7 @@ docker compose -f docker-compose.sandbox-volume.yml up -d
 }
 ```
 
-Замени `mcp-lsp-demo` на реальное имя контейнера.
+Замени `1c-dev-mcp-bsl-rlm` на реальное имя контейнера, если переопределял `.env`.
 
 ### 5. Проверь подключение
 

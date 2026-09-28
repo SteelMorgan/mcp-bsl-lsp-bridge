@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"rockerboo/mcp-lsp-bridge/interfaces"
 	"rockerboo/mcp-lsp-bridge/logger"
@@ -42,9 +43,76 @@ func FindPreciseCharacterPosition(bridge interfaces.BridgeInterface, uri string,
 		}
 	}
 
-	// If no semantic token found, try to find the symbol name in nearby positions
+	// No semantic token: some servers (e.g. BSL LS for method declarations) report
+	// the symbol location at the start of the declaration line, on a keyword.
+	// Look for the name in the line text itself.
+	if ch, ok := findNameInLine(uri, line, symbolName); ok {
+		logger.Debug(fmt.Sprintf("Found position for %s in line text: char %d -> %d", symbolName, approxCharacter, ch))
+		return ch
+	}
+
 	logger.Debug(fmt.Sprintf("No semantic token found for %s, using approximate position %d", symbolName, approxCharacter))
 	return approxCharacter
+}
+
+// findNameInLine returns the UTF-16 offset of symbolName in the given line of
+// the file behind uri. An exact match wins; otherwise a case-insensitive one
+// (BSL identifiers are case-insensitive). Matches must be whole identifiers.
+func findNameInLine(uri string, line uint32, symbolName string) (uint32, bool) {
+	if symbolName == "" {
+		return 0, false
+	}
+	data, err := os.ReadFile(utils.URIToFilePath(uri))
+	if err != nil {
+		return 0, false
+	}
+	text := strings.TrimPrefix(string(data), "\ufeff")
+	lines := strings.Split(text, "\n")
+	if int(line) >= len(lines) {
+		return 0, false
+	}
+	lineRunes := []rune(strings.TrimRight(lines[line], "\r"))
+	nameRunes := []rune(symbolName)
+	lowerLine := []rune(strings.ToLower(string(lineRunes)))
+	lowerName := []rune(strings.ToLower(symbolName))
+	for _, exact := range []bool{true, false} {
+		hay, needle := lineRunes, nameRunes
+		if !exact {
+			hay, needle = lowerLine, lowerName
+		}
+		if len(hay) != len(lineRunes) {
+			continue // case folding changed rune count; skip unsafe mapping
+		}
+		for i := 0; i+len(needle) <= len(hay); i++ {
+			if string(hay[i:i+len(needle)]) != string(needle) {
+				continue
+			}
+			if i > 0 && isIdentRune(hay[i-1]) {
+				continue
+			}
+			if end := i + len(needle); end < len(hay) && isIdentRune(hay[end]) {
+				continue
+			}
+			return utf16Len(lineRunes[:i]), true
+		}
+	}
+	return 0, false
+}
+
+func isIdentRune(r rune) bool {
+	return r == '_' || unicode.IsLetter(r) || unicode.IsDigit(r)
+}
+
+func utf16Len(rs []rune) uint32 {
+	var n uint32
+	for _, r := range rs {
+		if r >= 0x10000 {
+			n += 2
+		} else {
+			n++
+		}
+	}
+	return n
 }
 
 // safeUint32 safely converts an int to uint32, checking for overflow

@@ -31,16 +31,16 @@ cp env.example .env
 
 | Параметр | Описание | Пример |
 |----------|----------|--------|
-| `MCP_PROJECT_NAME` | Уникальный ID проекта | `my-project` |
+| `MCP_PROJECT_NAME` | Уникальный ID проекта | `mcp-bsl-rlm` |
 | `HOST_PROJECTS_ROOT` | Путь к коду 1С на хосте | `D:/Projects/1C/MyConfig` |
 | `WORKSPACE_ROOT` | Путь внутри контейнера | `/projects` |
 
 **Пример .env:**
 
 ```env
-MCP_PROJECT_NAME=my-project
-MCP_CONTAINER_PREFIX=mcp-lsp
-MCP_LSP_BRIDGE_TAG=latest
+MCP_CONTAINER_PREFIX=1c-dev
+MCP_PROJECT_NAME=mcp-bsl-rlm
+MCP_BSL_RLM_TAG=latest
 
 HOST_PROJECTS_ROOT=D:/Projects/1C/MyConfig
 PROJECTS_ROOT=/projects
@@ -67,19 +67,19 @@ docker compose ps
 ```
 
 **Имя контейнера** формируется как: `${MCP_CONTAINER_PREFIX}-${MCP_PROJECT_NAME}`
-Например: `mcp-lsp-my-project`
+Например: `1c-dev-mcp-bsl-rlm`
 
 ### 1.4 Проверка работоспособности
 
 ```bash
 # Проверить что контейнер запущен
-docker ps | grep mcp-lsp
+docker ps | grep mcp-bsl-rlm
 
 # Проверить health (BSL LS готов)
-docker inspect --format='{{.State.Health.Status}}' mcp-lsp-my-project
+docker inspect --format='{{.State.Health.Status}}' 1c-dev-mcp-bsl-rlm
 
 # Тест MCP bridge
-docker exec -i mcp-lsp-my-project mcp-lsp-bridge --help
+docker exec -i 1c-dev-mcp-bsl-rlm mcp-lsp-bridge --help
 ```
 
 Ожидаемый health status: `healthy` (может занять 1-2 минуты при первом запуске).
@@ -97,7 +97,7 @@ docker exec -i mcp-lsp-my-project mcp-lsp-bridge --help
       "args": [
         "exec",
         "-i",
-        "mcp-lsp-my-project",
+        "1c-dev-mcp-bsl-rlm",
         "mcp-lsp-bridge"
       ],
       "env": {}
@@ -106,7 +106,7 @@ docker exec -i mcp-lsp-my-project mcp-lsp-bridge --help
 }
 ```
 
-**Важно**: Замени `mcp-lsp-my-project` на реальное имя контейнера из `.env`.
+**Важно**: Замени `1c-dev-mcp-bsl-rlm` на реальное имя контейнера из `.env`.
 
 ### 1.6 Проверка подключения MCP
 

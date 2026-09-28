@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "rlm-tools-bsl service stopped with exit code ${1:-unknown}"

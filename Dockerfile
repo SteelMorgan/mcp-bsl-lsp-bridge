@@ -17,19 +17,15 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o /out/lsp-session
 
 
 # === Separate stage for BSL LS download (cached independently) ===
-FROM debian:bookworm-slim AS bsl-ls-downloader
+FROM debian:trixie-slim AS bsl-ls-downloader
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends wget ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# Download BSL Language Server from GitHub releases
-# Pinned to 1.0.0-rc.1: this release advertises completionProvider/signatureHelpProvider
-# (0.29.0 / GitHub "latest" stable did NOT, which made completion/signature_help throw
-# UnsupportedOperationException and poison the session). The non-"latest" branch builds
-# the URL as .../releases/download/v${VERSION}/bsl-language-server-${VERSION}-exec.jar,
-# which matches the v1.0.0-rc.1 pre-release asset name.
-ARG BSL_LS_VERSION=1.0.0-rc.1
+# Download BSL Language Server from GitHub releases. Pinned to a tested version
+# for reproducible builds; "latest" (newest stable release) is opt-in only.
+ARG BSL_LS_VERSION=1.0.7
 RUN mkdir -p /opt/bsl-ls \
   && if [ "$BSL_LS_VERSION" = "latest" ]; then \
        BSL_LS_URL=$(wget -qO- https://api.github.com/repos/1c-syntax/bsl-language-server/releases/latest | grep -o '"browser_download_url": *"[^"]*-exec.jar"' | head -1 | cut -d'"' -f4); \
@@ -42,24 +38,28 @@ RUN mkdir -p /opt/bsl-ls \
 
 
 # === Final stage ===
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 # Install xz-utils first for unpacking s6-overlay, then other packages.
 # Also install locales for UTF-8 support (critical for Cyrillic filenames and content).
-#
-# Java 21: BSL Language Server v1.0+ requires JDK 21 (bookworm only ships JDK 17),
-# so we pull Eclipse Temurin 21 from the Adoptium APT repository.
+ARG RLM_TOOLS_BSL_VERSION=1.41.0
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget gnupg \
-  && mkdir -p /etc/apt/keyrings \
-  && wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg \
-  && echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/deb bookworm main" > /etc/apt/sources.list.d/adoptium.list \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends temurin-21-jre \
+  && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget python3 python3-venv git openjdk-21-jre-headless \
   && rm -rf /var/lib/apt/lists/* \
   && sed -i '/ru_RU.UTF-8/s/^# //g' /etc/locale.gen \
   && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
   && locale-gen
+
+# Install upstream rlm-tools-bsl as a runtime package. Pinned to a tested version:
+# upstream releases change the MCP contract (e.g. 1.41.0 requires rlm_start.domains),
+# so "latest" (PyPI at build time) is opt-in only.
+RUN python3 -m venv /opt/rlm-tools-bsl \
+  && /opt/rlm-tools-bsl/bin/pip install --no-cache-dir --upgrade pip \
+  && if [ "$RLM_TOOLS_BSL_VERSION" = "latest" ]; then \
+       /opt/rlm-tools-bsl/bin/pip install --no-cache-dir rlm-tools-bsl; \
+     else \
+       /opt/rlm-tools-bsl/bin/pip install --no-cache-dir "rlm-tools-bsl==${RLM_TOOLS_BSL_VERSION}"; \
+     fi
 
 # Install s6-overlay for process supervision
 ARG S6_OVERLAY_VERSION=3.1.6.2
@@ -86,6 +86,7 @@ RUN java -jar /opt/bsl-ls/bsl-language-server.jar --version 2>/dev/null | grep -
 
 # Default locations used by the bridge
 RUN mkdir -p /home/user/.config/mcp-lsp-bridge /home/user/.local/share/mcp-lsp-bridge/logs \
+    /home/user/.config/rlm-tools-bsl/logs /home/user/.cache/rlm-tools-bsl \
   && chown -R user:user /home/user/.config /home/user/.local
 
 COPY docker/lsp_config.json /home/user/.config/mcp-lsp-bridge/lsp_config.json
@@ -122,6 +123,11 @@ RUN find /etc/s6-overlay/s6-rc.d -type f -exec sed -i 's/\r$//' {} \; \
 ENV S6_KEEP_ENV=1
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2
 ENV S6_CMD_WAIT_FOR_SERVICES_MAXTIME=0
+ENV PATH="/opt/rlm-tools-bsl/bin:${PATH}"
+ENV RLM_TRANSPORT=streamable-http
+ENV RLM_HOST=127.0.0.1
+ENV RLM_PORT=9000
+ENV RLM_MCP_URL=http://127.0.0.1:9000/mcp
 
 # UTF-8 locale for Cyrillic support
 ENV LANG=ru_RU.UTF-8

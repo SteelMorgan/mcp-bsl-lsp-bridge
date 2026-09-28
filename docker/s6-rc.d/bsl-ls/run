@@ -17,6 +17,9 @@ mkdir -p /home/user/.local/share/mcp-lsp-bridge/logs
 # State file for multi-project mode (persists the last-used project across restarts).
 STATE_PATH="${MCP_STATE_PATH:-/var/lib/mcp-lsp-bridge/state.json}"
 mkdir -p "$(dirname "$STATE_PATH")" 2>/dev/null || true
+RLM_INDEX_DIR="${RLM_INDEX_DIR:-/var/lib/mcp-lsp-bridge/rlm-index}"
+mkdir -p "$RLM_INDEX_DIR" 2>/dev/null || true
+chown -R user:user "$(dirname "$STATE_PATH")" "$RLM_INDEX_DIR" 2>/dev/null || true
 
 # --- Global BSL LS configuration -------------------------------------------
 # We DO NOT pass `-c` anymore (it was the single-project flag). `-c` maps to BSL LS
@@ -73,7 +76,7 @@ cat "$GLOBAL_CFG"
 # -Dapp.globalConfiguration.path pins the generated global config deterministically
 # (a Spring Boot system property overrides the ${user.home} default in
 # application.properties).
-exec /usr/bin/lsp-session-manager \
+exec s6-setuidgid user /usr/bin/lsp-session-manager \
     --port="${BSL_LS_PORT:-9999}" \
     --workspace="${WORKSPACE_ROOT:-/projects}" \
     --state="${STATE_PATH}" \

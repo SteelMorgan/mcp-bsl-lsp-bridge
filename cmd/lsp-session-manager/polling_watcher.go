@@ -28,7 +28,7 @@ const (
 // PollingWatcher отслеживает изменения файлов через периодическое сканирование
 type PollingWatcher struct {
 	workspaceDir   string
-	extensions     []string // ".bsl", ".os"
+	extensions     []string
 	interval       time.Duration
 	workers        int
 	sendNotifyFunc func(changes []FileChange) error
@@ -50,7 +50,7 @@ type FileChange struct {
 func NewPollingWatcher(workspaceDir string, interval time.Duration, workers int, notifyFunc func([]FileChange) error, isIndexingFunc func() bool) *PollingWatcher {
 	return &PollingWatcher{
 		workspaceDir:   workspaceDir,
-		extensions:     []string{".bsl", ".os"},
+		extensions:     watchedSourceExtensions(),
 		interval:       interval,
 		workers:        workers,
 		sendNotifyFunc: notifyFunc,

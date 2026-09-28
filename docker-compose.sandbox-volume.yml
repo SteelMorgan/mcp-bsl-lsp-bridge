@@ -1,19 +1,23 @@
-name: mcp-bsl-lsp
+name: 1c-dev
 
 services:
-  mcp-lsp:
+  mcp-bsl-rlm:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        # BSL LS version: "latest" for newest, or specific like "0.28.1"
-        BSL_LS_VERSION: ${BSL_LS_VERSION:-latest}
-    image: mcp-lsp-bridge-bsl:${MCP_LSP_BRIDGE_TAG:-latest}
+        # BSL LS >= 1.0 requires Java 21 and advertises completion/signature providers.
+        # Versions are pinned; "latest" is opt-in and resolved at build time.
+        BSL_LS_VERSION: ${BSL_LS_VERSION:-1.0.7}
+        RLM_TOOLS_BSL_VERSION: ${RLM_TOOLS_BSL_VERSION:-1.41.0}
+    image: mcp-bsl-rlm:${MCP_BSL_RLM_TAG:-latest}
 
-    container_name: ${MCP_CONTAINER_PREFIX:-mcp-lsp}-${MCP_PROJECT_NAME:-bridge}
+    container_name: ${MCP_CONTAINER_NAME:-mcp-bsl-rlm}
     restart: unless-stopped
 
     mem_limit: ${CONTAINER_MEMORY:-7g}
+    # Total (RAM+swap) ceiling. 9g => ~2g swap cushion for BSL LS bursts.
+    memswap_limit: ${CONTAINER_MEMSWAP:-9g}
     cpus: ${CONTAINER_CPUS:-16}
 
     environment:
@@ -42,10 +46,23 @@ services:
       FILE_WATCHER_MODE: ${FILE_WATCHER_MODE:-polling}
       FILE_WATCHER_INTERVAL: ${FILE_WATCHER_INTERVAL:-30s}
       FILE_WATCHER_WORKERS: ${FILE_WATCHER_WORKERS:-4}
+      # RLM static index/search layer.
+      RLM_TOOLS_ENABLED: ${RLM_TOOLS_ENABLED:-1}
+      RLM_HOST: ${RLM_HOST:-127.0.0.1}
+      RLM_PORT: ${RLM_PORT:-9000}
+      RLM_MCP_URL: ${RLM_MCP_URL:-http://127.0.0.1:9000/mcp}
+      RLM_INDEX_ENABLED: ${RLM_INDEX_ENABLED:-1}
+      RLM_INDEX_BUILD_ON_START: ${RLM_INDEX_BUILD_ON_START:-1}
+      RLM_INDEX_UPDATE_ON_CHANGE: ${RLM_INDEX_UPDATE_ON_CHANGE:-1}
+      RLM_INDEX_DEBOUNCE: ${RLM_INDEX_DEBOUNCE:-10s}
+      RLM_INDEX_TIMEOUT: ${RLM_INDEX_TIMEOUT:-30m}
+      RLM_INDEX_DIR: ${RLM_INDEX_DIR:-/var/lib/mcp-lsp-bridge/rlm-index}
+      # rlm_start domains sent by the bridge when a client omits them (rlm-tools-bsl >= 1.41).
+      RLM_DEFAULT_DOMAINS: ${RLM_DEFAULT_DOMAINS:-поиск,код}
 
     volumes:
       - "projects-code:${PROJECTS_ROOT:-/workspaces/work}:${PROJECTS_MOUNT_MODE:-rw}"
-      # Persistent state for multi-project mode (last-used project + active list).
+      # Persistent state for multi-project mode and RLM indexes.
       - "mcp-state:/var/lib/mcp-lsp-bridge"
       # BSL LS is now bundled in the image (downloaded during build)
       # Uncomment below to override with a local version:
