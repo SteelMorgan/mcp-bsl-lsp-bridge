@@ -94,7 +94,15 @@ The bridge offers robust tools for:
 ## 1C/BSL Project Discovery
 For 1C/BSL codebases, use the rlm-tools-bsl capability whenever the task requires
 discovering project-wide context, even if the user did not explicitly ask to search.
-Start with rlm_start, then use rlm_execute for batched helper calls. This applies
+Start with rlm_start, then use rlm_execute for batched helper calls. Pass domains
+to rlm_start (keys: документ, структура, код, связи, расширения, поиск, весь каталог;
+[] = core helpers only): поиск/код to find an implementation, код for callers,
+связи/структура for impact of an object change, документ for posting and register
+movements. When omitted, the bridge sends its default (поиск, код). Load more
+domains later with rlm_execute(domains=[...]); rlm_help is optional, not a required
+first step. Helper contracts: find_attributes/find_predefined take the exact object
+name (not a substring) and find_common_modules returns a page (total may exceed the
+returned list). This applies
 before using broad filesystem search/read tools such as Claude Code Grep, Glob,
 Read over many files, shell rg/grep/find, or manual recursive file reads.
 

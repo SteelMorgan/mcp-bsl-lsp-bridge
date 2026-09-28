@@ -217,11 +217,65 @@ func parseStringList(raw string) []string {
 	return out
 }
 
+// rlmDomainKeys - перечень доменов хелперов rlm-tools-bsl (>= 1.41.0).
+const rlmDomainKeys = "документ, структура, код, связи, расширения, поиск, весь каталог"
+
+// rlmDefaultDomains - домены, которые мост подставляет в rlm_start, если клиент
+// их не передал. С 1.41.0 upstream отказывает в старте BSL-сессии без domains,
+// а старые клиенты/инструкции параметр не знают; "поиск" + "код" покрывают
+// типовой сценарий "найти и прочитать реализацию". Переопределяется
+// RLM_DEFAULT_DOMAINS (через запятую или JSON-массив; "[]" - только ядро).
+func rlmDefaultDomains() []string {
+	if raw, ok := os.LookupEnv("RLM_DEFAULT_DOMAINS"); ok {
+		if list := parseStringList(raw); list != nil {
+			return list
+		}
+		if strings.TrimSpace(raw) == "" {
+			return []string{}
+		}
+	}
+	return []string{"поиск", "код"}
+}
+
+// rlmDomainsArg извлекает список доменов из аргумента: принимает JSON-массив,
+// строку с JSON-массивом или перечисление через запятую. Второй результат -
+// был ли аргумент передан вообще (пустой список [] - это осознанный выбор
+// "только ядро", его нужно пробросить, а не заменить дефолтом).
+func rlmDomainsArg(request mcp.CallToolRequest, name string) ([]string, bool) {
+	raw, ok := request.GetArguments()[name]
+	if !ok || raw == nil {
+		return nil, false
+	}
+	switch v := raw.(type) {
+	case []interface{}:
+		out := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				out = append(out, strings.TrimSpace(s))
+			}
+		}
+		return out, true
+	case []string:
+		return v, true
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return nil, false
+		}
+		list := parseStringList(v)
+		if list == nil {
+			list = []string{}
+		}
+		return list, true
+	}
+	return nil, false
+}
+
 func RLMStartTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("rlm_start",
 			mcp.WithDescription("Open an upstream rlm-tools-bsl search/navigation session over a 1C/BSL codebase. Use this whenever you need to discover project-wide 1C context for the task, even if the user did not explicitly ask to search. Prefer rlm_start before Claude Code Grep/Glob/broad Read, shell rg/grep/find, or manual recursive file reads for BSL modules, metadata objects, methods, references/usages, call paths, forms, rights, queries, XML/MDO content, extensions, business mechanisms and full-text search."),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("query", mcp.Description("What you want to find or analyze in the BSL codebase."), mcp.Required()),
+			mcp.WithArray("domains", mcp.WithStringItems(), mcp.Description("Helper domains to load for a BSL project (rlm-tools-bsl >= 1.41 requires a choice in slim mode). Keys: "+rlmDomainKeys+". [] = core only (one module/procedure); 1 domain = narrow question; 2 = junction of two domains; [\"весь каталог\"] = full end-to-end analysis. Guide: find implementation/text -> поиск, код; who calls a method -> код; where an object is used, rights, integration -> связи; attributes, tabular sections, forms, enums -> структура; posting, register movements, subscriptions, print forms -> документ; extension interceptors -> расширения. Omitted -> bridge default (RLM_DEFAULT_DOMAINS, built-in: поиск, код). More domains can be loaded later via rlm_execute(domains=...).")),
 			mcp.WithString("path", mcp.Description("Path to a 1C configuration root or parent directory. Host paths and paths relative to the mounted project root are converted to container paths before starting RLM.")),
 			mcp.WithString("project", mcp.Description("Project name from the RLM registry.")),
 			mcp.WithString("effort", mcp.Description("Analysis depth: auto, low, medium, high, max.")),
@@ -236,6 +290,11 @@ func RLMStartTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandl
 				return mcp.NewToolResultError(err.Error()), nil
 			}
 			args := map[string]interface{}{"query": query}
+			if domains, ok := rlmDomainsArg(request, "domains"); ok {
+				args["domains"] = domains
+			} else {
+				args["domains"] = rlmDefaultDomains()
+			}
 			if err := addIfProjectPath(args, request, "path", bridge); err != nil {
 				return mcp.NewToolResultError(err.Error()), nil
 			}
@@ -252,12 +311,13 @@ func RLMStartTool(bridge interfaces.BridgeInterface) (mcp.Tool, server.ToolHandl
 
 func RLMExecuteTool(_ interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("rlm_execute",
-			mcp.WithDescription("Execute Python helper code inside an RLM session. Batch related discovery work here instead of making many Grep/Glob/Read or rg/grep/find calls across a 1C project. Use helper functions returned by rlm_start/rlm_help and print compact summaries."),
+			mcp.WithDescription("Execute Python helper code inside an RLM session. Batch related discovery work here instead of making many Grep/Glob/Read or rg/grep/find calls across a 1C project. Use helper functions returned by rlm_start (core + chosen domains) and print compact summaries. Any helper may be called by name; its signature arrives with the first response."),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("session_id", mcp.Description("Session ID from rlm_start."), mcp.Required()),
 			mcp.WithString("code", mcp.Description("Python code to execute in the RLM sandbox."), mcp.Required()),
 			mcp.WithString("detail_level", mcp.Description("compact, usage, or full.")),
 			mcp.WithNumber("max_new_variables", mcp.Description("When detail_level=full, cap returned new_variables list.")),
+			mcp.WithArray("domains", mcp.WithStringItems(), mcp.Description("Load extra helper domains into the session; their signatures arrive in this response. Keys: "+rlmDomainKeys+".")),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			sessionID, err := request.RequireString("session_id")
 			if err != nil {
@@ -270,6 +330,9 @@ func RLMExecuteTool(_ interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerF
 			args := map[string]interface{}{"session_id": sessionID, "code": code}
 			addIfString(args, request, "detail_level")
 			addIfInt(args, request, "max_new_variables")
+			if domains, ok := rlmDomainsArg(request, "domains"); ok && len(domains) > 0 {
+				args["domains"] = domains
+			}
 			return callRLMTool(ctx, "rlm_execute", args)
 		}
 }
@@ -290,7 +353,7 @@ func RLMEndTool(_ interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc)
 
 func RLMHelpTool(_ interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc) {
 	return mcp.NewTool("rlm_help",
-			mcp.WithDescription("Get upstream rlm-tools-bsl recipes, helper details, categories and strategy sections."),
+			mcp.WithDescription("Optional on-demand help from upstream rlm-tools-bsl: topic recipes, helper contracts, helper domains, categories and strategy sections. Not required before rlm_execute: signatures of helpers arrive with rlm_start/rlm_execute responses."),
 			mcp.WithDestructiveHintAnnotation(false),
 			mcp.WithString("topic", mcp.Description("Business domain or alias to fetch a recipe for.")),
 			mcp.WithString("helpers", mcp.Description("Comma-separated helper names or JSON string array.")),
@@ -298,8 +361,12 @@ func RLMHelpTool(_ interfaces.BridgeInterface) (mcp.Tool, server.ToolHandlerFunc
 			mcp.WithString("section", mcp.Description("workflow, disambiguation, performance, batching, io, critical.")),
 			mcp.WithString("format", mcp.Description("compact or full.")),
 			mcp.WithBoolean("include_code", mcp.Description("Include code_hint snippets.")),
+			mcp.WithArray("domain", mcp.WithStringItems(), mcp.Description("Helper domain(s) to describe (signatures without core; session is not changed). Keys: "+rlmDomainKeys+".")),
 		), func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			args := map[string]interface{}{}
+			if domains, ok := rlmDomainsArg(request, "domain"); ok && len(domains) > 0 {
+				args["domain"] = domains
+			}
 			addIfString(args, request, "topic")
 			if helpers := parseStringList(request.GetString("helpers", "")); len(helpers) > 0 {
 				args["helpers"] = helpers

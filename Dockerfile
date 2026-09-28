@@ -23,9 +23,9 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends wget ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
-# Download BSL Language Server from GitHub releases. "latest" follows the newest
-# stable release; explicit versions keep reproducible builds when needed.
-ARG BSL_LS_VERSION=latest
+# Download BSL Language Server from GitHub releases. Pinned to a tested version
+# for reproducible builds; "latest" (newest stable release) is opt-in only.
+ARG BSL_LS_VERSION=1.0.7
 RUN mkdir -p /opt/bsl-ls \
   && if [ "$BSL_LS_VERSION" = "latest" ]; then \
        BSL_LS_URL=$(wget -qO- https://api.github.com/repos/1c-syntax/bsl-language-server/releases/latest | grep -o '"browser_download_url": *"[^"]*-exec.jar"' | head -1 | cut -d'"' -f4); \
@@ -42,7 +42,7 @@ FROM debian:trixie-slim
 
 # Install xz-utils first for unpacking s6-overlay, then other packages.
 # Also install locales for UTF-8 support (critical for Cyrillic filenames and content).
-ARG RLM_TOOLS_BSL_VERSION=latest
+ARG RLM_TOOLS_BSL_VERSION=1.41.0
 RUN apt-get update \
   && apt-get install -y --no-install-recommends xz-utils ca-certificates procps netcat-openbsd locales wget python3 python3-venv git openjdk-21-jre-headless \
   && rm -rf /var/lib/apt/lists/* \
@@ -50,8 +50,9 @@ RUN apt-get update \
   && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
   && locale-gen
 
-# Install upstream rlm-tools-bsl as a runtime package. "latest" follows PyPI at
-# build time; explicit versions keep reproducible builds when needed.
+# Install upstream rlm-tools-bsl as a runtime package. Pinned to a tested version:
+# upstream releases change the MCP contract (e.g. 1.41.0 requires rlm_start.domains),
+# so "latest" (PyPI at build time) is opt-in only.
 RUN python3 -m venv /opt/rlm-tools-bsl \
   && /opt/rlm-tools-bsl/bin/pip install --no-cache-dir --upgrade pip \
   && if [ "$RLM_TOOLS_BSL_VERSION" = "latest" ]; then \

@@ -48,6 +48,8 @@ Proxy behavior:
 - sends `tools/call` JSON-RPC to the local upstream MCP endpoint;
 - accepts upstream SSE responses and returns text content to the caller;
 - does not reimplement upstream helper logic.
+- `rlm_start.domains` (array of helper domains, required upstream for BSL projects since rlm-tools-bsl 1.41.0): an explicit value, including `[]` (core only), is forwarded as is; when omitted the bridge sends `RLM_DEFAULT_DOMAINS` (built-in default `поиск, код`). Set `RLM_DEFAULT_DOMAINS=` (empty) to default to core only.
+- `rlm_execute.domains` loads extra domains into a session; `rlm_help.domain` describes domain helpers.
 
 If upstream adds a new MCP tool, add only a matching Go proxy declaration and forwarder argument mapping.
 
@@ -132,9 +134,10 @@ Overlap is intentional but not a hard conflict:
 
 ## Updating Upstream
 
-1. Set `RLM_TOOLS_BSL_VERSION=latest` or pin a specific tested version.
+1. Bump the pinned `RLM_TOOLS_BSL_VERSION` (Dockerfile default and compose) to a specific tested version; do not build with `latest`.
 2. Rebuild the image.
 3. Verify `rlm-tools-bsl /health`.
-4. Verify proxied MCP calls: `rlm_help`, `rlm_projects(action=list)`, `rlm_index(action=info, path=...)`.
+4. Verify proxied MCP calls: `rlm_help`, `rlm_projects(action=list)`, `rlm_index(action=info, path=...)`, `rlm_start(..., domains=[...])` -> `rlm_execute` -> `rlm_end`.
+   A version with a new index builder rebuilds the index on the first automatic update; wait for `RLM index: ... completed` in the logs.
 5. If upstream tool signatures changed, update only `mcpserver/tools/rlm_proxy.go` schemas and argument forwarding.
 6. Do not vendor upstream Python modules unless there is an explicit decision to maintain a fork.

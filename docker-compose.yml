@@ -7,9 +7,9 @@ services:
       dockerfile: Dockerfile
       args:
         # BSL LS >= 1.0 requires Java 21 and advertises completion/signature providers.
-        # "latest" is resolved from GitHub Releases at build time.
-        BSL_LS_VERSION: ${BSL_LS_VERSION:-latest}
-        RLM_TOOLS_BSL_VERSION: ${RLM_TOOLS_BSL_VERSION:-latest}
+        # Versions are pinned; "latest" is opt-in and resolved at build time.
+        BSL_LS_VERSION: ${BSL_LS_VERSION:-1.0.7}
+        RLM_TOOLS_BSL_VERSION: ${RLM_TOOLS_BSL_VERSION:-1.41.0}
     image: mcp-bsl-rlm:${MCP_BSL_RLM_TAG:-latest}
 
     container_name: ${MCP_CONTAINER_NAME:-mcp-bsl-rlm}
@@ -58,6 +58,8 @@ services:
       RLM_INDEX_DEBOUNCE: ${RLM_INDEX_DEBOUNCE:-10s}
       RLM_INDEX_TIMEOUT: ${RLM_INDEX_TIMEOUT:-30m}
       RLM_INDEX_DIR: ${RLM_INDEX_DIR:-/var/lib/mcp-lsp-bridge/rlm-index}
+      # rlm_start domains sent by the bridge when a client omits them (rlm-tools-bsl >= 1.41).
+      RLM_DEFAULT_DOMAINS: ${RLM_DEFAULT_DOMAINS:-поиск,код}
 
     volumes:
       # Mount the PARENT projects directory. In multi-project mode each child
