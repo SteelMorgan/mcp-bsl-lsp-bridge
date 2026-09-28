@@ -1,0 +1,83 @@
+name: 1c-dev
+
+services:
+  mcp-bsl-rlm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # BSL LS >= 1.0 requires Java 21 and advertises completion/signature providers.
+        # Versions are pinned; "latest" is opt-in and resolved at build time.
+        BSL_LS_VERSION: ${BSL_LS_VERSION:-1.0.7}
+        RLM_TOOLS_BSL_VERSION: ${RLM_TOOLS_BSL_VERSION:-1.41.0}
+    image: mcp-bsl-rlm:${MCP_BSL_RLM_TAG:-latest}
+
+    container_name: ${MCP_CONTAINER_NAME:-mcp-bsl-rlm}
+    restart: unless-stopped
+
+    mem_limit: ${CONTAINER_MEMORY:-7g}
+    # Total (RAM+swap) ceiling. 9g => ~2g swap cushion for BSL LS bursts.
+    memswap_limit: ${CONTAINER_MEMSWAP:-9g}
+    cpus: ${CONTAINER_CPUS:-16}
+
+    environment:
+      # Note: HOST_PROJECTS_ROOT is not used in this mode (named volume mount)
+      PROJECTS_ROOT: ${PROJECTS_ROOT:-/workspaces/work}
+      WORKSPACE_ROOT: ${WORKSPACE_ROOT:-/workspaces/work}
+      BSL_LS_PORT: ${BSL_LS_PORT:-9999}
+      MCP_LSP_BSL_JAVA_XMX: ${MCP_LSP_BSL_JAVA_XMX:-6g}
+      MCP_LSP_BSL_JAVA_XMS: ${MCP_LSP_BSL_JAVA_XMS:-2g}
+      MCP_LSP_LOG_LEVEL: ${MCP_LSP_LOG_LEVEL:-debug}
+      # Multi-project mode (see docs/configuration.md). Requires BSL LS >= 1.0.
+      # PROJECTS_ROOT must point at the PARENT holding projA/, projB/ … Default 0
+      # keeps single-project behavior.
+      MULTI_PROJECT: ${MULTI_PROJECT:-0}
+      MCP_STATE_PATH: ${MCP_STATE_PATH:-/var/lib/mcp-lsp-bridge/state.json}
+      # 1C platform context (syntax-helper .hbk -> platform globals/types for
+      # hover, completion, signature_help). BSL_PLATFORM_BIN is the IN-CONTAINER
+      # path to the platform 'bin' dir; set it together with the read-only mount
+      # in docker-compose.platform.yml. Empty (default) -> BSL LS auto-detects an
+      # installed platform (incl. Windows). See docs/configuration.md.
+      BSL_PLATFORM_BIN: ${BSL_PLATFORM_BIN:-}
+      BSL_PLATFORM_VERSION: ${BSL_PLATFORM_VERSION:-}
+      BSL_LANGUAGE: ${BSL_LANGUAGE:-ru}
+      # File watcher configuration
+      # Modes: off (manual tool only), polling (for Docker/Windows), fsnotify (Linux native), auto
+      FILE_WATCHER_MODE: ${FILE_WATCHER_MODE:-polling}
+      FILE_WATCHER_INTERVAL: ${FILE_WATCHER_INTERVAL:-30s}
+      FILE_WATCHER_WORKERS: ${FILE_WATCHER_WORKERS:-4}
+      # RLM static index/search layer.
+      RLM_TOOLS_ENABLED: ${RLM_TOOLS_ENABLED:-1}
+      RLM_HOST: ${RLM_HOST:-127.0.0.1}
+      RLM_PORT: ${RLM_PORT:-9000}
+      RLM_MCP_URL: ${RLM_MCP_URL:-http://127.0.0.1:9000/mcp}
+      RLM_INDEX_ENABLED: ${RLM_INDEX_ENABLED:-1}
+      RLM_INDEX_BUILD_ON_START: ${RLM_INDEX_BUILD_ON_START:-1}
+      RLM_INDEX_UPDATE_ON_CHANGE: ${RLM_INDEX_UPDATE_ON_CHANGE:-1}
+      RLM_INDEX_DEBOUNCE: ${RLM_INDEX_DEBOUNCE:-10s}
+      RLM_INDEX_TIMEOUT: ${RLM_INDEX_TIMEOUT:-30m}
+      RLM_INDEX_DIR: ${RLM_INDEX_DIR:-/var/lib/mcp-lsp-bridge/rlm-index}
+      # rlm_start domains sent by the bridge when a client omits them (rlm-tools-bsl >= 1.41).
+      RLM_DEFAULT_DOMAINS: ${RLM_DEFAULT_DOMAINS:-поиск,код}
+
+    volumes:
+      - "projects-code:${PROJECTS_ROOT:-/workspaces/work}:${PROJECTS_MOUNT_MODE:-rw}"
+      # Persistent state for multi-project mode and RLM indexes.
+      - "mcp-state:/var/lib/mcp-lsp-bridge"
+      # BSL LS is now bundled in the image (downloaded during build)
+      # Uncomment below to override with a local version:
+      # - "${BSL_LS_HOST_DIR}:/opt/bsl-ls:ro"
+
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nc -z localhost ${BSL_LS_PORT:-9999}"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+
+volumes:
+  projects-code:
+    external: true
+    name: ${PROJECTS_VOLUME_NAME:-agent-work-sandbox-1c}
+  # Persistent multi-project state (survives stop/start and rm/recreate).
+  mcp-state:
